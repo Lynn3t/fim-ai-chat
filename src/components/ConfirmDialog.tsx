@@ -1,0 +1,154 @@
+'use client';
+
+import { useState } from 'react';
+
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  type?: 'danger' | 'warning' | 'info';
+}
+
+export function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  onConfirm,
+  onCancel,
+  type = 'info'
+}: ConfirmDialogProps) {
+  if (!isOpen) return null;
+
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'danger':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'warning':
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      default:
+        return 'text-blue-600 bg-blue-50 border-blue-200';
+    }
+  };
+
+  const getConfirmButtonStyles = () => {
+    switch (type) {
+      case 'danger':
+        return 'bg-red-600 hover:bg-red-700';
+      case 'warning':
+        return 'bg-yellow-600 hover:bg-yellow-700';
+      default:
+        return 'bg-blue-600 hover:bg-blue-700';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 背景遮罩 */}
+      <div 
+        className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+        onClick={onCancel}
+      />
+      
+      {/* 对话框 */}
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+        <div className="p-6">
+          {/* 标题 */}
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {title}
+          </h3>
+          
+          {/* 消息 */}
+          <div className={`p-4 rounded-lg border ${getTypeStyles()} mb-6`}>
+            <p className="text-sm">{message}</p>
+          </div>
+          
+          {/* 按钮 */}
+          <div className="flex space-x-3 justify-end">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              {cancelText}
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${getConfirmButtonStyles()}`}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Hook for managing confirm dialogs
+export function useConfirm() {
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const confirm = (
+    title: string,
+    message: string,
+    options?: {
+      confirmText?: string;
+      cancelText?: string;
+      type?: 'danger' | 'warning' | 'info';
+    }
+  ): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setDialog({
+        isOpen: true,
+        title,
+        message,
+        ...options,
+        onConfirm: () => {
+          setDialog(prev => ({ ...prev, isOpen: false }));
+          resolve(true);
+        }
+      });
+    });
+  };
+
+  const handleCancel = () => {
+    setDialog(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleConfirm = () => {
+    dialog.onConfirm?.();
+  };
+
+  return {
+    confirm,
+    ConfirmDialog: () => (
+      <ConfirmDialog
+        isOpen={dialog.isOpen}
+        title={dialog.title}
+        message={dialog.message}
+        confirmText={dialog.confirmText}
+        cancelText={dialog.cancelText}
+        type={dialog.type}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    )
+  };
+}
