@@ -1,0 +1,265 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { checkUserPermission } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const adminUserId = searchParams.get('adminUserId')
+
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'adminUserId is required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 获取所有模型
+    const models = await prisma.model.findMany({
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+          },
+        },
+      },
+      orderBy: [
+        { provider: { name: 'asc' } },
+        { order: 'asc' },
+        { name: 'asc' },
+      ],
+    })
+
+    return NextResponse.json(models)
+
+  } catch (error) {
+    console.error('Error fetching models:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch models' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, modelId, isEnabled, ...updateData } = data
+
+    if (!adminUserId || !modelId) {
+      return NextResponse.json(
+        { error: 'adminUserId and modelId are required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 检查模型是否存在
+    const model = await prisma.model.findUnique({
+      where: { id: modelId }
+    })
+
+    if (!model) {
+      return NextResponse.json(
+        { error: 'Model not found' },
+        { status: 404 }
+      )
+    }
+
+    // 更新模型
+    const updatedModel = await prisma.model.update({
+      where: { id: modelId },
+      data: {
+        isEnabled: isEnabled !== undefined ? isEnabled : model.isEnabled,
+        ...updateData,
+      },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(updatedModel)
+
+  } catch (error) {
+    console.error('Error updating model:', error)
+    return NextResponse.json(
+      { error: 'Failed to update model' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, providerId, modelId, name, description, group, ...modelData } = data
+
+    if (!adminUserId || !providerId || !modelId || !name) {
+      return NextResponse.json(
+        { error: 'adminUserId, providerId, modelId, and name are required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 检查提供商是否存在
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId }
+    })
+
+    if (!provider) {
+      return NextResponse.json(
+        { error: 'Provider not found' },
+        { status: 404 }
+      )
+    }
+
+    // 检查模型ID是否已存在
+    const existingModel = await prisma.model.findFirst({
+      where: {
+        providerId,
+        modelId,
+      }
+    })
+
+    if (existingModel) {
+      return NextResponse.json(
+        { error: 'Model with this ID already exists for this provider' },
+        { status: 400 }
+      )
+    }
+
+    // 创建新模型
+    const newModel = await prisma.model.create({
+      data: {
+        providerId,
+        modelId,
+        name,
+        description,
+        group,
+        isEnabled: true,
+        order: 0,
+        ...modelData,
+      },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(newModel, { status: 201 })
+
+  } catch (error) {
+    console.error('Error creating model:', error)
+    return NextResponse.json(
+      { error: 'Failed to create model' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, modelId } = data
+
+    if (!adminUserId || !modelId) {
+      return NextResponse.json(
+        { error: 'adminUserId and modelId are required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 检查模型是否存在
+    const model = await prisma.model.findUnique({
+      where: { id: modelId }
+    })
+
+    if (!model) {
+      return NextResponse.json(
+        { error: 'Model not found' },
+        { status: 404 }
+      )
+    }
+
+    // 检查是否有相关的对话或消息
+    const conversationCount = await prisma.conversation.count({
+      where: { modelId }
+    })
+
+    const messageCount = await prisma.message.count({
+      where: { modelId }
+    })
+
+    if (conversationCount > 0 || messageCount > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete model with existing conversations or messages' },
+        { status: 400 }
+      )
+    }
+
+    // 删除模型
+    await prisma.model.delete({
+      where: { id: modelId }
+    })
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Model deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('Error deleting model:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete model' },
+      { status: 500 }
+    )
+  }
+}

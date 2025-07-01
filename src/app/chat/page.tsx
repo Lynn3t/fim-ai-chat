@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useToast, ToastContainer } from '@/components/Toast';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { MessageActions } from '@/components/MessageActions';
 import { AIIcon } from '@/components/AIIcon';
-import { getModelGroups, sortModelsByOrder, sortCategoriesByOrder, sortByOrder } from '@/utils/aiModelUtils';
 
 interface Message {
   id: string;
+  conversationId?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
@@ -19,6 +22,11 @@ interface Message {
     providerId: string;
     providerName: string;
   };
+  tokenUsage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 interface ChatHistory {
@@ -27,6 +35,14 @@ interface ChatHistory {
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
+  provider?: {
+    id: string;
+    name: string;
+  };
+  model?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface AIModel {
@@ -63,86 +79,94 @@ interface ConfigData {
   customCategoryOrder?: Record<string, string[]>; // 自定义分组排序
 }
 
-export default function ChatPage() {
+function ChatPageContent() {
+  const { user, chatConfig } = useAuth();
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [config, setConfig] = useState<ConfigData | null>(null);
+  const [providers, setProviders] = useState<AIProvider[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('');
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [tokenStats, setTokenStats] = useState({
+    input: 0,
+    output: 0,
+    total: 0,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
-  // 加载配置
+  // 加载提供商和模型
   useEffect(() => {
-    const savedConfig = localStorage.getItem('fimai-config');
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig);
-        // 兼容旧版本配置
-        if (parsed.openaiApiKey || parsed.models) {
-          const defaultModels = [
-            { id: '1', name: 'GPT-4o Mini', modelId: 'gpt-4o-mini', enabled: true, isCustom: false }
-          ];
+    let isMounted = true;
 
-          const migratedConfig: ConfigData = {
-            providers: [
-              {
-                id: 'openai',
-                name: 'OpenAI',
-                apiKey: parsed.openaiApiKey || '',
-                baseUrl: parsed.openaiBaseUrl || 'https://api.openai.com/v1',
-                enabled: true,
-                models: defaultModels
-              }
-            ],
-            defaultProviderId: 'openai',
-            defaultModelId: '1',
-            customGroups: []
-          };
-          setConfig(migratedConfig);
-          setSelectedModelId('1');
-        } else {
-          setConfig(parsed);
-          setSelectedModelId(parsed.defaultModelId || '');
+    const loadProviders = async () => {
+      try {
+        const response = await fetch('/api/providers');
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          setProviders(data);
+
+          // 设置默认模型
+          if (data.length > 0 && data[0].models.length > 0 && !selectedModelId) {
+            setSelectedModelId(data[0].models[0].id);
+          }
         }
-      } catch {
-        // 使用console.error而不是toast，避免依赖循环
-        console.error('配置加载失败');
+      } catch (error) {
+        if (isMounted) {
+          console.error('加载提供商失败:', error);
+          toast.error('加载AI模型失败');
+        }
       }
+    };
+
+    if (user && providers.length === 0) {
+      loadProviders();
     }
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, providers.length, selectedModelId]);
 
   // 加载历史聊天记录
   useEffect(() => {
-    const savedHistories = localStorage.getItem('fimai-chat-histories');
-    if (savedHistories) {
-      try {
-        const parsed = JSON.parse(savedHistories);
-        const histories = parsed.map((h: { createdAt: string; updatedAt: string; messages: { timestamp: string }[] }) => ({
-          ...h,
-          createdAt: new Date(h.createdAt),
-          updatedAt: new Date(h.updatedAt),
-          messages: h.messages.map((m: { timestamp: string }) => ({
-            ...m,
-            timestamp: new Date(m.timestamp)
-          }))
-        }));
-        setChatHistories(histories);
-      } catch {
-        console.error('历史聊天记录加载失败');
-      }
-    }
-  }, []);
+    const loadChatHistories = async () => {
+      if (!user || !chatConfig?.canSaveToDatabase) return;
 
-  // 保存历史聊天记录
+      try {
+        const response = await fetch(`/api/conversations?userId=${user.id}`);
+        if (response.ok) {
+          const conversations = await response.json();
+          const histories: ChatHistory[] = conversations.map((conv: any) => ({
+            id: conv.id,
+            title: conv.title,
+            messages: [], // 消息会在选择对话时加载
+            createdAt: new Date(conv.createdAt),
+            updatedAt: new Date(conv.updatedAt),
+            provider: conv.provider,
+            model: conv.model,
+          }));
+          setChatHistories(histories);
+        }
+      } catch (error) {
+        console.error('加载聊天历史失败:', error);
+      }
+    };
+
+    loadChatHistories();
+  }, [user, chatConfig]);
+
+  // 保存聊天历史（对于访客用户，使用localStorage）
   const saveChatHistories = (histories: ChatHistory[]) => {
-    localStorage.setItem('fimai-chat-histories', JSON.stringify(histories));
+    if (user?.role === 'GUEST') {
+      localStorage.setItem('fimai-chat-histories', JSON.stringify(histories));
+    }
     setChatHistories(histories);
   };
 
@@ -303,9 +327,9 @@ export default function ChatPage() {
 
   // 获取当前选中的模型和提供商
   const getCurrentModel = () => {
-    if (!config || !selectedModelId) return null;
+    if (!providers || !selectedModelId) return null;
 
-    for (const provider of config.providers) {
+    for (const provider of providers) {
       const model = provider.models.find(m => m.id === selectedModelId);
       if (model) {
         return { model, provider };
@@ -324,53 +348,96 @@ export default function ChatPage() {
     };
   };
 
-  // 获取排序后的分组列表（与config页面保持一致）
-  const getSortedCategories = (providerId: string, groupedModels: Record<string, any[]>) => {
-    const categories = Object.keys(groupedModels);
-    const customOrder = config?.customCategoryOrder?.[providerId];
 
-    if (customOrder) {
-      // 使用自定义顺序
-      const orderedCategories = customOrder.filter(name => categories.includes(name));
-      const remainingCategories = categories.filter(name => !customOrder.includes(name));
-      return [...orderedCategories, ...sortCategoriesByOrder(remainingCategories)];
-    } else {
-      // 使用默认顺序
-      return sortCategoriesByOrder(categories);
-    }
-  };
 
   // 发送消息
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !user) return;
 
     const currentModel = getCurrentModel();
     if (!currentModel) {
-      toast.error('请先在配置页面设置AI服务提供商和模型');
+      toast.error('请选择一个AI模型');
       return;
     }
 
-    if (!currentModel.provider?.apiKey) {
-      toast.error('请先在配置页面设置API Key');
+    // 检查聊天权限
+    try {
+      const permissionResponse = await fetch(`/api/chat/permissions?userId=${user.id}&modelId=${currentModel.model.id}`);
+      const permissions = await permissionResponse.json();
+
+      if (!permissions.canChat) {
+        toast.error(permissions.error || '没有聊天权限');
+        return;
+      }
+    } catch (error) {
+      toast.error('权限检查失败');
       return;
     }
 
     const userMessage: Message = {
       id: Date.now().toString(),
+      conversationId: currentChatId || undefined,
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
       modelInfo: {
-        modelId: currentModel.model.modelId,
+        modelId: currentModel.model.modelId || currentModel.model.id,
         modelName: currentModel.model.name,
         providerId: currentModel.provider.id,
-        providerName: currentModel.provider.name
+        providerName: currentModel.provider.displayName || currentModel.provider.name
       }
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+
+    // 如果是新对话且可以保存到数据库，创建对话
+    let conversationId = currentChatId;
+    if (!conversationId && chatConfig?.canSaveToDatabase) {
+      try {
+        const title = await generateChatTitle(userMessage.content);
+        const convResponse = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            providerId: currentModel.provider.id,
+            modelId: currentModel.model.id,
+            title,
+          }),
+        });
+
+        if (convResponse.ok) {
+          const conversation = await convResponse.json();
+          conversationId = conversation.id;
+          setCurrentChatId(conversationId);
+        }
+      } catch (error) {
+        console.error('创建对话失败:', error);
+      }
+    }
+
+    // 保存用户消息到数据库
+    if (chatConfig?.canSaveToDatabase && conversationId) {
+      try {
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            userId: user.id,
+            providerId: currentModel.provider.id,
+            modelId: currentModel.model.id,
+            role: 'user',
+            content: userMessage.content,
+            saveToDatabase: true,
+          }),
+        });
+      } catch (error) {
+        console.error('保存用户消息失败:', error);
+      }
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -386,7 +453,7 @@ export default function ChatPage() {
           config: {
             openaiApiKey: currentModel.provider.apiKey,
             openaiBaseUrl: currentModel.provider.baseUrl,
-            model: currentModel.model.modelId
+            model: currentModel.model.modelId || currentModel.model.id
           }
         }),
       });
@@ -400,18 +467,21 @@ export default function ChatPage() {
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
+        conversationId: conversationId || undefined,
         role: 'assistant',
         content: '',
         timestamp: new Date(),
         modelInfo: {
-          modelId: currentModel.model.modelId,
+          modelId: currentModel.model.modelId || currentModel.model.id,
           modelName: currentModel.model.name,
           providerId: currentModel.provider.id,
-          providerName: currentModel.provider.name
+          providerName: currentModel.provider.displayName || currentModel.provider.name
         }
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      let finalTokenUsage: any = null;
 
       // 处理流式响应
       while (true) {
@@ -425,13 +495,19 @@ export default function ChatPage() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') continue;
-            
+
             try {
               const parsed = JSON.parse(data);
               const content = parsed.choices?.[0]?.delta?.content || '';
+
+              // 保存token使用信息
+              if (parsed.usage) {
+                finalTokenUsage = parsed.usage;
+              }
+
               if (content) {
-                setMessages(prev => prev.map(msg => 
-                  msg.id === assistantMessage.id 
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessage.id
                     ? { ...msg, content: msg.content + content }
                     : msg
                 ));
@@ -440,6 +516,47 @@ export default function ChatPage() {
               // 忽略解析错误
             }
           }
+        }
+      }
+
+      // 更新token统计
+      if (finalTokenUsage) {
+        setTokenStats(prev => ({
+          input: prev.input + (finalTokenUsage.prompt_tokens || 0),
+          output: prev.output + (finalTokenUsage.completion_tokens || 0),
+          total: prev.total + (finalTokenUsage.total_tokens || 0),
+        }));
+
+        // 更新消息的token信息
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessage.id
+            ? { ...msg, tokenUsage: finalTokenUsage }
+            : msg
+        ));
+      }
+
+      // 保存AI响应到数据库
+      if (chatConfig?.canSaveToDatabase && conversationId) {
+        try {
+          const finalMessage = messages.find(m => m.id === assistantMessage.id);
+          await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversationId,
+              userId: user.id,
+              providerId: currentModel.provider.id,
+              modelId: currentModel.model.id,
+              role: 'assistant',
+              content: finalMessage?.content || assistantMessage.content,
+              tokenUsage: finalTokenUsage,
+              inputText: userMessage.content,
+              outputText: finalMessage?.content || assistantMessage.content,
+              saveToDatabase: true,
+            }),
+          });
+        } catch (error) {
+          console.error('保存AI响应失败:', error);
         }
       }
     } catch (error) {
@@ -494,6 +611,21 @@ export default function ChatPage() {
     toast.success('消息已删除');
   };
 
+  // 重新发送消息
+  const handleResendMessage = async (messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (!message || message.role !== 'user') return;
+
+    // 删除该消息及其后面的所有消息
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    const newMessages = messages.slice(0, messageIndex);
+    setMessages(newMessages);
+
+    // 重新发送
+    setInput(message.content);
+    setTimeout(() => handleSend(), 100);
+  };
+
   // 编辑并重新发送消息
   const handleEditMessage = async (messageId: string, newContent: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
@@ -503,115 +635,15 @@ export default function ChatPage() {
     const newMessages = messages.slice(0, messageIndex);
     setMessages(newMessages);
 
-    // 创建新的用户消息
-    const editedMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: newContent,
-      timestamp: new Date(),
-      modelInfo: {
-        modelId: currentModel.model.modelId,
-        modelName: currentModel.model.name,
-        providerId: currentModel.provider.id,
-        providerName: currentModel.provider.name
-      }
-    };
-
-    setMessages(prev => [...prev, editedMessage]);
-    setIsLoading(true);
-
-    // 重新发送请求
-    const currentModel = getCurrentModel();
-    if (!currentModel) {
-      toast.error('请先配置AI服务提供商和模型');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...newMessages, editedMessage].map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          config: {
-            openaiApiKey: currentModel.provider.apiKey,
-            openaiBaseUrl: currentModel.provider.baseUrl,
-            model: currentModel.model.modelId
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('API请求失败');
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('无法读取响应');
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        modelInfo: {
-          modelId: currentModel.model.modelId,
-          modelName: currentModel.model.name,
-          providerId: currentModel.provider.id,
-          providerName: currentModel.provider.name
-        }
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // 处理流式响应
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = new TextDecoder().decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || '';
-              if (content) {
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessage.id
-                    ? { ...msg, content: msg.content + content }
-                    : msg
-                ));
-              }
-            } catch {
-              // 忽略解析错误
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('重新发送失败:', error);
-      toast.error('重新发送失败，请稍后重试');
-    } finally {
-      setIsLoading(false);
-    }
+    // 重新发送编辑后的消息
+    setInput(newContent);
+    setTimeout(() => handleSend(), 100);
   };
 
-  // 重新发送消息
-  const handleResendMessage = (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (message && message.role === 'user') {
-      handleEditMessage(messageId, message.content);
-    }
+  // 复制消息
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    toast.success('消息已复制到剪贴板');
   };
 
   return (
@@ -624,7 +656,7 @@ export default function ChatPage() {
               FimAI Chat
             </h1>
             {/* 模型选择器 */}
-            {config && config.providers.some(p => p.models.length > 0) && (
+            {providers && providers.some(p => p.models.length > 0) && (
               <div className="relative" ref={modelDropdownRef}>
                 <button
                   onClick={() => setShowModelDropdown(!showModelDropdown)}
@@ -643,57 +675,41 @@ export default function ChatPage() {
 
                 {showModelDropdown && (
                   <div className="absolute left-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto">
-                    {sortByOrder(config.providers).map((provider) => {
-                      const enabledModels = provider.models.filter(m => m.enabled);
+                    {providers.map((provider) => {
+                      const enabledModels = provider.models.filter(m => m.isEnabled);
                       if (enabledModels.length === 0) return null;
-
-                      const groups = getModelGroups(enabledModels, config.customGroups || []);
-                      const sortedGroupNames = getSortedCategories(provider.id, groups);
 
                       return (
                         <div key={provider.id} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
                           {/* 提供商标题 */}
                           <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-2">
                             <AIIcon modelId={enabledModels[0]?.modelId || ''} size={16} />
-                            <span>{provider.name}</span>
+                            <span>{provider.displayName || provider.name}</span>
                           </div>
 
-                          {/* 分组和模型 */}
-                          {sortedGroupNames.map((groupName) => {
-                            const models = groups[groupName];
-                            return (
-                            <div key={groupName}>
-                              {/* 分组标题 */}
-                              <div className="px-4 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-25 dark:bg-gray-750">
-                                {groupName}
+                          {/* 模型列表 */}
+                          {enabledModels.map((model) => (
+                            <button
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModelId(model.id);
+                                setShowModelDropdown(false);
+                              }}
+                              className={`w-full text-left px-6 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
+                                selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
+                              }`}
+                            >
+                              <AIIcon modelId={model.modelId} size={16} />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                  {model.name}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {model.modelId}
+                                </div>
                               </div>
-
-                              {/* 模型列表 */}
-                              {models.map((model) => (
-                                <button
-                                  key={model.id}
-                                  onClick={() => {
-                                    setSelectedModelId(model.id);
-                                    setShowModelDropdown(false);
-                                  }}
-                                  className={`w-full text-left px-6 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
-                                    selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
-                                  }`}
-                                >
-                                  <AIIcon modelId={model.modelId} size={16} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                      {model.name}
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                      {model.modelId}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          );
-                          })}
+                            </button>
+                          ))}
                         </div>
                       );
                     })}
@@ -789,7 +805,12 @@ export default function ChatPage() {
             <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
               <h2 className="text-2xl font-semibold mb-4">欢迎使用 FimAI Chat</h2>
               <p>开始您的AI对话之旅吧！</p>
-              {(!config || config.providers.length === 0 || !config.providers.some(p => p.apiKey)) && (
+              {user && (
+                <p className="mt-2 text-sm">
+                  欢迎，{user.username}！您的角色：{user.role === 'ADMIN' ? '管理员' : user.role === 'USER' ? '用户' : '访客'}
+                </p>
+              )}
+              {(!providers || providers.length === 0 || !providers.some(p => p.models.length > 0)) && (
                 <p className="mt-4 text-red-500">
                   请先 <Link href="/config" className="underline">配置AI服务提供商</Link>
                 </p>
@@ -828,7 +849,7 @@ export default function ChatPage() {
                       {/* 发送者名称和模型信息 */}
                       <div className={`flex items-center space-x-2 mb-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {message.role === 'user' ? 'Username' : modelInfo.name}
+                          {message.role === 'user' ? (user?.username || 'User') : modelInfo.name}
                         </span>
                         {message.role === 'assistant' && modelInfo.id && (
                           <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -888,6 +909,15 @@ export default function ChatPage() {
       {/* 输入区域 */}
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-4">
         <div className="max-w-4xl mx-auto">
+          {/* Token统计显示 */}
+          <div className="flex justify-end mb-3">
+            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <span>Input: {tokenStats.input}</span>
+              <span>Output: {tokenStats.output}</span>
+              <span>Total: {tokenStats.total}</span>
+            </div>
+          </div>
+
           <div className="flex space-x-4">
             <textarea
               value={input}
@@ -912,5 +942,13 @@ export default function ChatPage() {
       {/* Toast容器 */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <ChatPageContent />
+    </ProtectedRoute>
   );
 }
