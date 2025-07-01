@@ -26,7 +26,9 @@ export default function LoginPage() {
       if (loginType === 'user') {
         result = await login(username, password)
       } else {
-        result = await loginWithAccessCode(username, accessCode)
+        // 访问码登录不需要用户名，自动生成
+        const guestUsername = username || `guest_${Date.now()}`
+        result = await loginWithAccessCode(guestUsername, accessCode)
       }
 
       if (result.success) {
@@ -83,21 +85,40 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 用户名 */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                用户名
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="请输入用户名"
-                required
-              />
-            </div>
+            {/* 用户名（仅用户登录时显示） */}
+            {loginType === 'user' && (
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  用户名
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="请输入用户名"
+                  required
+                />
+              </div>
+            )}
+
+            {/* 访客用户名（访问码登录时可选） */}
+            {loginType === 'guest' && (
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  用户名 <span className="text-gray-500 text-xs">(可选，留空将自动生成)</span>
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="请输入用户名（可选）"
+                />
+              </div>
+            )}
 
             {/* 密码（仅用户登录时显示） */}
             {loginType === 'user' && (

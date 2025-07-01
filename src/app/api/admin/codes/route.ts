@@ -101,11 +101,10 @@ export async function POST(request: NextRequest) {
     if (type === 'invite') {
       // 创建邀请码
       const code = generateInviteCode()
-      
+
       const inviteCode = await prisma.inviteCode.create({
         data: {
           code,
-          role: role || 'USER',
           maxUses: maxUses || 1,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           createdBy: adminUserId,

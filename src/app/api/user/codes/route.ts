@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  createInviteCode, 
-  createAccessCode, 
-  deleteInviteCode, 
-  deleteAccessCode 
+import {
+  createInviteCode,
+  createAccessCode,
+  deleteInviteCode,
+  deleteAccessCode,
+  getUserInviteCodes,
+  getUserAccessCodes
 } from '@/lib/db/codes'
 import { checkUserPermission } from '@/lib/auth'
+import { getSystemSetting } from '@/lib/db/system-settings'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +32,17 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // 检查用户已创建的邀请码数量限制
+      const maxInviteCodes = await getSystemSetting('user_max_invite_codes') || 1
+      const existingInviteCodes = await getUserInviteCodes(userId)
+
+      if (existingInviteCodes.length >= maxInviteCodes) {
+        return NextResponse.json(
+          { error: `最多只能创建 ${maxInviteCodes} 个邀请码` },
+          { status: 400 }
+        )
+      }
+
       const inviteCode = await createInviteCode({
         createdBy: userId,
         expiresAt: codeData.expiresAt ? new Date(codeData.expiresAt) : undefined,
@@ -47,11 +61,33 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // 检查用户已创建的访问码数量限制
+      const maxAccessCodes = await getSystemSetting('user_max_access_codes') || 10
+      const existingAccessCodes = await getUserAccessCodes(userId)
+
+      if (existingAccessCodes.length >= maxAccessCodes) {
+        return NextResponse.json(
+          { error: `最多只能创建 ${maxAccessCodes} 个访问码` },
+          { status: 400 }
+        )
+      }
+
+      // 检查访问码最大用户数量限制
+      const maxUsers = await getSystemSetting('access_code_max_users') || 10
+      const requestedMaxUses = codeData.maxUses || maxUsers
+
+      if (requestedMaxUses > maxUsers) {
+        return NextResponse.json(
+          { error: `访问码最大用户数量不能超过 ${maxUsers}` },
+          { status: 400 }
+        )
+      }
+
       const accessCode = await createAccessCode({
         createdBy: userId,
         allowedModelIds: codeData.allowedModelIds,
         expiresAt: codeData.expiresAt ? new Date(codeData.expiresAt) : undefined,
-        maxUses: codeData.maxUses,
+        maxUses: requestedMaxUses,
       })
 
       return NextResponse.json(accessCode, { status: 201 })

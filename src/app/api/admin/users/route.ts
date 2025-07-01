@@ -76,6 +76,13 @@ export async function PATCH(request: NextRequest) {
     let result
     switch (action) {
       case 'updateStatus':
+        // 防止管理员封禁自己
+        if (adminUserId === userId && !updateData.isActive) {
+          return NextResponse.json(
+            { error: 'Cannot ban your own account' },
+            { status: 400 }
+          )
+        }
         result = await updateUserStatus(userId, updateData.isActive)
         break
       

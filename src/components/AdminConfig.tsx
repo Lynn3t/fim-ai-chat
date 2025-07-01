@@ -40,7 +40,7 @@ interface InviteCode {
 }
 
 export default function AdminConfig() {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'invites' | 'system'>('dashboard');
   const [stats, setStats] = useState<SystemStats | null>(null);
@@ -55,14 +55,17 @@ export default function AdminConfig() {
   } | null>(null);
   const [providers, setProviders] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
+  const [systemSettings, setSystemSettings] = useState<any>({});
+  const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<any>(null);
 
   // 加载仪表板数据
   const loadDashboard = async () => {
-    if (!user) return;
+    if (!currentUser) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/dashboard?adminUserId=${user.id}`);
+      const response = await fetch(`/api/admin/dashboard?adminUserId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -83,11 +86,11 @@ export default function AdminConfig() {
 
   // 加载用户列表
   const loadUsers = async () => {
-    if (!user) return;
+    if (!currentUser) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/users?adminUserId=${user.id}`);
+      const response = await fetch(`/api/admin/users?adminUserId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
@@ -108,11 +111,11 @@ export default function AdminConfig() {
 
   // 加载邀请码列表
   const loadInviteCodes = async () => {
-    if (!user) return;
+    if (!currentUser) return;
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/codes?adminUserId=${user.id}&type=invite`);
+      const response = await fetch(`/api/admin/codes?adminUserId=${currentUser.id}&type=invite`);
       if (response.ok) {
         const data = await response.json();
         setInviteCodes(data);
@@ -127,26 +130,37 @@ export default function AdminConfig() {
   };
 
   // 创建邀请码
-  const createInviteCode = async () => {
-    if (!user) return;
-    
-    try {
-      const response = await fetch('/api/admin/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: user.id,
-          type: 'invite',
-          maxUses: 1,
-        }),
-      });
+  const createInviteCode = async (count: number = 1, maxUses: number = 1) => {
+    if (!currentUser) return;
 
-      if (response.ok) {
-        toast.success('邀请码创建成功');
-        loadInviteCodes();
+    try {
+      const promises = [];
+      for (let i = 0; i < count; i++) {
+        promises.push(
+          fetch('/api/admin/codes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminUserId: currentUser.id,
+              type: 'invite',
+              maxUses,
+            }),
+          })
+        );
+      }
+
+      const responses = await Promise.all(promises);
+      const successCount = responses.filter(r => r.ok).length;
+
+      if (successCount === count) {
+        toast.success(`成功创建 ${count} 个邀请码`);
+      } else if (successCount > 0) {
+        toast.success(`成功创建 ${successCount}/${count} 个邀请码`);
       } else {
         toast.error('创建邀请码失败');
       }
+
+      loadInviteCodes();
     } catch (error) {
       toast.error('创建邀请码失败');
     }
@@ -154,14 +168,20 @@ export default function AdminConfig() {
 
   // 切换用户状态
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
-    if (!user) return;
+    if (!currentUser) return;
+
+    // 防止封禁自己
+    if (userId === currentUser.id && isActive) {
+      toast.error('不能封禁自己的账户');
+      return;
+    }
 
     try {
       const response = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: user.id,
+          adminUserId: currentUser.id,
           userId,
           action: 'updateStatus',
           isActive: !isActive,
@@ -186,10 +206,10 @@ export default function AdminConfig() {
 
   // 删除用户
   const deleteUser = async (userId: string, username: string) => {
-    if (!user) return;
+    if (!currentUser) return;
 
     // 防止删除自己
-    if (userId === user.id) {
+    if (userId === currentUser.id) {
       toast.error('不能删除自己的账户');
       return;
     }
@@ -203,7 +223,7 @@ export default function AdminConfig() {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: user.id,
+          adminUserId: currentUser.id,
           userId,
         }),
       });
@@ -226,10 +246,10 @@ export default function AdminConfig() {
 
   // 获取数据库重置信息
   const loadResetInfo = async () => {
-    if (!user) return;
+    if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/admin/database/reset?adminUserId=${user.id}`);
+      const response = await fetch(`/api/admin/database/reset?adminUserId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
         setResetInfo({
@@ -247,7 +267,7 @@ export default function AdminConfig() {
 
   // 执行数据库重置
   const handleDatabaseReset = async () => {
-    if (!user || !resetInfo) return;
+    if (!currentUser || !resetInfo) return;
 
     setIsResetting(true);
     try {
@@ -255,7 +275,7 @@ export default function AdminConfig() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: user.id,
+          adminUserId: currentUser.id,
           confirmText: resetInfo.confirmationRequired,
         }),
       });
@@ -282,7 +302,7 @@ export default function AdminConfig() {
 
   // 加载提供商和模型
   const loadProvidersAndModels = async () => {
-    if (!user) return;
+    if (!currentUser) return;
 
     try {
       const response = await fetch('/api/providers');
@@ -321,7 +341,7 @@ export default function AdminConfig() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: user.id,
+          adminUserId: currentUser.id,
           modelId,
           isEnabled: !isEnabled,
         }),
@@ -343,6 +363,171 @@ export default function AdminConfig() {
     }
   };
 
+  // 加载系统设置
+  const loadSystemSettings = async () => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/system-settings?adminUserId=${currentUser.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSystemSettings(data.raw || {});
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: 加载系统设置失败`;
+        console.error('Load system settings error:', errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
+      console.error('Load system settings error:', error);
+      toast.error(`加载系统设置失败: ${errorMessage}`);
+    }
+  };
+
+  // 更新系统设置
+  const updateSystemSettings = async (settings: Record<string, any>) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch('/api/admin/system-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          settings,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('系统设置已更新');
+        loadSystemSettings();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: 更新系统设置失败`;
+        console.error('Update system settings error:', errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
+      console.error('Update system settings error:', error);
+      toast.error(`更新系统设置失败: ${errorMessage}`);
+    }
+  };
+
+  // 创建提供商
+  const createProvider = async (providerData: any) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch('/api/admin/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          ...providerData,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('提供商创建成功');
+        loadProvidersAndModels();
+        setShowAddProviderModal(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '创建提供商失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('创建提供商失败');
+    }
+  };
+
+  // 更新提供商
+  const updateProvider = async (providerId: string, providerData: any) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/providers/${providerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          ...providerData,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('提供商更新成功');
+        loadProvidersAndModels();
+        setEditingProvider(null);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '更新提供商失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('更新提供商失败');
+    }
+  };
+
+  // 删除提供商
+  const deleteProvider = async (providerId: string, providerName: string) => {
+    if (!currentUser) return;
+
+    if (!confirm(`确定要删除提供商 "${providerName}" 吗？这将同时删除该提供商下的所有模型。`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/providers/${providerId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('提供商删除成功');
+        loadProvidersAndModels();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '删除提供商失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('删除提供商失败');
+    }
+  };
+
+  // 切换提供商状态
+  const toggleProviderStatus = async (providerId: string, isEnabled: boolean) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/providers/${providerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          isEnabled: !isEnabled,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(isEnabled ? '提供商已禁用' : '提供商已启用');
+        loadProvidersAndModels();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '操作失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('操作失败');
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'dashboard') {
       loadDashboard();
@@ -350,12 +535,14 @@ export default function AdminConfig() {
       loadUsers();
     } else if (activeTab === 'invites') {
       loadInviteCodes();
-    } else if (user && activeTab === 'models') {
+    } else if (currentUser && activeTab === 'models') {
       loadProvidersAndModels();
+    } else if (activeTab === 'system') {
+      loadSystemSettings();
     }
-  }, [activeTab, user]);
+  }, [activeTab, currentUser]);
 
-  if (!user || user.role !== 'ADMIN') {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
     return (
       <div className="text-center py-8">
         <p className="text-red-500">您没有管理员权限</p>
@@ -524,23 +711,39 @@ export default function AdminConfig() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => toggleUserStatus(user.id, user.isActive)}
-                              className={`${
-                                user.isActive
-                                  ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
-                                  : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                              }`}
-                            >
-                              {user.isActive ? '封禁' : '激活'}
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                              onClick={() => deleteUser(user.id, user.username)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            >
-                              删除
-                            </button>
+                            {user.id === currentUser?.id ? (
+                              // 当前管理员用户：禁用封禁和删除按钮
+                              <>
+                                <span className="text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                                  封禁
+                                </span>
+                                <span className="text-gray-300">|</span>
+                                <span className="text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                                  删除
+                                </span>
+                              </>
+                            ) : (
+                              // 其他用户：正常显示操作按钮
+                              <>
+                                <button
+                                  onClick={() => toggleUserStatus(user.id, user.isActive)}
+                                  className={`${
+                                    user.isActive
+                                      ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
+                                      : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
+                                  }`}
+                                >
+                                  {user.isActive ? '封禁' : '激活'}
+                                </button>
+                                <span className="text-gray-300">|</span>
+                                <button
+                                  onClick={() => deleteUser(user.id, user.username)}
+                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  删除
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -707,12 +910,42 @@ export default function AdminConfig() {
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   邀请码管理
                 </h2>
-                <button
-                  onClick={createInviteCode}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  创建邀请码
-                </button>
+                <div className="flex space-x-2">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-700 dark:text-gray-300">数量:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      defaultValue="1"
+                      id="invite-count"
+                      className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-700 dark:text-gray-300">使用次数:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      defaultValue="1"
+                      id="invite-max-uses"
+                      className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const countInput = document.getElementById('invite-count') as HTMLInputElement;
+                      const maxUsesInput = document.getElementById('invite-max-uses') as HTMLInputElement;
+                      const count = parseInt(countInput.value) || 1;
+                      const maxUses = parseInt(maxUsesInput.value) || 1;
+                      createInviteCode(count, maxUses);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    创建邀请码
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -767,35 +1000,111 @@ export default function AdminConfig() {
                 系统设置
               </h2>
               <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    管理员邀请码
+                {/* 邀请码设置 */}
+                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    邀请码设置
                   </h3>
-                  <p className="text-blue-700 dark:text-blue-300 text-sm mb-2">
-                    用于注册第一个管理员账户的特殊邀请码：
-                  </p>
-                  <code className="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 px-2 py-1 rounded font-mono text-sm">
-                    fimai_ADMIN_MASTER_KEY
-                  </code>
-                  <p className="text-blue-600 dark:text-blue-400 text-xs mt-2">
-                    此邀请码仅能使用一次，用于创建第一个管理员账户（已使用）
-                  </p>
-                </div>
-                
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    快速操作
-                  </h3>
-                  <div className="space-y-2">
-                    <Link
-                      href="/chat"
-                      className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    >
-                      前往聊天
-                    </Link>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        用户最大邀请码创建数量
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={systemSettings.user_max_invite_codes || 1}
+                        onChange={(e) => setSystemSettings(prev => ({
+                          ...prev,
+                          user_max_invite_codes: parseInt(e.target.value)
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        普通用户可以创建的邀请码数量上限
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        邀请码最大使用次数
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={systemSettings.invite_code_max_uses || 1}
+                        onChange={(e) => setSystemSettings(prev => ({
+                          ...prev,
+                          invite_code_max_uses: parseInt(e.target.value)
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        单个邀请码可以使用的次数上限
+                      </p>
+                    </div>
                   </div>
                 </div>
 
+                {/* 访问码设置 */}
+                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    访问码设置
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        用户最大访问码创建数量
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={systemSettings.user_max_access_codes || 10}
+                        onChange={(e) => setSystemSettings(prev => ({
+                          ...prev,
+                          user_max_access_codes: parseInt(e.target.value)
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        普通用户可以创建的访问码数量上限
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        访问码最大用户数量
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10000"
+                        value={systemSettings.access_code_max_users || 10}
+                        onChange={(e) => setSystemSettings(prev => ({
+                          ...prev,
+                          access_code_max_users: parseInt(e.target.value)
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        单个访问码可以支持的用户数量上限
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 保存按钮 */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => updateSystemSettings(systemSettings)}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    保存设置
+                  </button>
+                </div>
+
+                {/* 危险操作区域 */}
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                   <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
                     ⚠️ 危险操作

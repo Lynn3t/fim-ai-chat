@@ -79,6 +79,20 @@ model UserSettings {
   @@map("user_settings")
 }
 
+// 系统设置模型
+model SystemSettings {
+  id    String @id @default(cuid())
+  key   String @unique // 设置键名
+  value String // 设置值（JSON字符串）
+  type  String @default("string") // 值类型：string, number, boolean, json
+  description String? // 设置描述
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
 // AI 服务提供商
 model Provider {
   id          String   @id @default(cuid())

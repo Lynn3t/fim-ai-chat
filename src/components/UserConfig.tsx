@@ -108,7 +108,7 @@ export default function UserConfig() {
   // 创建邀请码
   const createInviteCode = async () => {
     if (!user) return;
-    
+
     try {
       const response = await fetch('/api/user/codes', {
         method: 'POST',
@@ -124,7 +124,9 @@ export default function UserConfig() {
         toast.success('邀请码创建成功');
         loadDashboard();
       } else {
-        toast.error('创建邀请码失败');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '创建邀请码失败';
+        toast.error(errorMessage);
       }
     } catch (error) {
       toast.error('创建邀请码失败');

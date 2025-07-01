@@ -49,6 +49,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 从localStorage恢复用户状态
   useEffect(() => {
+    // 初始化系统设置
+    const initializeSystem = async () => {
+      try {
+        await fetch('/api/init', { method: 'POST' })
+      } catch (error) {
+        console.error('Failed to initialize system:', error)
+      }
+    }
+
+    initializeSystem()
+
     const savedUser = localStorage.getItem('fimai_user')
     if (savedUser) {
       try {
