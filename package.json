@@ -18,6 +18,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@lobehub/icons": "^2.7.0",
+    "@lobehub/icons-static-svg": "^1.51.0",
     "@lobehub/ui": "^2.7.3",
     "@prisma/client": "^6.10.1",
     "@types/bcryptjs": "^2.4.6",

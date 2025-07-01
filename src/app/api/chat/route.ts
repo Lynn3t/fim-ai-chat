@@ -1,48 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { checkChatPermissions } from '@/lib/chat-permissions';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
-interface ConfigData {
-  openaiApiKey: string;
-  openaiBaseUrl: string;
-  model: string;
+interface ChatRequest {
+  messages: Message[];
+  userId: string;
+  modelId: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, config }: { messages: Message[], config: ConfigData } = await request.json();
+    const { messages, userId, modelId }: ChatRequest = await request.json();
 
-    if (!config.openaiApiKey) {
-      return NextResponse.json({ error: 'API Key is required' }, { status: 400 });
+    if (!messages || !userId || !modelId) {
+      return NextResponse.json({
+        error: 'Missing required fields: messages, userId, modelId'
+      }, { status: 400 });
+    }
+
+    // 检查用户聊天权限
+    const permissions = await checkChatPermissions(userId, modelId);
+    if (!permissions.canChat) {
+      return NextResponse.json(
+        { error: permissions.error || 'No permission to chat' },
+        { status: 403 }
+      );
+    }
+
+    // 根据模型ID获取提供商配置
+    const model = await prisma.model.findUnique({
+      where: { id: modelId },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            baseUrl: true,
+            apiKey: true,
+            isEnabled: true,
+          },
+        },
+      },
+    });
+
+    if (!model) {
+      return NextResponse.json({ error: 'Model not found' }, { status: 404 });
+    }
+
+    if (!model.isEnabled || !model.provider.isEnabled) {
+      return NextResponse.json({ error: 'Model or provider is disabled' }, { status: 400 });
+    }
+
+    if (!model.provider.apiKey || !model.provider.baseUrl) {
+      return NextResponse.json({
+        error: 'Provider configuration incomplete'
+      }, { status: 500 });
     }
 
     // 构建请求URL
-    const apiUrl = `${config.openaiBaseUrl}/chat/completions`;
+    const apiUrl = `${model.provider.baseUrl}/chat/completions`;
 
-    // 调用OpenAI API
+    // 调用AI API
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openaiApiKey}`,
+        'Authorization': `Bearer ${model.provider.apiKey}`,
       },
       body: JSON.stringify({
-        model: config.model,
+        model: model.modelId,
         messages: messages,
         stream: true,
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: model.temperature || 0.7,
+        max_tokens: model.maxTokens || 2000,
+        ...(model.topP && { top_p: model.topP }),
+        ...(model.frequencyPenalty && { frequency_penalty: model.frequencyPenalty }),
+        ...(model.presencePenalty && { presence_penalty: model.presencePenalty }),
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('OpenAI API Error:', errorData);
+      console.error('AI API Error:', errorData);
       return NextResponse.json(
-        { error: 'OpenAI API request failed', details: errorData },
+        { error: 'AI API request failed', details: errorData },
         { status: response.status }
       );
     }

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/db/permissions'
+import { checkUserPermission } from '@/lib/auth'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const data = await request.json()
     const { adminUserId, ...updateData } = data
-    const providerId = params.id
+    const { id: providerId } = await params
 
     if (!adminUserId) {
       return NextResponse.json(
@@ -84,12 +84,12 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url)
     const adminUserId = searchParams.get('adminUserId')
-    const providerId = params.id
+    const { id: providerId } = await params
 
     if (!adminUserId) {
       return NextResponse.json(

@@ -3,8 +3,59 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Toast';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import Link from 'next/link';
+import { SortableList } from '@/components/SortableList';
+import {
+  OpenAI,
+  Anthropic,
+  Google,
+  Microsoft,
+  Meta,
+  HuggingFace,
+  Cohere,
+  Stability,
+  Replicate,
+  Together,
+  Perplexity,
+  Mistral,
+  // 添加更多 AI 提供商图标
+  Baidu,
+  Alibaba,
+  Tencent,
+  ByteDance,
+  DeepSeek,
+  Moonshot,
+  Zhipu,
+  Yi,
+  SenseNova,
+  Spark,
+  Ollama,
+  ComfyUI,
+  SiliconCloud,
+  Flux,
+  XAI,
+  Groq,
+  Fireworks,
+  OpenRouter,
+  Bedrock,
+  Azure,
+  VertexAI,
+  Claude,
+  Gemini,
+  Qwen,
+  Hunyuan,
+  Wenxin,
+  Doubao,
+  Stepfun,
+  DeepInfra,
+  Anyscale,
+  Novita,
+  Runway,
+  Pika,
+  Suno,
+  Ideogram,
+  Recraft
+} from '@lobehub/icons';
 
 interface User {
   id: string;
@@ -20,50 +71,151 @@ interface User {
   };
 }
 
-interface SystemStats {
-  totalUsers: number;
-  activeUsers: number;
-  totalTokens: number;
-  totalCost: number;
-  todayTokens: number;
-  todayCost: number;
-}
-
 interface InviteCode {
   id: string;
   code: string;
   isUsed: boolean;
+  usedBy?: string;
+  usedAt?: string;
+  expiresAt?: string;
   maxUses: number;
   currentUses: number;
-  expiresAt?: string;
   createdAt: string;
+  creator: {
+    id: string;
+    username: string;
+  };
+}
+
+interface SystemStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalInviteCodes: number;
+  usedInviteCodes: number;
+  totalAccessCodes: number;
+  usedAccessCodes: number;
+}
+
+// 图标映射 - 优先使用 lobehub icons，其次使用 emoji
+const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any>, emoji: string }> = {
+  // 国际主流 AI 提供商
+  openai: { component: OpenAI, emoji: '🤖' },
+  anthropic: { component: Anthropic, emoji: '🧠' },
+  google: { component: Google, emoji: '🔍' },
+  microsoft: { component: Microsoft, emoji: '🪟' },
+  meta: { component: Meta, emoji: '📘' },
+  huggingface: { component: HuggingFace, emoji: '🤗' },
+  cohere: { component: Cohere, emoji: '🌊' },
+  stability: { component: Stability, emoji: '🎨' },
+  replicate: { component: Replicate, emoji: '🔄' },
+  together: { component: Together, emoji: '🤝' },
+  perplexity: { component: Perplexity, emoji: '❓' },
+  mistral: { component: Mistral, emoji: '🌪️' },
+  groq: { component: Groq, emoji: '⚡' },
+  fireworks: { component: Fireworks, emoji: '🎆' },
+  openrouter: { component: OpenRouter, emoji: '🛣️' },
+  bedrock: { component: Bedrock, emoji: '🏔️' },
+  azure: { component: Azure, emoji: '☁️' },
+  vertexai: { component: VertexAI, emoji: '🔺' },
+  claude: { component: Claude, emoji: '🤖' },
+  gemini: { component: Gemini, emoji: '♊' },
+  xai: { component: XAI, emoji: '❌' },
+
+  // 中国 AI 提供商
+  baidu: { component: Baidu, emoji: '🐻' },
+  alibaba: { component: Alibaba, emoji: '🛒' },
+  tencent: { component: Tencent, emoji: '🐧' },
+  bytedance: { component: ByteDance, emoji: '🎵' },
+  deepseek: { component: DeepSeek, emoji: '🔍' },
+  moonshot: { component: Moonshot, emoji: '🌙' },
+  zhipu: { component: Zhipu, emoji: '🧠' },
+  yi: { component: Yi, emoji: '🔤' },
+  sensenova: { component: SenseNova, emoji: '🌟' },
+  spark: { component: Spark, emoji: '⚡' },
+  qwen: { component: Qwen, emoji: '🤖' },
+  hunyuan: { component: Hunyuan, emoji: '🌀' },
+  wenxin: { component: Wenxin, emoji: '📝' },
+  doubao: { component: Doubao, emoji: '🫘' },
+  stepfun: { component: Stepfun, emoji: '👣' },
+
+  // 开源和部署平台
+  ollama: { component: Ollama, emoji: '🦙' },
+  comfyui: { component: ComfyUI, emoji: '🎨' },
+  siliconcloud: { component: SiliconCloud, emoji: '☁️' },
+  deepinfra: { component: DeepInfra, emoji: '🏗️' },
+  anyscale: { component: Anyscale, emoji: '📏' },
+  novita: { component: Novita, emoji: '🆕' },
+
+  // 多媒体 AI
+  flux: { component: Flux, emoji: '🌊' },
+  runway: { component: Runway, emoji: '🛫' },
+  pika: { component: Pika, emoji: '⚡' },
+  suno: { component: Suno, emoji: '🎵' },
+  ideogram: { component: Ideogram, emoji: '💭' },
+  recraft: { component: Recraft, emoji: '🎨' },
+
+  // 自定义选项
+  custom: { emoji: '⚙️' },
+};
+
+// 获取提供商图标的函数
+function getProviderIcon(iconKey?: string): React.ReactNode {
+  if (!iconKey) return '🤖';
+
+  // 处理自定义 emoji
+  if (iconKey.startsWith('custom:')) {
+    const customEmoji = iconKey.replace('custom:', '');
+    return customEmoji || '⚙️';
+  }
+
+  const iconConfig = PROVIDER_ICON_MAPPING[iconKey.toLowerCase()];
+  if (!iconConfig) return '🤖';
+
+  // 优先使用 lobehub icon 组件
+  if (iconConfig.component) {
+    const IconComponent = iconConfig.component;
+    return <IconComponent size={16} />;
+  }
+
+  // 其次使用 emoji
+  return iconConfig.emoji;
 }
 
 export default function AdminConfig() {
   const { user: currentUser } = useAuth();
-  const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'invites' | 'system'>('dashboard');
-  const [stats, setStats] = useState<SystemStats | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showResetDialog, setShowResetDialog] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetInfo, setResetInfo] = useState<{
-    steps: string[];
-    confirmationRequired: string;
-  } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const toast = { success: toastSuccess, error: toastError };
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'invites' | 'system' | 'models'>('dashboard');
   const [providers, setProviders] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
-  const [systemSettings, setSystemSettings] = useState<any>({});
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
   const [editingProvider, setEditingProvider] = useState<any>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'providers' | 'models'>('providers');
+  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
+  const [showAddModelModal, setShowAddModelModal] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 用户管理相关状态
+  const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<SystemStats | null>(null);
+
+  // 邀请码管理相关状态
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [showCreateInviteModal, setShowCreateInviteModal] = useState(false);
+  const [inviteFormData, setInviteFormData] = useState({
+    count: 1,
+    maxUses: 1,
+  });
+
+  // 系统设置相关状态
+  const [systemSettings, setSystemSettings] = useState<any>({});
 
   // 加载仪表板数据
   const loadDashboard = async () => {
     if (!currentUser) return;
-
     setIsLoading(true);
+
     try {
       const response = await fetch(`/api/admin/dashboard?adminUserId=${currentUser.id}`);
       if (response.ok) {
@@ -87,8 +239,8 @@ export default function AdminConfig() {
   // 加载用户列表
   const loadUsers = async () => {
     if (!currentUser) return;
-
     setIsLoading(true);
+
     try {
       const response = await fetch(`/api/admin/users?adminUserId=${currentUser.id}`);
       if (response.ok) {
@@ -112,8 +264,8 @@ export default function AdminConfig() {
   // 加载邀请码列表
   const loadInviteCodes = async () => {
     if (!currentUser) return;
-    
     setIsLoading(true);
+
     try {
       const response = await fetch(`/api/admin/codes?adminUserId=${currentUser.id}&type=invite`);
       if (response.ok) {
@@ -129,240 +281,6 @@ export default function AdminConfig() {
     }
   };
 
-  // 创建邀请码
-  const createInviteCode = async (count: number = 1, maxUses: number = 1) => {
-    if (!currentUser) return;
-
-    try {
-      const promises = [];
-      for (let i = 0; i < count; i++) {
-        promises.push(
-          fetch('/api/admin/codes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              adminUserId: currentUser.id,
-              type: 'invite',
-              maxUses,
-            }),
-          })
-        );
-      }
-
-      const responses = await Promise.all(promises);
-      const successCount = responses.filter(r => r.ok).length;
-
-      if (successCount === count) {
-        toast.success(`成功创建 ${count} 个邀请码`);
-      } else if (successCount > 0) {
-        toast.success(`成功创建 ${successCount}/${count} 个邀请码`);
-      } else {
-        toast.error('创建邀请码失败');
-      }
-
-      loadInviteCodes();
-    } catch (error) {
-      toast.error('创建邀请码失败');
-    }
-  };
-
-  // 切换用户状态
-  const toggleUserStatus = async (userId: string, isActive: boolean) => {
-    if (!currentUser) return;
-
-    // 防止封禁自己
-    if (userId === currentUser.id && isActive) {
-      toast.error('不能封禁自己的账户');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          userId,
-          action: 'updateStatus',
-          isActive: !isActive,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(isActive ? '用户已封禁' : '用户已激活');
-        loadUsers();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 操作失败`;
-        console.error('Toggle user status error:', errorMessage);
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
-      console.error('Toggle user status error:', error);
-      toast.error(`操作失败: ${errorMessage}`);
-    }
-  };
-
-  // 删除用户
-  const deleteUser = async (userId: string, username: string) => {
-    if (!currentUser) return;
-
-    // 防止删除自己
-    if (userId === currentUser.id) {
-      toast.error('不能删除自己的账户');
-      return;
-    }
-
-    if (!confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销！`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/admin/users', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          userId,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(`用户 "${username}" 已删除`);
-        loadUsers();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 删除用户失败`;
-        console.error('Delete user error:', errorMessage);
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
-      console.error('Delete user error:', error);
-      toast.error(`删除用户失败: ${errorMessage}`);
-    }
-  };
-
-  // 获取数据库重置信息
-  const loadResetInfo = async () => {
-    if (!currentUser) return;
-
-    try {
-      const response = await fetch(`/api/admin/database/reset?adminUserId=${currentUser.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setResetInfo({
-          steps: data.steps,
-          confirmationRequired: data.confirmationRequired,
-        });
-        setShowResetDialog(true);
-      } else {
-        toast.error('获取重置信息失败');
-      }
-    } catch (error) {
-      toast.error('获取重置信息失败');
-    }
-  };
-
-  // 执行数据库重置
-  const handleDatabaseReset = async () => {
-    if (!currentUser || !resetInfo) return;
-
-    setIsResetting(true);
-    try {
-      const response = await fetch('/api/admin/database/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          confirmText: resetInfo.confirmationRequired,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        toast.success('数据库重置成功！页面将在3秒后刷新...');
-        setShowResetDialog(false);
-
-        // 3秒后刷新页面
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 3000);
-      } else {
-        toast.error(result.error || '数据库重置失败');
-      }
-    } catch (error) {
-      toast.error('数据库重置失败');
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  // 加载提供商和模型
-  const loadProvidersAndModels = async () => {
-    if (!currentUser) return;
-
-    try {
-      const response = await fetch('/api/providers');
-      if (response.ok) {
-        const data = await response.json();
-        setProviders(data);
-
-        // 提取所有模型
-        const allModels = data.flatMap((provider: any) =>
-          provider.models.map((model: any) => ({
-            ...model,
-            providerName: provider.name,
-            providerId: provider.id,
-          }))
-        );
-        setModels(allModels);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 加载提供商失败`;
-        console.error('Load providers error:', errorMessage);
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
-      console.error('Load providers error:', error);
-      toast.error(`加载提供商失败: ${errorMessage}`);
-    }
-  };
-
-  // 切换模型状态
-  const toggleModelStatus = async (modelId: string, isEnabled: boolean) => {
-    if (!user) return;
-
-    try {
-      const response = await fetch('/api/admin/models', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          modelId,
-          isEnabled: !isEnabled,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(isEnabled ? '模型已禁用' : '模型已启用');
-        loadProvidersAndModels();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 操作失败`;
-        console.error('Toggle model status error:', errorMessage);
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
-      console.error('Toggle model status error:', error);
-      toast.error(`操作失败: ${errorMessage}`);
-    }
-  };
-
   // 加载系统设置
   const loadSystemSettings = async () => {
     if (!currentUser) return;
@@ -371,12 +289,12 @@ export default function AdminConfig() {
       const response = await fetch(`/api/admin/system-settings?adminUserId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        setSystemSettings(data.raw || {});
+        setSystemSettings(data);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 加载系统设置失败`;
+        const errorMessage = errorData.error || '加载系统设置失败';
         console.error('Load system settings error:', errorMessage);
-        toast.error(errorMessage);
+        toast.error(`加载系统设置失败: ${errorMessage}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
@@ -385,33 +303,40 @@ export default function AdminConfig() {
     }
   };
 
-  // 更新系统设置
-  const updateSystemSettings = async (settings: Record<string, any>) => {
+  // 加载提供商和模型
+  const loadProvidersAndModels = async () => {
     if (!currentUser) return;
 
+    setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/system-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          settings,
-        }),
-      });
-
+      const response = await fetch(`/api/admin/providers?adminUserId=${currentUser.id}`);
       if (response.ok) {
-        toast.success('系统设置已更新');
-        loadSystemSettings();
+        const data = await response.json();
+        console.log('Admin Providers API response:', data);
+        // API 返回的是 Provider[] 数组，每个 provider 包含 models
+        setProviders(data || []);
+
+        // 提取所有模型
+        const allModels = data?.flatMap((provider: any) =>
+          provider.models?.map((model: any) => ({
+            ...model,
+            providerName: provider.displayName
+          })) || []
+        ) || [];
+        setModels(allModels);
+        console.log('Loaded providers:', data?.length || 0, 'models:', allModels.length);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}: 更新系统设置失败`;
-        console.error('Update system settings error:', errorMessage);
+        const errorMessage = errorData.error || '加载提供商失败';
+        console.error('Load providers error:', errorMessage);
         toast.error(errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
-      console.error('Update system settings error:', error);
-      toast.error(`更新系统设置失败: ${errorMessage}`);
+      console.error('Load providers error:', error);
+      toast.error(`加载提供商失败: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -480,12 +405,9 @@ export default function AdminConfig() {
     }
 
     try {
-      const response = await fetch(`/api/admin/providers/${providerId}`, {
+      const response = await fetch(`/api/admin/providers/${providerId}?adminUserId=${currentUser.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-        }),
       });
 
       if (response.ok) {
@@ -528,17 +450,374 @@ export default function AdminConfig() {
     }
   };
 
+  // 更新提供商排序
+  const updateProviderOrder = async (reorderedProviders: any[]) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch('/api/admin/providers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          providers: reorderedProviders.map((provider, index) => ({
+            id: provider.id,
+            order: index
+          }))
+        }),
+      });
+
+      if (response.ok) {
+        // 更新本地状态
+        setProviders(reorderedProviders);
+        toast.success('提供商排序已更新');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '更新排序失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('更新排序失败');
+    }
+  };
+
+  // 切换提供商展开状态
+  const toggleProviderExpanded = (providerId: string) => {
+    setExpandedProviders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(providerId)) {
+        newSet.delete(providerId);
+      } else {
+        newSet.add(providerId);
+      }
+      return newSet;
+    });
+  };
+
+  // 从v1/models API获取模型
+  const fetchModelsFromAPI = async (provider: any) => {
+    if (!currentUser) return;
+
+    if (!provider.baseUrl || !provider.apiKey) {
+      toast.error('提供商缺少Base URL或API Key，请先配置');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/fetch-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: provider.apiKey,
+          baseUrl: provider.baseUrl,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const models = data.models || [];
+
+        if (models.length === 0) {
+          toast.error('未获取到任何模型');
+          return;
+        }
+
+        // 批量创建模型 - 使用单个API调用
+        const batchResponse = await fetch('/api/admin/models/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminUserId: currentUser.id,
+            providerId: provider.id,
+            models: models.map((modelId: string) => ({
+              modelId: modelId,
+              name: modelId, // 默认使用modelId作为名称
+              isEnabled: true,
+            })),
+          }),
+        });
+
+        if (batchResponse.ok) {
+          const result = await batchResponse.json();
+          const { successCount, failCount, errors } = result;
+
+          if (successCount > 0) {
+            toast.success(`成功导入 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''}`);
+            loadProvidersAndModels(); // 重新加载数据
+          } else {
+            toast.error('所有模型导入失败');
+          }
+
+          // 如果有错误，显示详细信息
+          if (errors && errors.length > 0) {
+            console.warn('模型导入错误:', errors);
+          }
+        } else {
+          const errorData = await batchResponse.json().catch(() => ({}));
+          const errorMessage = errorData.error || '批量导入模型失败';
+          toast.error(errorMessage);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '获取模型失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Fetch models error:', error);
+      toast.error('网络错误：无法获取模型');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 打开自定义模型添加模态框
+  const openAddModelModal = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setShowAddModelModal(true);
+  };
+
+  // 创建自定义模型
+  const createCustomModel = async (modelData: { modelId: string; name: string; description?: string }) => {
+    if (!currentUser || !selectedProviderId) return;
+
+    try {
+      const response = await fetch('/api/admin/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          providerId: selectedProviderId,
+          modelId: modelData.modelId,
+          name: modelData.name,
+          description: modelData.description,
+          isEnabled: true,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('自定义模型创建成功');
+        setShowAddModelModal(false);
+        setSelectedProviderId('');
+        loadProvidersAndModels(); // 重新加载数据
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '创建模型失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Create model error:', error);
+      toast.error('网络错误：无法创建模型');
+    }
+  };
+
+  // 更新模型排序
+  const updateModelOrder = async (providerId: string, reorderedModels: any[]) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch('/api/admin/models', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          models: reorderedModels.map((model, index) => ({
+            id: model.id,
+            order: index
+          }))
+        }),
+      });
+
+      if (response.ok) {
+        // 更新本地状态
+        setProviders(prevProviders =>
+          prevProviders.map(provider =>
+            provider.id === providerId
+              ? { ...provider, models: reorderedModels }
+              : provider
+          )
+        );
+        toast.success('模型排序已更新');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '更新排序失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('更新排序失败');
+    }
+  };
+
+  // 用户管理函数
+  const toggleUserStatus = async (userId: string, isActive: boolean) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          isActive: !isActive,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(isActive ? '用户已禁用' : '用户已启用');
+        loadUsers();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '操作失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('操作失败');
+    }
+  };
+
+  const deleteUser = async (userId: string, username: string) => {
+    if (!currentUser) return;
+
+    if (!confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('用户删除成功');
+        loadUsers();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '删除用户失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('删除用户失败');
+    }
+  };
+
+  // 邀请码管理函数
+  const createInviteCode = async (count: number = 1, maxUses: number = 1) => {
+    if (!currentUser) return;
+
+    try {
+      const promises = [];
+      for (let i = 0; i < count; i++) {
+        promises.push(
+          fetch('/api/admin/codes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminUserId: currentUser.id,
+              type: 'invite',
+              maxUses,
+            }),
+          })
+        );
+      }
+
+      const responses = await Promise.all(promises);
+      const successCount = responses.filter(r => r.ok).length;
+
+      if (successCount === count) {
+        toast.success(`成功创建 ${count} 个邀请码`);
+      } else if (successCount > 0) {
+        toast.success(`成功创建 ${successCount}/${count} 个邀请码`);
+      } else {
+        toast.error('创建邀请码失败');
+      }
+
+      loadInviteCodes();
+      setShowCreateInviteModal(false);
+    } catch (error) {
+      toast.error('创建邀请码失败');
+    }
+  };
+
+  // 从表单创建邀请码
+  const createInviteCodeFromForm = async () => {
+    await createInviteCode(inviteFormData.count, inviteFormData.maxUses);
+    setInviteFormData({ count: 1, maxUses: 1 }); // 重置表单
+  };
+
+  const deleteInviteCode = async (codeId: string, code: string) => {
+    if (!currentUser) return;
+
+    if (!confirm(`确定要删除邀请码 "${code}" 吗？`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/codes/${codeId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('邀请码删除成功');
+        loadInviteCodes();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '删除邀请码失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('删除邀请码失败');
+    }
+  };
+
+  // 系统设置函数
+  const updateSystemSettings = async (settings: any) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch('/api/admin/system-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          ...settings,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('系统设置更新成功');
+        loadSystemSettings();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '更新系统设置失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('更新系统设置失败');
+    }
+  };
+
   useEffect(() => {
+    if (!currentUser) return;
+
     if (activeTab === 'dashboard') {
       loadDashboard();
+      loadProvidersAndModels(); // 为了获取提供商和模型数量
     } else if (activeTab === 'users') {
       loadUsers();
     } else if (activeTab === 'invites') {
       loadInviteCodes();
-    } else if (currentUser && activeTab === 'models') {
-      loadProvidersAndModels();
     } else if (activeTab === 'system') {
       loadSystemSettings();
+    } else if (activeTab === 'models') {
+      loadProvidersAndModels();
     }
   }, [activeTab, currentUser]);
 
@@ -559,592 +838,1423 @@ export default function AdminConfig() {
         {/* 页面标题 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            管理员控制面板
+            管理员配置
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            管理用户、邀请码和系统设置
+            管理系统用户、邀请码和模型配置
           </p>
         </div>
 
-        {/* 标签页导航 */}
-        <div className="mb-8">
+        {/* 导航标签 */}
+        <div className="mb-6">
           <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="-mb-px flex space-x-8">
               {[
-                { id: 'dashboard', name: '仪表板', icon: '📊' },
-                { id: 'users', name: '用户管理', icon: '👥' },
-                { id: 'models', name: '模型管理', icon: '🤖' },
-                { id: 'invites', name: '邀请码', icon: '🎫' },
-                { id: 'system', name: '系统设置', icon: '⚙️' },
+                { id: 'dashboard', name: '仪表板' },
+                { id: 'users', name: '用户管理' },
+                { id: 'invites', name: '邀请码管理' },
+                { id: 'models', name: '模型管理' },
+                { id: 'system', name: '系统设置' },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
                   }`}
                 >
-                  <span>{tab.icon}</span>
-                  <span>{tab.name}</span>
+                  {tab.name}
                 </button>
               ))}
             </nav>
           </div>
         </div>
 
-        {/* 标签页内容 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-          {activeTab === 'dashboard' && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                系统概览
+        {/* 模型管理 */}
+        {activeTab === 'models' && (
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                模型管理
               </h2>
-              {stats ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                      总用户数
-                    </h3>
-                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                      {stats.totalUsers || 0}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-green-600 dark:text-green-400">
-                      活跃用户
-                    </h3>
-                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                      {stats.activeUsers || 0}
-                    </p>
-                  </div>
-                  <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                      总Token使用
-                    </h3>
-                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                      {(stats.totalTokens || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                      今日Token
-                    </h3>
-                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                      {(stats.todayTokens || 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-gray-500 mt-2">加载中...</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'users' && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                用户管理
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        用户
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        角色
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        状态
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        注册时间
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        操作
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {users.map((user) => (
-                      <tr key={user.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {user.username}
-                            </div>
-                            {user.email && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {user.email}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.role === 'ADMIN' 
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                              : user.role === 'USER'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                          }`}>
-                            {user.role === 'ADMIN' ? '管理员' : user.role === 'USER' ? '用户' : '访客'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.isActive 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                          }`}>
-                            {user.isActive ? '活跃' : '封禁'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {user.id === currentUser?.id ? (
-                              // 当前管理员用户：禁用封禁和删除按钮
-                              <>
-                                <span className="text-gray-400 dark:text-gray-500 cursor-not-allowed">
-                                  封禁
-                                </span>
-                                <span className="text-gray-300">|</span>
-                                <span className="text-gray-400 dark:text-gray-500 cursor-not-allowed">
-                                  删除
-                                </span>
-                              </>
-                            ) : (
-                              // 其他用户：正常显示操作按钮
-                              <>
-                                <button
-                                  onClick={() => toggleUserStatus(user.id, user.isActive)}
-                                  className={`${
-                                    user.isActive
-                                      ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
-                                      : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                                  }`}
-                                >
-                                  {user.isActive ? '封禁' : '激活'}
-                                </button>
-                                <span className="text-gray-300">|</span>
-                                <button
-                                  onClick={() => deleteUser(user.id, user.username)}
-                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                >
-                                  删除
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                共 {models.length} 个模型，{providers.length} 个提供商
               </div>
             </div>
-          )}
 
-          {activeTab === 'models' && (
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  模型管理
-                </h2>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  共 {models.length} 个模型
+            {/* 提供商和模型管理 */}
+              <div className="space-y-6">
+                {/* 添加提供商按钮 */}
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    提供商列表
+                  </h3>
+                  <button
+                    onClick={() => setShowAddProviderModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    添加提供商
+                  </button>
                 </div>
-              </div>
 
-              {/* 提供商统计 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                    提供商数量
-                  </h3>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    {providers.length}
-                  </p>
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-green-600 dark:text-green-400">
-                    启用模型
-                  </h3>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                    {models.filter(m => m.isEnabled).length}
-                  </p>
-                </div>
-                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-red-600 dark:text-red-400">
-                    禁用模型
-                  </h3>
-                  <p className="text-2xl font-bold text-red-900 dark:text-red-100">
-                    {models.filter(m => !m.isEnabled).length}
-                  </p>
-                </div>
-              </div>
-
-              {/* 模型列表 */}
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-                <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
-                    模型列表
-                  </h3>
-
+                {/* 提供商列表 */}
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                   {isLoading ? (
                     <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="text-gray-500 mt-2">加载中...</p>
+                      <p className="text-gray-500">加载中...</p>
                     </div>
-                  ) : models.length === 0 ? (
+                  ) : providers.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-gray-500">暂无模型数据</p>
+                      <p className="text-gray-500">暂无提供商数据</p>
+                      <p className="text-xs text-gray-400 mt-2">调试信息: providers.length = {providers.length}</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              模型信息
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              提供商
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              分组
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              状态
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              操作
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                          {models.map((model) => (
-                            <tr key={model.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {model.name}
+                    <div className="p-6">
+                      <div className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                        拖拽左侧图标可调整提供商顺序
+                      </div>
+                      <SortableList
+                        items={providers}
+                        onReorder={updateProviderOrder}
+                      >
+                        {(provider) => (
+                          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                            {/* 提供商主要信息 */}
+                            <div className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center flex-1">
+                                  <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center mr-4">
+                                    <span className="text-xl">
+                                      {getProviderIcon(provider.icon)}
+                                    </span>
                                   </div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {model.modelId}
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {provider.displayName}
+                                      </div>
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        provider.isEnabled
+                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                      }`}>
+                                        {provider.isEnabled ? '启用' : '禁用'}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                      {provider.name} • {provider.baseUrl || '无Base URL'}
+                                    </div>
+                                    {provider.models && provider.models.length > 0 && (
+                                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                        {provider.models.length} 个模型
+                                      </div>
+                                    )}
                                   </div>
-                                  {model.description && (
-                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                      {model.description}
+                                </div>
+                                <div className="flex items-center space-x-2 ml-4">
+                                  <button
+                                    onClick={() => toggleProviderExpanded(provider.id)}
+                                    className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                                  >
+                                    {expandedProviders.has(provider.id) ? '收起模型' : '管理模型'}
+                                  </button>
+                                  <button
+                                    onClick={() => toggleProviderStatus(provider.id, provider.isEnabled)}
+                                    className={`px-3 py-1 text-xs rounded ${
+                                      provider.isEnabled
+                                        ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800'
+                                    }`}
+                                  >
+                                    {provider.isEnabled ? '禁用' : '启用'}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingProvider(provider)}
+                                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
+                                  >
+                                    编辑
+                                  </button>
+                                  <button
+                                    onClick={() => deleteProvider(provider.id, provider.displayName)}
+                                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800"
+                                  >
+                                    删除
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 模型管理折叠区域 */}
+                            {expandedProviders.has(provider.id) && (
+                              <div className="border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                    模型管理
+                                  </h4>
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => fetchModelsFromAPI(provider)}
+                                      disabled={isLoading}
+                                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {isLoading ? '获取中...' : 'v1/models 获取'}
+                                    </button>
+                                    <button
+                                      onClick={() => openAddModelModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800"
+                                    >
+                                      自定义模型
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* 模型列表 */}
+                                <div className="space-y-2">
+                                  {provider.models && provider.models.length > 0 ? (
+                                    <div>
+                                      <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        拖拽左侧图标可调整模型顺序
+                                      </div>
+                                      <SortableList
+                                        items={provider.models}
+                                        onReorder={(reorderedModels) => updateModelOrder(provider.id, reorderedModels)}
+                                      >
+                                        {(model: any) => (
+                                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border">
+                                            <div className="flex-1">
+                                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                {model.name}
+                                              </div>
+                                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                ID: {model.modelId}
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                model.isEnabled
+                                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                              }`}>
+                                                {model.isEnabled ? '启用' : '禁用'}
+                                              </span>
+                                              <button className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800">
+                                                编辑
+                                              </button>
+                                              <button className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
+                                                删除
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </SortableList>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                                      暂无模型，点击上方按钮添加模型
                                     </div>
                                   )}
                                 </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {model.providerName}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {model.group || '-'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  model.isEnabled
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                }`}>
-                                  {model.isEnabled ? '启用' : '禁用'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => toggleModelStatus(model.id, model.isEnabled)}
-                                  className={`${
-                                    model.isEnabled
-                                      ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
-                                      : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                                  }`}
-                                >
-                                  {model.isEnabled ? '禁用' : '启用'}
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </SortableList>
                     </div>
                   )}
                 </div>
               </div>
+          </div>
+        )}
 
-              {/* 注意事项 */}
-              <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <span className="text-yellow-600 dark:text-yellow-400 text-xl">⚠️</span>
+        {/* 仪表板 */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            {/* 统计卡片 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">👥</span>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                          总用户数
+                        </dt>
+                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                          {isLoading ? '...' : (stats?.totalUsers || 0)}
+                        </dd>
+                      </dl>
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      注意事项
-                    </h3>
-                    <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                      <p>禁用模型后，用户将无法使用该模型进行聊天。请谨慎操作，建议在低峰时段进行配置更改。</p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">✅</span>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                          活跃用户
+                        </dt>
+                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                          {isLoading ? '...' : (stats?.activeUsers || 0)}
+                        </dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">🤖</span>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                          AI 模型数
+                        </dt>
+                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                          {models.length}
+                        </dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">🏢</span>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                          服务提供商
+                        </dt>
+                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                          {providers.length}
+                        </dd>
+                      </dl>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
 
-          {activeTab === 'invites' && (
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  邀请码管理
-                </h2>
-                <div className="flex space-x-2">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-700 dark:text-gray-300">数量:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      defaultValue="1"
-                      id="invite-count"
-                      className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-800 dark:text-white"
-                    />
+            {/* 快速操作 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                快速操作
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">👥</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">管理用户</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">查看和管理系统用户</div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-700 dark:text-gray-300">使用次数:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      defaultValue="1"
-                      id="invite-max-uses"
-                      className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-800 dark:text-white"
-                    />
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('models')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🤖</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">模型管理</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">配置 AI 模型和提供商</div>
                   </div>
-                  <button
-                    onClick={() => {
-                      const countInput = document.getElementById('invite-count') as HTMLInputElement;
-                      const maxUsesInput = document.getElementById('invite-max-uses') as HTMLInputElement;
-                      const count = parseInt(countInput.value) || 1;
-                      const maxUses = parseInt(maxUsesInput.value) || 1;
-                      createInviteCode(count, maxUses);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    创建邀请码
-                  </button>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        邀请码
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        使用情况
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        状态
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        创建时间
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {inviteCodes.map((code) => (
-                      <tr key={code.id}>
-                        <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900 dark:text-white">
-                          {code.code}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {code.currentUses} / {code.maxUses}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            code.isUsed 
-                              ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                              : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          }`}>
-                            {code.isUsed ? '已使用' : '可用'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(code.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('invites')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🎫</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">邀请码管理</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">创建和管理邀请码</div>
+                  </div>
+                </button>
               </div>
             </div>
-          )}
 
-          {activeTab === 'system' && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                系统设置
+            {/* 系统状态 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                系统状态
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">数据库连接</span>
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    正常
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">API 服务</span>
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    运行中
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">启用的提供商</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {providers.filter(p => p.isEnabled).length} / {providers.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 用户管理 */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                用户管理
               </h2>
-              <div className="space-y-6">
-                {/* 邀请码设置 */}
-                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    邀请码设置
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        用户最大邀请码创建数量
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={systemSettings.user_max_invite_codes || 1}
-                        onChange={(e) => setSystemSettings(prev => ({
-                          ...prev,
-                          user_max_invite_codes: parseInt(e.target.value)
-                        }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        普通用户可以创建的邀请码数量上限
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        邀请码最大使用次数
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={systemSettings.invite_code_max_uses || 1}
-                        onChange={(e) => setSystemSettings(prev => ({
-                          ...prev,
-                          invite_code_max_uses: parseInt(e.target.value)
-                        }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        单个邀请码可以使用的次数上限
-                      </p>
-                    </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                共 {users.length} 个用户
+              </div>
+            </div>
+
+            {/* 用户列表 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">加载中...</p>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">暂无用户数据</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          用户信息
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          角色
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          状态
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          注册时间
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Token 使用
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {users.map((user) => (
+                        <tr key={user.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                {user.username}
+                              </div>
+                              {user.email && (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {user.email}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.role === 'ADMIN'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                : user.role === 'USER'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.isActive
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {user.isActive ? '活跃' : '禁用'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {new Date(user.createdAt).toLocaleDateString('zh-CN')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {user.tokenUsage ? (
+                              <div>
+                                <div>{user.tokenUsage.totalTokens.toLocaleString()} tokens</div>
+                                <div className="text-xs text-gray-500">
+                                  ¥{user.tokenUsage.cost.toFixed(2)}
+                                </div>
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {user.role !== 'ADMIN' && (
+                                <>
+                                  <button
+                                    onClick={() => toggleUserStatus(user.id, user.isActive)}
+                                    className={`${
+                                      user.isActive
+                                        ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
+                                        : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
+                                    }`}
+                                  >
+                                    {user.isActive ? '禁用' : '启用'}
+                                  </button>
+                                  <span className="text-gray-300">|</span>
+                                  <button
+                                    onClick={() => deleteUser(user.id, user.username)}
+                                    className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                  >
+                                    删除
+                                  </button>
+                                </>
+                              )}
+                              {user.role === 'ADMIN' && (
+                                <span className="text-gray-400 text-xs">管理员</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 邀请码管理 */}
+        {activeTab === 'invites' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                邀请码管理
+              </h2>
+              <button
+                onClick={() => setShowCreateInviteModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                创建邀请码
+              </button>
+            </div>
+
+            {/* 快速创建 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                快速创建
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button
+                  onClick={() => createInviteCode(1, 1)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-medium text-gray-900 dark:text-white">单次使用</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">创建 1 个单次使用邀请码</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => createInviteCode(5, 1)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-medium text-gray-900 dark:text-white">批量创建</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">创建 5 个单次使用邀请码</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => createInviteCode(1, 10)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-medium text-gray-900 dark:text-white">多次使用</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">创建 1 个可用 10 次的邀请码</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* 邀请码列表 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  邀请码列表 ({inviteCodes.length})
+                </h3>
+              </div>
+
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">加载中...</p>
+                </div>
+              ) : inviteCodes.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">暂无邀请码</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          邀请码
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          使用情况
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          状态
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          创建者
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          创建时间
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {inviteCodes.map((code) => (
+                        <tr key={code.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-mono text-gray-900 dark:text-white">
+                              {code.code}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {code.currentUses} / {code.maxUses}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              code.currentUses >= code.maxUses
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            }`}>
+                              {code.currentUses >= code.maxUses ? '已用完' : '可用'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {code.creator.username}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {new Date(code.createdAt).toLocaleDateString('zh-CN')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => deleteInviteCode(code.id, code.code)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            >
+                              删除
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 系统设置 */}
+        {activeTab === 'system' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              系统设置
+            </h2>
+
+            {/* 基本设置 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                基本设置
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    系统名称
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-900 dark:text-white font-medium">FIM AI</span>
+                    <input
+                      type="text"
+                      value={systemSettings.systemNameSuffix || ' Chat'}
+                      onChange={(e) => setSystemSettings((prev: any) => ({ ...prev, systemNameSuffix: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder=" Chat"
+                    />
                   </div>
                 </div>
 
-                {/* 访问码设置 */}
-                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    访问码设置
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        用户最大访问码创建数量
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={systemSettings.user_max_access_codes || 10}
-                        onChange={(e) => setSystemSettings(prev => ({
-                          ...prev,
-                          user_max_access_codes: parseInt(e.target.value)
-                        }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        普通用户可以创建的访问码数量上限
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        访问码最大用户数量
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10000"
-                        value={systemSettings.access_code_max_users || 10}
-                        onChange={(e) => setSystemSettings(prev => ({
-                          ...prev,
-                          access_code_max_users: parseInt(e.target.value)
-                        }))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        单个访问码可以支持的用户数量上限
-                      </p>
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    系统描述
+                  </label>
+                  <textarea
+                    value={systemSettings.systemDescription || '智能 AI 聊天助手'}
+                    onChange={(e) => setSystemSettings((prev: any) => ({ ...prev, systemDescription: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows={3}
+                    placeholder="智能 AI 聊天助手"
+                  />
                 </div>
 
-                {/* 保存按钮 */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => updateSystemSettings(systemSettings)}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    保存设置
-                  </button>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="allowRegistration"
+                    checked={systemSettings.allowRegistration ?? true}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, allowRegistration: e.target.checked }))}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="allowRegistration" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    允许用户注册
+                  </label>
                 </div>
 
-                {/* 危险操作区域 */}
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
-                    ⚠️ 危险操作
-                  </h3>
-                  <p className="text-red-700 dark:text-red-300 text-sm mb-4">
-                    以下操作将永久删除所有数据，请谨慎操作！
-                  </p>
-                  <button
-                    onClick={loadResetInfo}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium"
-                  >
-                    🗑️ 重置数据库
-                  </button>
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-2">
-                    此操作将删除所有用户、聊天记录、邀请码等数据
-                  </p>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="requireInviteCode"
+                    checked={systemSettings.requireInviteCode ?? true}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, requireInviteCode: e.target.checked }))}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="requireInviteCode" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    注册需要邀请码
+                  </label>
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* 数据库重置确认对话框 */}
-      <ConfirmDialog
-        isOpen={showResetDialog}
-        title="⚠️ 重置数据库"
-        message="此操作将永久删除所有数据且无法恢复！请确认您了解此操作的后果。"
-        confirmText="确认重置"
-        cancelText="取消"
-        type="danger"
-        requireTextConfirmation={resetInfo?.confirmationRequired}
-        isLoading={isResetting}
-        steps={resetInfo?.steps || []}
-        onConfirm={handleDatabaseReset}
-        onCancel={() => {
-          setShowResetDialog(false);
-          setResetInfo(null);
-        }}
-      />
+            {/* Token 设置 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Token 设置
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    默认 Token 限额（每用户）
+                  </label>
+                  <input
+                    type="number"
+                    value={systemSettings.defaultTokenLimit || 100000}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, defaultTokenLimit: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Token 价格（每 1000 tokens，人民币分）
+                  </label>
+                  <input
+                    type="number"
+                    value={systemSettings.tokenPrice || 1}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, tokenPrice: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="enableTokenTracking"
+                    checked={systemSettings.enableTokenTracking ?? true}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, enableTokenTracking: e.target.checked }))}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="enableTokenTracking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    启用 Token 使用统计
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* 安全设置 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                安全设置
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    会话超时时间（小时）
+                  </label>
+                  <input
+                    type="number"
+                    value={systemSettings.sessionTimeout || 24}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    最大并发请求数
+                  </label>
+                  <input
+                    type="number"
+                    value={systemSettings.maxConcurrentRequests || 10}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, maxConcurrentRequests: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="enableRateLimit"
+                    checked={systemSettings.enableRateLimit ?? true}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, enableRateLimit: e.target.checked }))}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="enableRateLimit" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    启用请求频率限制
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* 保存按钮 */}
+            <div className="flex justify-end">
+              <button
+                onClick={() => updateSystemSettings(systemSettings)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                保存设置
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 添加提供商模态框 */}
+        {showAddProviderModal && (
+          <ProviderModal
+            isOpen={showAddProviderModal}
+            onClose={() => setShowAddProviderModal(false)}
+            onSubmit={createProvider}
+            title="添加提供商"
+          />
+        )}
+
+        {/* 编辑提供商模态框 */}
+        {editingProvider && (
+          <ProviderModal
+            isOpen={!!editingProvider}
+            onClose={() => setEditingProvider(null)}
+            onSubmit={(data) => updateProvider(editingProvider.id, data)}
+            title="编辑提供商"
+            initialData={editingProvider}
+          />
+        )}
+
+        {/* 创建邀请码模态框 */}
+        {showCreateInviteModal && (
+          <CreateInviteModal
+            isOpen={showCreateInviteModal}
+            onClose={() => setShowCreateInviteModal(false)}
+            onSubmit={createInviteCodeFromForm}
+            formData={inviteFormData}
+            setFormData={setInviteFormData}
+          />
+        )}
+
+        {/* 添加自定义模型模态框 */}
+        {showAddModelModal && (
+          <AddModelModal
+            isOpen={showAddModelModal}
+            onClose={() => {
+              setShowAddModelModal(false);
+              setSelectedProviderId('');
+            }}
+            onSubmit={createCustomModel}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 提供商模态框组件
+interface ProviderModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  title: string;
+  initialData?: any;
+}
+
+function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: ProviderModalProps) {
+  const { error: toastError } = useToast();
+  const [formData, setFormData] = useState({
+    name: initialData?.displayName || initialData?.name || '',
+    baseUrl: initialData?.baseUrl || '',
+    apiKey: initialData?.apiKey || '',
+    icon: (() => {
+      // 如果是自定义 emoji，返回 'custom'，否则返回原值
+      if (initialData?.icon?.startsWith('custom:')) {
+        return 'custom';
+      }
+      return initialData?.icon || 'custom'; // 默认为自定义 emoji
+    })(),
+    description: initialData?.description || '',
+    isEnabled: initialData?.isEnabled ?? true,
+  });
+
+  // 自定义 emoji 状态
+  const [customEmoji, setCustomEmoji] = useState(() => {
+    // 如果初始数据的图标是自定义 emoji，提取出来
+    if (initialData?.icon?.startsWith('custom:')) {
+      return initialData.icon.replace('custom:', '');
+    }
+    return 'F'; // 默认为 emoji F
+  });
+  const [showCustomEmoji, setShowCustomEmoji] = useState(() => {
+    // 如果初始数据的图标是自定义 emoji，显示自定义输入框
+    return initialData?.icon?.startsWith('custom:') || true; // 默认显示自定义输入框
+  });
+
+  // 常用的 AI 提供商图标选项 - 优先使用 lobehub icons，其次使用 emoji
+  const iconOptions = [
+    // 国际主流 AI 提供商
+    { value: 'openai', label: 'OpenAI', component: OpenAI, emoji: '🤖' },
+    { value: 'anthropic', label: 'Anthropic', component: Anthropic, emoji: '🧠' },
+    { value: 'google', label: 'Google', component: Google, emoji: '🔍' },
+    { value: 'microsoft', label: 'Microsoft', component: Microsoft, emoji: '🪟' },
+    { value: 'meta', label: 'Meta', component: Meta, emoji: '📘' },
+    { value: 'huggingface', label: 'Hugging Face', component: HuggingFace, emoji: '🤗' },
+    { value: 'cohere', label: 'Cohere', component: Cohere, emoji: '🌊' },
+    { value: 'stability', label: 'Stability AI', component: Stability, emoji: '🎨' },
+    { value: 'replicate', label: 'Replicate', component: Replicate, emoji: '🔄' },
+    { value: 'together', label: 'Together AI', component: Together, emoji: '🤝' },
+    { value: 'perplexity', label: 'Perplexity', component: Perplexity, emoji: '❓' },
+    { value: 'mistral', label: 'Mistral AI', component: Mistral, emoji: '🌪️' },
+    { value: 'groq', label: 'Groq', component: Groq, emoji: '⚡' },
+    { value: 'fireworks', label: 'Fireworks AI', component: Fireworks, emoji: '🎆' },
+    { value: 'openrouter', label: 'OpenRouter', component: OpenRouter, emoji: '🛣️' },
+    { value: 'bedrock', label: 'AWS Bedrock', component: Bedrock, emoji: '🏔️' },
+    { value: 'azure', label: 'Azure AI', component: Azure, emoji: '☁️' },
+    { value: 'vertexai', label: 'Vertex AI', component: VertexAI, emoji: '🔺' },
+    { value: 'claude', label: 'Claude', component: Claude, emoji: '🤖' },
+    { value: 'gemini', label: 'Gemini', component: Gemini, emoji: '♊' },
+    { value: 'xai', label: 'xAI', component: XAI, emoji: '❌' },
+
+    // 中国 AI 提供商
+    { value: 'baidu', label: '百度', component: Baidu, emoji: '🐻' },
+    { value: 'alibaba', label: '阿里巴巴', component: Alibaba, emoji: '🛒' },
+    { value: 'tencent', label: '腾讯', component: Tencent, emoji: '🐧' },
+    { value: 'bytedance', label: '字节跳动', component: ByteDance, emoji: '🎵' },
+    { value: 'deepseek', label: 'DeepSeek', component: DeepSeek, emoji: '🔍' },
+    { value: 'moonshot', label: 'Moonshot', component: Moonshot, emoji: '🌙' },
+    { value: 'zhipu', label: '智谱AI', component: Zhipu, emoji: '🧠' },
+    { value: 'yi', label: '零一万物', component: Yi, emoji: '🔤' },
+    { value: 'sensenova', label: '商汤', component: SenseNova, emoji: '🌟' },
+    { value: 'spark', label: '讯飞星火', component: Spark, emoji: '⚡' },
+    { value: 'qwen', label: '通义千问', component: Qwen, emoji: '🤖' },
+    { value: 'hunyuan', label: '腾讯混元', component: Hunyuan, emoji: '🌀' },
+    { value: 'wenxin', label: '文心一言', component: Wenxin, emoji: '📝' },
+    { value: 'doubao', label: '豆包', component: Doubao, emoji: '🫘' },
+    { value: 'stepfun', label: 'StepFun', component: Stepfun, emoji: '👣' },
+
+    // 开源和部署平台
+    { value: 'ollama', label: 'Ollama', component: Ollama, emoji: '🦙' },
+    { value: 'comfyui', label: 'ComfyUI', component: ComfyUI, emoji: '🎨' },
+    { value: 'siliconcloud', label: 'SiliconCloud', component: SiliconCloud, emoji: '☁️' },
+    { value: 'deepinfra', label: 'DeepInfra', component: DeepInfra, emoji: '🏗️' },
+    { value: 'anyscale', label: 'Anyscale', component: Anyscale, emoji: '📏' },
+    { value: 'novita', label: 'Novita AI', component: Novita, emoji: '🆕' },
+
+    // 多媒体 AI
+    { value: 'flux', label: 'Flux', component: Flux, emoji: '🌊' },
+    { value: 'runway', label: 'Runway', component: Runway, emoji: '🛫' },
+    { value: 'pika', label: 'Pika', component: Pika, emoji: '⚡' },
+    { value: 'suno', label: 'Suno', component: Suno, emoji: '🎵' },
+    { value: 'ideogram', label: 'Ideogram', component: Ideogram, emoji: '💭' },
+    { value: 'recraft', label: 'Recraft', component: Recraft, emoji: '🎨' },
+
+    // 自定义选项
+    { value: 'custom', label: '自定义 Emoji', emoji: '⚙️' },
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) {
+      toastError('请填写提供商名称');
+      return;
+    }
+
+    if (!formData.baseUrl) {
+      toastError('请填写 Base URL');
+      return;
+    }
+
+    // 如果选择了自定义 emoji，验证是否输入了内容
+    if (formData.icon === 'custom' && !customEmoji.trim()) {
+      toastError('请输入自定义 emoji');
+      return;
+    }
+
+    // 生成 name 和 displayName
+    const submitData = {
+      ...formData,
+      name: formData.name.toLowerCase().replace(/\s+/g, '-'),
+      displayName: formData.name,
+      // 如果是自定义 emoji，使用用户输入的值
+      icon: formData.icon === 'custom' ? `custom:${customEmoji.trim()}` : formData.icon,
+    };
+
+    onSubmit(submitData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          {title}
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              提供商名称 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="例如: OpenAI, Anthropic"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              将自动生成内部标识符和显示名称
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              图标选择 <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={formData.icon}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData(prev => ({ ...prev, icon: value }));
+                  setShowCustomEmoji(value === 'custom');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none"
+                required
+              >
+                {iconOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-8 pointer-events-none">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">
+                    {(() => {
+                      const selectedOption = iconOptions.find(opt => opt.value === formData.icon);
+                      if (!selectedOption) return '🤖';
+
+                      if (selectedOption.component) {
+                        const IconComponent = selectedOption.component;
+                        return <IconComponent size={16} />;
+                      }
+                      return selectedOption.emoji;
+                    })()}
+                  </span>
+                </div>
+              </div>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* 自定义 Emoji 输入框 */}
+            {showCustomEmoji && (
+              <div className="mt-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  自定义 Emoji
+                </label>
+                <input
+                  type="text"
+                  value={customEmoji}
+                  onChange={(e) => {
+                    // 只允许输入一个字符（emoji）
+                    const value = e.target.value;
+                    if (value.length <= 1) {
+                      setCustomEmoji(value);
+                    }
+                  }}
+                  placeholder="输入一个 emoji，如：🚀"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  maxLength={1}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  可以输入任何 emoji 或符号作为图标
+                </p>
+              </div>
+            )}
+
+
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Base URL <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="url"
+              value={formData.baseUrl}
+              onChange={(e) => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="https://api.openai.com/v1"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              API Key
+            </label>
+            <input
+              type="password"
+              value={formData.apiKey}
+              onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="sk-..."
+            />
+          </div>
+
+
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              描述
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              rows={3}
+              placeholder="提供商描述..."
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isEnabled"
+              checked={formData.isEnabled}
+              onChange={(e) => setFormData(prev => ({ ...prev, isEnabled: e.target.checked }))}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="isEnabled" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+              启用提供商
+            </label>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              {initialData ? '更新' : '创建'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// 创建邀请码模态框组件
+interface CreateInviteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+  formData: {
+    count: number;
+    maxUses: number;
+  };
+  setFormData: (data: any) => void;
+}
+
+function CreateInviteModal({ isOpen, onClose, onSubmit, formData, setFormData }: CreateInviteModalProps) {
+  const { error: toastError } = useToast();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.count < 1 || formData.count > 100) {
+      toastError('邀请码数量必须在 1-100 之间');
+      return;
+    }
+    if (formData.maxUses < 1 || formData.maxUses > 1000) {
+      toastError('使用次数必须在 1-1000 之间');
+      return;
+    }
+    onSubmit();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          创建邀请码
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              邀请码数量 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={formData.count}
+              onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="1"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              一次最多创建 100 个邀请码
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              每个邀请码可使用次数 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              value={formData.maxUses}
+              onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 1 })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="1"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              每个邀请码最多可使用 1000 次
+            </p>
+          </div>
+
+          {/* 预览信息 */}
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">创建预览</h4>
+            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <div>将创建 <span className="font-medium text-gray-900 dark:text-white">{formData.count}</span> 个邀请码</div>
+              <div>每个邀请码可使用 <span className="font-medium text-gray-900 dark:text-white">{formData.maxUses}</span> 次</div>
+              <div>总共可注册 <span className="font-medium text-gray-900 dark:text-white">{formData.count * formData.maxUses}</span> 个用户</div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              创建邀请码
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// 添加自定义模型模态框组件
+interface AddModelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: { modelId: string; name: string; description?: string }) => void;
+}
+
+function AddModelModal({ isOpen, onClose, onSubmit }: AddModelModalProps) {
+  const { error: toastError } = useToast();
+  const [formData, setFormData] = useState({
+    modelId: '',
+    name: '',
+    description: '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.modelId.trim()) {
+      toastError('请填写模型ID');
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toastError('请填写模型名称');
+      return;
+    }
+
+    onSubmit({
+      modelId: formData.modelId.trim(),
+      name: formData.name.trim(),
+      description: formData.description.trim() || undefined,
+    });
+
+    // 重置表单
+    setFormData({
+      modelId: '',
+      name: '',
+      description: '',
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          添加自定义模型
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              模型ID <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.modelId}
+              onChange={(e) => setFormData(prev => ({ ...prev, modelId: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="例如: gpt-4o-mini"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              用于API请求的模型标识符
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              模型名称 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="例如: GPT-4o Mini"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              用户界面显示的模型名称
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              描述（可选）
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              rows={3}
+              placeholder="模型描述..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              添加模型
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

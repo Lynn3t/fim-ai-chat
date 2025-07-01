@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProviders, createProvider } from '@/lib/db/providers'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const providers = await getProviders(true)
+    const { searchParams } = new URL(request.url)
+    const includeDisabled = searchParams.get('includeDisabled') === 'true'
+
+    const providers = await getProviders(true, !includeDisabled)
     return NextResponse.json(providers)
   } catch (error) {
     console.error('Error fetching providers:', error)

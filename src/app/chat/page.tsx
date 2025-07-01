@@ -232,11 +232,8 @@ function ChatPageContent() {
               content: `请为以下对话生成一个简短的标题（不超过15个字符）：\n\n${firstMessage}`
             }
           ],
-          config: {
-            openaiApiKey: currentModel.provider.apiKey,
-            openaiBaseUrl: currentModel.provider.baseUrl,
-            model: currentModel.model.modelId
-          }
+          userId: user.id,
+          modelId: currentModel.model.id
         }),
       });
 
@@ -450,11 +447,8 @@ function ChatPageContent() {
             role: msg.role,
             content: msg.content
           })),
-          config: {
-            openaiApiKey: currentModel.provider.apiKey,
-            openaiBaseUrl: currentModel.provider.baseUrl,
-            model: currentModel.model.modelId || currentModel.model.id
-          }
+          userId: user.id,
+          modelId: currentModel.model.id
         }),
       });
 

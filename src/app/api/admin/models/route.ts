@@ -162,6 +162,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 获取当前提供商下最大的 order 值
+    const maxOrderModel = await prisma.model.findFirst({
+      where: { providerId },
+      orderBy: { order: 'desc' },
+      select: { order: true }
+    })
+
+    const nextOrder = (maxOrderModel?.order || 0) + 1
+
     // 创建新模型
     const newModel = await prisma.model.create({
       data: {
@@ -171,7 +180,7 @@ export async function POST(request: NextRequest) {
         description,
         group,
         isEnabled: true,
-        order: 0,
+        order: nextOrder,
         ...modelData,
       },
       include: {
@@ -191,6 +200,55 @@ export async function POST(request: NextRequest) {
     console.error('Error creating model:', error)
     return NextResponse.json(
       { error: 'Failed to create model' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, models } = data
+
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'adminUserId is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!Array.isArray(models)) {
+      return NextResponse.json(
+        { error: 'models array is required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 批量更新模型排序
+    const updatePromises = models.map((model: { id: string; order: number }) =>
+      prisma.model.update({
+        where: { id: model.id },
+        data: { order: model.order },
+      })
+    )
+
+    await Promise.all(updatePromises)
+
+    return NextResponse.json({ success: true })
+
+  } catch (error) {
+    console.error('Error updating model order:', error)
+    return NextResponse.json(
+      { error: 'Failed to update model order' },
       { status: 500 }
     )
   }

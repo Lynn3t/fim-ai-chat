@@ -62,12 +62,12 @@ export async function createProvider(data: CreateProviderData): Promise<Provider
 /**
  * 获取所有提供商
  */
-export async function getProviders(includeModels = false): Promise<Provider[]> {
+export async function getProviders(includeModels = false, enabledOnly = true): Promise<Provider[]> {
   return prisma.provider.findMany({
-    where: { isEnabled: true },
+    where: enabledOnly ? { isEnabled: true } : {},
     include: {
       models: includeModels ? {
-        where: { isEnabled: true },
+        where: enabledOnly ? { isEnabled: true } : {},
         orderBy: { order: 'asc' },
       } : false,
     },

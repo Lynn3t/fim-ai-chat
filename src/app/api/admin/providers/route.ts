@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/db/permissions'
+import { checkUserPermission } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,6 +122,55 @@ export async function POST(request: NextRequest) {
     console.error('Error creating provider:', error)
     return NextResponse.json(
       { error: 'Failed to create provider' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, providers } = data
+
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'adminUserId is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!Array.isArray(providers)) {
+      return NextResponse.json(
+        { error: 'providers array is required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 批量更新提供商排序
+    const updatePromises = providers.map((provider: { id: string; order: number }) =>
+      prisma.provider.update({
+        where: { id: provider.id },
+        data: { order: provider.order },
+      })
+    )
+
+    await Promise.all(updatePromises)
+
+    return NextResponse.json({ success: true })
+
+  } catch (error) {
+    console.error('Error updating provider order:', error)
+    return NextResponse.json(
+      { error: 'Failed to update provider order' },
       { status: 500 }
     )
   }
