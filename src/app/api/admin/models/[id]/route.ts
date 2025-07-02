@@ -2,15 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkUserPermission } from '@/lib/auth'
 
+// 获取单个模型
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: modelId } = await params
+
+    // 获取模型信息
+    const model = await prisma.model.findUnique({
+      where: { id: modelId },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+          },
+        },
+      },
+    })
+
+    if (!model) {
+      return NextResponse.json(
+        { error: 'Model not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(model)
+  } catch (error) {
+    console.error('Error fetching model:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch model' },
+      { status: 500 }
+    )
+  }
+}
+
 // 更新单个模型
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const data = await request.json()
     const { adminUserId, isEnabled, name, description, group } = data
-    const modelId = params.id
+    const { id: modelId } = await params
 
     if (!adminUserId) {
       return NextResponse.json(
@@ -62,12 +101,12 @@ export async function PATCH(
 // 删除单个模型
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url)
     const adminUserId = searchParams.get('adminUserId')
-    const modelId = params.id
+    const { id: modelId } = await params
 
     if (!adminUserId) {
       return NextResponse.json(

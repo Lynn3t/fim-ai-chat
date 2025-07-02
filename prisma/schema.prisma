@@ -55,6 +55,9 @@ model User {
   // 访问码管理（用户可以生成访问码）
   generatedAccessCodes AccessCode[]
 
+  // 模型分组排序配置
+  modelGroupOrders ModelGroupOrder[]
+
   @@map("users")
 }
 
@@ -293,4 +296,21 @@ model UserPermission {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_permissions")
+}
+
+// 模型分组排序配置
+model ModelGroupOrder {
+  id          String   @id @default(cuid())
+  userId      String
+  groupName   String   // 分组名称，如 "ChatGPT", "Claude", "Gemini" 等
+  order       Int      @default(0) // 排序值，越小越靠前
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupName])
+  @@index([userId])
+  @@index([order])
+  @@map("model_group_orders")
 }

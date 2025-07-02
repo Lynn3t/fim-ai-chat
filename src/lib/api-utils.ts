@@ -9,7 +9,7 @@ export async function getUserFromRequest(request: NextRequest): Promise<string |
     // 从查询参数中获取userId（临时方案，实际项目应该使用JWT或session）
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || searchParams.get('adminUserId');
-    
+
     if (!userId) {
       return null;
     }

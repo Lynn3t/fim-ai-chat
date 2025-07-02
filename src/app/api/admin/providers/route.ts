@@ -155,16 +155,20 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    console.log('Updating provider order:', providers);
+
     // 批量更新提供商排序
-    const updatePromises = providers.map((provider: { id: string; order: number }) =>
-      prisma.provider.update({
+    const updatePromises = providers.map((provider: { id: string; order: number }) => {
+      console.log(`Updating provider ${provider.id} to order ${provider.order}`);
+      return prisma.provider.update({
         where: { id: provider.id },
         data: { order: provider.order },
-      })
-    )
+      });
+    });
 
-    await Promise.all(updatePromises)
+    await Promise.all(updatePromises);
 
+    console.log('Provider order update completed successfully');
     return NextResponse.json({ success: true })
 
   } catch (error) {

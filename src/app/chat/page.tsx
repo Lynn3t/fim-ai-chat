@@ -9,6 +9,7 @@ import { useToast, ToastContainer } from '@/components/Toast';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { MessageActions } from '@/components/MessageActions';
 import { AIIcon } from '@/components/AIIcon';
+import { getModelGroups, getCategorySortOrder, getGroupIcon, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
 import type { Message, AIProvider, AIModel, ChatHistory, TokenUsage } from '@/types';
 
 interface Message {
@@ -87,6 +88,7 @@ function ChatPageContent() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [userGroupOrders, setUserGroupOrders] = useState<Array<{ groupName: string; order: number }>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('');
@@ -106,35 +108,75 @@ function ChatPageContent() {
   useEffect(() => {
     let isMounted = true;
 
+    const loadGroupOrders = async () => {
+      try {
+        const response = await fetch(`/api/admin/model-groups?userId=${user.id}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            setUserGroupOrders(result.data);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading group orders:', error);
+      }
+    };
+
     const loadProviders = async () => {
       try {
-        const response = await fetch('/api/providers');
+        const response = await fetch(`/api/providers?userId=${user.id}`);
         if (response.ok && isMounted) {
-          const data = await response.json();
-          setProviders(data);
+          const result = await response.json();
+          console.log('Providers API response:', result);
+
+          // 检查是否是标准化的API响应格式
+          if (result && result.success && result.data) {
+            // 标准化API响应格式：{ success: true, data: [...] }
+            if (Array.isArray(result.data)) {
+              setProviders(result.data);
+            } else {
+              console.error('API返回的data字段不是数组:', result.data);
+              setProviders([]);
+              toast.error('加载AI模型失败：数据格式错误');
+            }
+          } else if (Array.isArray(result)) {
+            // 直接返回数组格式（向后兼容）
+            setProviders(result);
+          } else {
+            console.error('API返回的数据格式不正确:', result);
+            setProviders([]);
+            toast.error('加载AI模型失败：数据格式错误');
+          }
+        } else {
+          if (isMounted) {
+            console.error('加载提供商失败:', response.status, response.statusText);
+            toast.error('加载AI模型失败');
+          }
         }
       } catch (error) {
         if (isMounted) {
           console.error('加载提供商失败:', error);
           toast.error('加载AI模型失败');
+          setProviders([]); // 确保在错误情况下设置为空数组
         }
       }
     };
 
-    if (user && providers.length === 0) {
+    if (user && Array.isArray(providers) && providers.length === 0) {
       loadProviders();
+      loadGroupOrders(); // 同时加载分组排序
     }
 
     return () => {
       isMounted = false;
     };
-  }, [user, providers.length, toast]);
+  }, [user]); // 只依赖user，避免无限循环
 
   // 设置默认模型（单独的effect避免循环依赖）
   useEffect(() => {
-    if (providers.length > 0 && !selectedModelId) {
+    if (Array.isArray(providers) && providers.length > 0 && !selectedModelId) {
       const firstProvider = providers[0];
-      if (firstProvider.models.length > 0) {
+      if (firstProvider && firstProvider.models && firstProvider.models.length > 0) {
         setSelectedModelId(firstProvider.models[0].id);
       }
     }
@@ -279,18 +321,52 @@ function ChatPageContent() {
     return firstMessage.slice(0, 15) + (firstMessage.length > 15 ? '...' : '');
   };
 
-  // 加载历史聊天
-  const loadChatHistory = (historyId: string) => {
+  // 加载历史聊天 - 乐观更新 + 延迟验证
+  const loadChatHistory = async (historyId: string) => {
     const history = chatHistories.find(h => h.id === historyId);
-    if (history) {
-      setMessages(history.messages);
-      setCurrentChatId(historyId);
-      setShowHistoryDropdown(false);
+    if (!history) return;
+
+    // 保存当前状态
+    const previousMessages = [...messages];
+    const previousChatId = currentChatId;
+
+    // 1. 立即更新UI (保留滚动位置)
+    setMessages(history.messages);
+    setCurrentChatId(historyId);
+    setShowHistoryDropdown(false);
+
+    // 2. 如果是数据库用户，验证消息完整性
+    if (user && chatConfig?.canSaveToDatabase) {
+      // 延迟验证 (1秒后)
+      setTimeout(async () => {
+        try {
+          const response = await fetch(`/api/conversations/${historyId}/messages`);
+          if (response.ok) {
+            const serverMessages = await response.json();
+
+            // 3. 验证消息是否完整
+            if (serverMessages.length !== history.messages.length) {
+              // 使用服务器数据更新
+              setMessages(serverMessages);
+              toast.warning('聊天记录已从服务器同步');
+            }
+          }
+        } catch (error) {
+          // 验证失败，但不回滚，只提示
+          console.error('Failed to verify chat history:', error);
+          toast.warning('无法验证聊天记录完整性');
+        }
+      }, 1000);
     }
   };
 
-  // 删除历史聊天
-  const deleteChatHistory = (historyId: string) => {
+  // 删除历史聊天 - 乐观更新 + 延迟验证
+  const deleteChatHistory = async (historyId: string) => {
+    // 保存原始数据
+    const originalHistory = chatHistories.find(h => h.id === historyId);
+    if (!originalHistory) return;
+
+    // 1. 立即从UI移除 (淡出效果)
     const updatedHistories = chatHistories.filter(h => h.id !== historyId);
     saveChatHistories(updatedHistories);
 
@@ -300,6 +376,45 @@ function ChatPageContent() {
     }
 
     toast.success('聊天记录已删除');
+
+    // 2. 如果是数据库用户，发送删除请求
+    if (user && chatConfig?.canSaveToDatabase) {
+      try {
+        const response = await fetch(`/api/conversations/${historyId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          throw new Error('Delete request failed');
+        }
+
+        // 3. 延迟验证 (1.5秒后)
+        setTimeout(async () => {
+          try {
+            const verifyResponse = await fetch(`/api/conversations/${historyId}`);
+
+            // 4. 如果对话仍然存在，说明删除失败
+            if (verifyResponse.ok) {
+              // 恢复聊天记录
+              const restoredHistories = [...chatHistories, originalHistory]
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+              saveChatHistories(restoredHistories);
+              toast.error('聊天记录删除失败，已恢复');
+            }
+          } catch {
+            // 404错误是正常的，说明删除成功
+            console.log('聊天记录删除验证完成');
+          }
+        }, 1500);
+
+      } catch (error) {
+        // API调用失败，立即恢复
+        const restoredHistories = [...chatHistories, originalHistory]
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        saveChatHistories(restoredHistories);
+        toast.error('删除操作失败，已恢复聊天记录');
+      }
+    }
   };
 
   // 自动滚动到底部
@@ -330,12 +445,14 @@ function ChatPageContent() {
 
   // 获取当前选中的模型和提供商
   const getCurrentModel = () => {
-    if (!providers || !selectedModelId) return null;
+    if (!Array.isArray(providers) || !selectedModelId) return null;
 
     for (const provider of providers) {
-      const model = provider.models.find(m => m.id === selectedModelId);
-      if (model) {
-        return { model, provider };
+      if (provider && provider.models && Array.isArray(provider.models)) {
+        const model = provider.models.find(m => m && m.id === selectedModelId);
+        if (model) {
+          return { model, provider };
+        }
       }
     }
     return null;
@@ -656,7 +773,7 @@ function ChatPageContent() {
               FimAI Chat
             </h1>
             {/* 模型选择器 */}
-            {providers && providers.some(p => p.models.length > 0) && (
+            {providers && Array.isArray(providers) && providers.some(p => p.models && p.models.length > 0) && (
               <div className="relative" ref={modelDropdownRef}>
                 <button
                   onClick={() => setShowModelDropdown(!showModelDropdown)}
@@ -675,20 +792,39 @@ function ChatPageContent() {
 
                 {showModelDropdown && (
                   <div className="absolute left-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto">
-                    {providers.map((provider) => {
-                      const enabledModels = provider.models.filter(m => m.isEnabled);
-                      if (enabledModels.length === 0) return null;
+                    {(() => {
+                      // 收集所有启用的模型
+                      const allEnabledModels = (Array.isArray(providers) ? providers : []).flatMap(provider =>
+                        (provider.models || [])
+                          .filter(m => m.isEnabled)
+                          .map(model => ({
+                            ...model,
+                            providerName: provider.displayName || provider.name,
+                            providerId: provider.id
+                          }))
+                      );
 
-                      return (
-                        <div key={provider.id} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                          {/* 提供商标题 */}
+                      if (allEnabledModels.length === 0) {
+                        return (
+                          <div className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                            没有可用的模型
+                          </div>
+                        );
+                      }
+
+                      // 使用用户自定义分组排序对模型进行分组
+                      const groupsWithOrder = getModelGroupsWithUserOrder(allEnabledModels, userGroupOrders);
+
+                      return groupsWithOrder.map((group) => (
+                        <div key={group.groupName} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                          {/* 分组标题 */}
                           <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-2">
-                            <AIIcon modelId={enabledModels[0]?.modelId || ''} size={16} />
-                            <span>{provider.displayName || provider.name}</span>
+                            <AIIcon modelId={group.models[0]?.modelId || ''} size={16} />
+                            <span>{group.groupName} ({group.models.length})</span>
                           </div>
 
-                          {/* 模型列表 */}
-                          {enabledModels.map((model) => (
+                          {/* 分组内的模型列表 */}
+                          {group.models.map((model) => (
                             <button
                               key={model.id}
                               onClick={() => {
@@ -705,14 +841,14 @@ function ChatPageContent() {
                                   {model.name}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                  {model.modelId}
+                                  {model.modelId} • {model.providerName}
                                 </div>
                               </div>
                             </button>
                           ))}
                         </div>
-                      );
-                    })}
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
@@ -810,7 +946,7 @@ function ChatPageContent() {
                   欢迎，{user.username}！您的角色：{user.role === 'ADMIN' ? '管理员' : user.role === 'USER' ? '用户' : '访客'}
                 </p>
               )}
-              {(!providers || providers.length === 0 || !providers.some(p => p.models.length > 0)) && (
+              {(!providers || !Array.isArray(providers) || providers.length === 0 || !providers.some(p => p.models && p.models.length > 0)) && (
                 <p className="mt-4 text-red-500">
                   请先 <Link href="/config" className="underline">配置AI服务提供商</Link>
                 </p>

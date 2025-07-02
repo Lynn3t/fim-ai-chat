@@ -176,9 +176,22 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
     }
   };
 
-  // 切换提供商启用状态
+  // 切换提供商启用状态 - 乐观更新 + 延迟验证
   const toggleProvider = async (provider: Provider) => {
-    setIsLoading(true);
+    // 保存原始状态
+    const originalProvider = { ...provider };
+
+    // 1. 立即更新UI (乐观更新)
+    setProviders(prev => prev.map(p =>
+      p.id === provider.id
+        ? { ...p, isEnabled: !provider.isEnabled }
+        : p
+    ));
+
+    // 显示即时反馈
+    toast.success(`提供商已${!provider.isEnabled ? '启用' : '禁用'}`);
+
+    // 2. 发送API请求
     try {
       const response = await fetch(`/api/admin/providers/${provider.id}`, {
         method: 'PATCH',
@@ -189,18 +202,48 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
         }),
       });
 
-      if (response.ok) {
-        toast.success(`提供商已${!provider.isEnabled ? '启用' : '禁用'}`);
-        loadProviders();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '操作失败');
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (1.5秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/providers/${provider.id}`);
+          if (verifyResponse.ok) {
+            const updatedProvider = await verifyResponse.json();
+
+            // 4. 验证状态是否正确
+            if (updatedProvider.isEnabled !== !provider.isEnabled) {
+              // 回滚状态
+              setProviders(prev => prev.map(p =>
+                p.id === provider.id
+                  ? { ...p, isEnabled: originalProvider.isEnabled }
+                  : p
+              ));
+              toast.error('状态更新失败，已恢复原状态');
+            }
+          }
+        } catch {
+          // 验证失败，回滚
+          setProviders(prev => prev.map(p =>
+            p.id === provider.id
+              ? { ...p, isEnabled: originalProvider.isEnabled }
+              : p
+          ));
+          toast.error('无法验证状态更新，已恢复原状态');
+        }
+      }, 1500);
+
     } catch (error) {
+      // API调用失败，立即回滚
+      setProviders(prev => prev.map(p =>
+        p.id === provider.id
+          ? { ...p, isEnabled: originalProvider.isEnabled }
+          : p
+      ));
       console.error('Toggle error:', error);
-      toast.error('网络错误');
-    } finally {
-      setIsLoading(false);
+      toast.error('操作失败，已恢复原状态');
     }
   };
 

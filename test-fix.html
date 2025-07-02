@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 API修复测试</h1>
+        <p>测试修复后的API接口，验证NextJS 15参数问题和新的自动分组功能。</p>
+
+        <div class="test-section info">
+            <h3>📋 测试项目</h3>
+            <ul>
+                <li>✅ NextJS 15 动态路由参数修复</li>
+                <li>✅ 新的后端自动分组API</li>
+                <li>✅ 批量分组操作</li>
+                <li>✅ 数据库事务优化</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 API测试</h3>
+            <button onclick="testSystemInit()">测试系统初始化</button>
+            <button onclick="testGetModels()">获取模型列表</button>
+            <button onclick="testAutoGroup()">测试自动分组</button>
+            <button onclick="testCustomGroup()">测试自定义分组</button>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 测试结果</h3>
+            <div id="results-container">
+                <p>点击上方按钮开始测试...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3001';
+        let adminUserId = null;
+        let testModels = [];
+
+        function log(message, type = 'info') {
+            const container = document.getElementById('results-container');
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function testSystemInit() {
+            log('🔄 测试系统初始化...', 'info');
+            try {
+                const response = await fetch(`${BASE_URL}/api/init`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ 系统初始化成功: ${data.message}`, 'success');
+                    // 尝试获取管理员用户ID
+                    if (data.adminUser) {
+                        adminUserId = data.adminUser.id;
+                        log(`👤 管理员用户ID: ${adminUserId}`, 'info');
+                    }
+                } else {
+                    log(`❌ 系统初始化失败: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 请求失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGetModels() {
+            log('🔄 测试获取模型列表...', 'info');
+            
+            if (!adminUserId) {
+                // 使用默认管理员ID
+                adminUserId = 'admin-user-id';
+                log('⚠️ 使用默认管理员ID进行测试', 'info');
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/admin/models?adminUserId=${adminUserId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    testModels = data;
+                    log(`✅ 成功获取 ${data.length} 个模型`, 'success');
+                    if (data.length > 0) {
+                        log(`📋 第一个模型: ${data[0].name} (${data[0].modelId})`, 'info');
+                    }
+                } else {
+                    log(`❌ 获取模型失败: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 请求失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAutoGroup() {
+            log('🔄 测试自动分组功能...', 'info');
+            
+            if (testModels.length === 0) {
+                log('⚠️ 请先获取模型列表', 'error');
+                return;
+            }
+
+            const firstProvider = testModels[0]?.provider;
+            if (!firstProvider) {
+                log('❌ 没有找到提供商信息', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/admin/models/auto-group`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        adminUserId: adminUserId,
+                        providerId: firstProvider.id,
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ 自动分组成功: ${data.message}`, 'success');
+                    log(`📊 更新了 ${data.updatedCount} 个模型`, 'info');
+                } else {
+                    log(`❌ 自动分组失败: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 请求失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCustomGroup() {
+            log('🔄 测试自定义分组功能...', 'info');
+            
+            if (testModels.length === 0) {
+                log('⚠️ 请先获取模型列表', 'error');
+                return;
+            }
+
+            const testModelIds = testModels.slice(0, 2).map(m => m.id);
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/admin/models/auto-group`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        adminUserId: adminUserId,
+                        modelIds: testModelIds,
+                        groupName: '测试分组',
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ 自定义分组成功: ${data.message}`, 'success');
+                    log(`📊 更新了 ${data.updatedCount} 个模型`, 'info');
+                } else {
+                    log(`❌ 自定义分组失败: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 请求失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动测试系统初始化
+        window.onload = function() {
+            log('🚀 页面加载完成，开始测试...', 'info');
+            testSystemInit();
+        };
+    </script>
+</body>
+</html>

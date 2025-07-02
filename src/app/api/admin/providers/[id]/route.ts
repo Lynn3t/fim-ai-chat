@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkUserPermission } from '@/lib/auth'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: providerId } = await params
+
+    // 获取提供商信息
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId },
+      include: {
+        models: {
+          orderBy: { order: 'asc' },
+        },
+      },
+    })
+
+    if (!provider) {
+      return NextResponse.json(
+        { error: 'Provider not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(provider)
+  } catch (error) {
+    console.error('Error fetching provider:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch provider' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

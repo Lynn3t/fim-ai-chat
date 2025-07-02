@@ -240,10 +240,7 @@ export async function PUT(request: NextRequest) {
           where: { id: model.id },
           data: { order: model.order },
         })
-      ),
-      {
-        timeout: 30000, // 30秒超时
-      }
+      )
     )
 
     return NextResponse.json({ success: true })

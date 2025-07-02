@@ -56,6 +56,8 @@ import {
   Ideogram,
   Recraft
 } from '@lobehub/icons';
+import { getModelGroups, getCategorySortOrder, sortGroupsByUserOrder, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
+import { SortableModelGroupList } from './SortableModelGroupList';
 
 interface User {
   id: string;
@@ -192,12 +194,14 @@ export default function AdminConfig() {
   const [editingProvider, setEditingProvider] = useState<any>(null);
   const [activeSubTab, setActiveSubTab] = useState<'providers' | 'models'>('providers');
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showAddModelModal, setShowAddModelModal] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [showCustomGroupModal, setShowCustomGroupModal] = useState(false);
   const [showAIRenameModal, setShowAIRenameModal] = useState(false);
   const [selectedModelsForGroup, setSelectedModelsForGroup] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userGroupOrders, setUserGroupOrders] = useState<Array<{ groupName: string; order: number }>>([]);
 
   // 用户管理相关状态
   const [users, setUsers] = useState<User[]>([]);
@@ -303,6 +307,23 @@ export default function AdminConfig() {
       const errorMessage = error instanceof Error ? error.message : '网络错误：无法连接到服务器';
       console.error('Load system settings error:', error);
       toast.error(`加载系统设置失败: ${errorMessage}`);
+    }
+  };
+
+  // 加载分组排序配置
+  const loadGroupOrders = async () => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/model-groups?userId=${currentUser.id}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          setUserGroupOrders(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading group orders:', error);
     }
   };
 
@@ -426,10 +447,25 @@ export default function AdminConfig() {
     }
   };
 
-  // 切换提供商状态
+  // 切换提供商状态 - 乐观更新 + 延迟验证
   const toggleProviderStatus = async (providerId: string, isEnabled: boolean) => {
     if (!currentUser) return;
 
+    // 保存原始状态
+    const originalProvider = providers.find(p => p.id === providerId);
+    if (!originalProvider) return;
+
+    // 1. 立即更新UI (乐观更新)
+    setProviders(prev => prev.map(provider =>
+      provider.id === providerId
+        ? { ...provider, isEnabled: !isEnabled }
+        : provider
+    ));
+
+    // 显示即时反馈
+    toast.success(isEnabled ? '提供商已禁用' : '提供商已启用');
+
+    // 2. 发送API请求
     try {
       const response = await fetch(`/api/admin/providers/${providerId}`, {
         method: 'PATCH',
@@ -440,47 +476,110 @@ export default function AdminConfig() {
         }),
       });
 
-      if (response.ok) {
-        toast.success(isEnabled ? '提供商已禁用' : '提供商已启用');
-        loadProvidersAndModels();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '操作失败';
-        toast.error(errorMessage);
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (1.5秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/providers/${providerId}`);
+          if (verifyResponse.ok) {
+            const provider = await verifyResponse.json();
+
+            // 4. 验证状态是否正确
+            if (provider.isEnabled !== !isEnabled) {
+              // 回滚状态
+              setProviders(prev => prev.map(p =>
+                p.id === providerId
+                  ? { ...p, isEnabled: originalProvider.isEnabled }
+                  : p
+              ));
+              toast.error('状态更新失败，已恢复原状态');
+            }
+          }
+        } catch {
+          // 验证失败，回滚
+          setProviders(prev => prev.map(p =>
+            p.id === providerId
+              ? { ...p, isEnabled: originalProvider.isEnabled }
+              : p
+          ));
+          toast.error('无法验证状态更新，已恢复原状态');
+        }
+      }, 1500);
+
     } catch (error) {
-      toast.error('操作失败');
+      // API调用失败，立即回滚
+      setProviders(prev => prev.map(p =>
+        p.id === providerId
+          ? { ...p, isEnabled: originalProvider.isEnabled }
+          : p
+      ));
+      toast.error('操作失败，已恢复原状态');
     }
   };
 
-  // 更新提供商排序
+  // 更新提供商排序 - 乐观更新 + 延迟验证
   const updateProviderOrder = async (reorderedProviders: any[]) => {
     if (!currentUser) return;
 
+    // 保存原始提供商顺序
+    const originalProviders = [...providers];
+
+    console.log('Provider order update:', {
+      original: originalProviders.map(p => ({ id: p.id, name: p.name, order: p.order })),
+      reordered: reorderedProviders.map((p, index) => ({ id: p.id, name: p.name, newOrder: index }))
+    });
+
+    // 1. 立即更新UI (乐观更新)
+    setProviders(reorderedProviders);
+
+    // 显示即时反馈
+    toast.success('提供商排序已更新');
+
     try {
+      // 2. 延迟验证 - 发送API请求
+      const updateData = {
+        adminUserId: currentUser.id,
+        providers: reorderedProviders.map((provider, index) => ({
+          id: provider.id,
+          order: index
+        }))
+      };
+
+      console.log('Sending provider order update:', updateData);
+
       const response = await fetch('/api/admin/providers', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-          providers: reorderedProviders.map((provider, index) => ({
-            id: provider.id,
-            order: index
-          }))
-        }),
+        body: JSON.stringify(updateData),
       });
 
-      if (response.ok) {
-        // 更新本地状态
-        setProviders(reorderedProviders);
-        toast.success('提供商排序已更新');
-      } else {
+      if (!response.ok) {
+        // 3. 如果API失败，回滚到原始状态
+        setProviders(originalProviders);
+
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || '更新排序失败';
-        toast.error(errorMessage);
+        toast.error(`排序更新失败: ${errorMessage}`);
+
+        console.error('Provider order update failed:', errorData);
+      } else {
+        // 4. 延迟验证成功，可选择性地重新加载数据确保一致性
+        setTimeout(async () => {
+          try {
+            await loadProvidersAndModels();
+          } catch (error) {
+            console.warn('Failed to reload providers after order update:', error);
+          }
+        }, 2000); // 2秒后重新加载验证
       }
     } catch (error) {
-      toast.error('更新排序失败');
+      // 5. 网络错误或其他异常，回滚状态
+      setProviders(originalProviders);
+      toast.error('网络错误，排序更新失败');
+      console.error('Provider order update error:', error);
     }
   };
 
@@ -495,6 +594,94 @@ export default function AdminConfig() {
       }
       return newSet;
     });
+  };
+
+  // 切换分组展开状态
+  const toggleGroupExpanded = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
+  // 处理分组排序 - 乐观更新 + 延迟验证
+  const handleGroupReorder = async (providerId: string, reorderedGroups: any[]) => {
+    if (!currentUser) return;
+
+    // 保存原始分组排序
+    const originalGroupOrders = [...userGroupOrders];
+
+    // 1. 立即更新UI (乐观更新)
+    const newGroupOrders = reorderedGroups.map((group, index) => ({
+      groupName: group.name,
+      order: index
+    }));
+
+    // 更新现有的分组排序，保留其他分组的排序
+    const updatedGroupOrders = [...originalGroupOrders];
+    newGroupOrders.forEach(({ groupName, order }) => {
+      const existingIndex = updatedGroupOrders.findIndex(g => g.groupName === groupName);
+      if (existingIndex >= 0) {
+        updatedGroupOrders[existingIndex].order = order;
+      } else {
+        updatedGroupOrders.push({ groupName, order });
+      }
+    });
+
+    setUserGroupOrders(updatedGroupOrders);
+    toast.success('分组排序已更新');
+
+    try {
+      // 2. 延迟验证 - 发送API请求
+      const response = await fetch(`/api/admin/model-groups?userId=${currentUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          groupOrders: newGroupOrders
+        }),
+      });
+
+      if (!response.ok) {
+        // 3. 如果API失败，回滚到原始状态
+        setUserGroupOrders(originalGroupOrders);
+
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`分组排序更新失败: ${errorMessage}`);
+
+        console.error('Group order update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          requestData: {
+            userId: currentUser.id,
+            groupOrders: newGroupOrders
+          }
+        });
+      } else {
+        // 4. 延迟验证成功，重新加载数据确保一致性
+        setTimeout(() => {
+          loadGroupOrders();
+        }, 1000);
+      }
+    } catch (error) {
+      // 5. 网络错误或其他异常，回滚状态
+      setUserGroupOrders(originalGroupOrders);
+      toast.error('网络错误，分组排序更新失败');
+      console.error('Group order update error:', error);
+    }
+  };
+
+  // 处理分组内模型排序
+  const handleGroupModelReorder = (providerId: string, groupId: string, reorderedModels: any[]) => {
+    // 更新提供商的模型顺序
+    updateModelOrder(providerId, reorderedModels);
   };
 
   // 从v1/models API获取模型
@@ -535,7 +722,37 @@ export default function AdminConfig() {
           return;
         }
 
-        // 批量创建模型 - 使用单个API调用
+        // 1. 立即显示预期模型 (乐观更新)
+        const newModels = models.map((modelId: string, index: number) => ({
+          id: `temp_${Date.now()}_${index}`, // 临时ID
+          modelId: modelId,
+          name: modelId,
+          isEnabled: true,
+          order: 999 + index, // 临时排序
+          description: null,
+          group: null,
+          maxTokens: null,
+          temperature: null,
+          topP: null,
+          frequencyPenalty: null,
+          presencePenalty: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          providerId: provider.id,
+          provider: provider,
+          _isTemporary: true, // 标记为临时模型
+        }));
+
+        // 立即添加到UI中 (灰色显示)
+        setProviders(prev => prev.map(p =>
+          p.id === provider.id
+            ? { ...p, models: [...(p.models || []), ...newModels] }
+            : p
+        ));
+
+        toast.success(`开始导入 ${models.length} 个模型...`);
+
+        // 2. 批量创建模型 - 使用单个API调用
         const batchResponse = await fetch('/api/admin/models/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -557,16 +774,53 @@ export default function AdminConfig() {
           const duration = ((Date.now() - startTime) / 1000).toFixed(1);
           if (successCount > 0) {
             toast.success(`成功导入 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''} (耗时 ${duration}s)`);
-            loadProvidersAndModels(); // 重新加载数据
           } else {
             toast.error('所有模型导入失败');
           }
+
+          // 3. 延迟验证 (3秒后)
+          setTimeout(async () => {
+            try {
+              // 重新加载提供商数据验证
+              const verifyResponse = await fetch(`/api/admin/providers/${provider.id}`);
+              if (verifyResponse.ok) {
+                const updatedProvider = await verifyResponse.json();
+                const serverModels = updatedProvider.models || [];
+
+                // 4. 更新UI，移除临时模型，显示真实模型
+                setProviders(prev => prev.map(p =>
+                  p.id === provider.id
+                    ? { ...p, models: serverModels }
+                    : p
+                ));
+
+                // 检查是否有失败的模型
+                const failedModels = models.filter(modelId =>
+                  !serverModels.some((m: any) => m.modelId === modelId)
+                );
+
+                if (failedModels.length > 0) {
+                  toast.warning(`${failedModels.length} 个模型导入失败: ${failedModels.slice(0, 3).join(', ')}${failedModels.length > 3 ? '...' : ''}`);
+                }
+              }
+            } catch {
+              // 验证失败，重新加载所有数据
+              loadProvidersAndModels();
+              toast.warning('无法验证导入结果，已重新加载数据');
+            }
+          }, 3000);
 
           // 如果有错误，显示详细信息
           if (errors && errors.length > 0) {
             console.warn('模型导入错误:', errors);
           }
         } else {
+          // API调用失败，移除临时模型
+          setProviders(prev => prev.map(p =>
+            p.id === provider.id
+              ? { ...p, models: (p.models || []).filter(m => !m._isTemporary) }
+              : p
+          ));
           const errorData = await batchResponse.json().catch(() => ({}));
           const errorMessage = errorData.error || '批量导入模型失败';
           toast.error(errorMessage);
@@ -628,10 +882,47 @@ export default function AdminConfig() {
     }
   };
 
-  // 切换模型状态
+  // 切换模型状态 - 乐观更新 + 延迟验证
   const toggleModelStatus = async (modelId: string, isEnabled: boolean) => {
     if (!currentUser) return;
 
+    // 保存原始状态
+    let originalModel: any = null;
+    let originalProviderIndex = -1;
+    let originalModelIndex = -1;
+
+    // 找到原始模型
+    for (let i = 0; i < providers.length; i++) {
+      const modelIndex = providers[i].models?.findIndex(m => m.id === modelId) ?? -1;
+      if (modelIndex !== -1) {
+        originalModel = providers[i].models![modelIndex];
+        originalProviderIndex = i;
+        originalModelIndex = modelIndex;
+        break;
+      }
+    }
+
+    if (!originalModel) return;
+
+    // 1. 立即更新UI (乐观更新)
+    setProviders(prev => prev.map((provider, pIndex) => {
+      if (pIndex === originalProviderIndex) {
+        return {
+          ...provider,
+          models: provider.models?.map((model, mIndex) =>
+            mIndex === originalModelIndex
+              ? { ...model, isEnabled: !isEnabled }
+              : model
+          )
+        };
+      }
+      return provider;
+    }));
+
+    // 显示即时反馈
+    toast.success(isEnabled ? '模型已禁用' : '模型已启用');
+
+    // 2. 发送API请求
     try {
       const response = await fetch(`/api/admin/models/${modelId}`, {
         method: 'PATCH',
@@ -642,16 +933,71 @@ export default function AdminConfig() {
         }),
       });
 
-      if (response.ok) {
-        toast.success(isEnabled ? '模型已禁用' : '模型已启用');
-        loadProvidersAndModels();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '操作失败';
-        toast.error(errorMessage);
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (1.5秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/models/${modelId}`);
+          if (verifyResponse.ok) {
+            const model = await verifyResponse.json();
+
+            // 4. 验证状态是否正确
+            if (model.isEnabled !== !isEnabled) {
+              // 回滚状态
+              setProviders(prev => prev.map((provider, pIndex) => {
+                if (pIndex === originalProviderIndex) {
+                  return {
+                    ...provider,
+                    models: provider.models?.map((m, mIndex) =>
+                      mIndex === originalModelIndex
+                        ? { ...m, isEnabled: originalModel.isEnabled }
+                        : m
+                    )
+                  };
+                }
+                return provider;
+              }));
+              toast.error('模型状态更新失败，已恢复原状态');
+            }
+          }
+        } catch {
+          // 验证失败，回滚
+          setProviders(prev => prev.map((provider, pIndex) => {
+            if (pIndex === originalProviderIndex) {
+              return {
+                ...provider,
+                models: provider.models?.map((m, mIndex) =>
+                  mIndex === originalModelIndex
+                    ? { ...m, isEnabled: originalModel.isEnabled }
+                    : m
+                )
+              };
+            }
+            return provider;
+          }));
+          toast.error('无法验证模型状态更新，已恢复原状态');
+        }
+      }, 1500);
+
     } catch (error) {
-      toast.error('操作失败');
+      // API调用失败，立即回滚
+      setProviders(prev => prev.map((provider, pIndex) => {
+        if (pIndex === originalProviderIndex) {
+          return {
+            ...provider,
+            models: provider.models?.map((m, mIndex) =>
+              mIndex === originalModelIndex
+                ? { ...m, isEnabled: originalModel.isEnabled }
+                : m
+            )
+          };
+        }
+        return provider;
+      }));
+      toast.error('操作失败，已恢复原状态');
     }
   };
 
@@ -699,29 +1045,24 @@ export default function AdminConfig() {
     }
 
     try {
-      // 导入分组工具函数
-      const { groupModelsByCategory, getAIModelCategoryName } = await import('@/utils/aiModelUtils');
-
-      // 按分类分组模型
-      const groupedModels = groupModelsByCategory(provider.models);
-
-      // 为每个模型设置分组
-      const updatePromises = provider.models.map((model: any) => {
-        const categoryName = getAIModelCategoryName(model.modelId);
-        return fetch(`/api/admin/models/${model.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminUserId: currentUser.id,
-            group: categoryName,
-          }),
-        });
+      const response = await fetch('/api/admin/models/auto-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          providerId: providerId,
+        }),
       });
 
-      await Promise.all(updatePromises);
-
-      toast.success(`已为 ${provider.models.length} 个模型自动分组`);
-      loadProvidersAndModels();
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message || `已为 ${provider.models.length} 个模型自动分组`);
+        loadProvidersAndModels();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '自动分组失败';
+        toast.error(errorMessage);
+      }
     } catch (error) {
       console.error('Auto group error:', error);
       toast.error('自动分组失败');
@@ -746,30 +1087,27 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      // 为选中的模型设置自定义分组
-      const updatePromises = groupData.modelIds.map((modelId: string) =>
-        fetch(`/api/admin/models/${modelId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminUserId: currentUser.id,
-            group: groupData.groupName,
-          }),
-        })
-      );
+      const response = await fetch('/api/admin/models/auto-group', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          modelIds: groupData.modelIds,
+          groupName: groupData.groupName,
+        }),
+      });
 
-      const responses = await Promise.all(updatePromises);
-      const successCount = responses.filter(r => r.ok).length;
-      const failCount = responses.length - successCount;
-
-      if (successCount > 0) {
-        toast.success(`成功为 ${successCount} 个模型设置分组"${groupData.groupName}"${failCount > 0 ? `，${failCount} 个失败` : ''}`);
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message || `成功为 ${groupData.modelIds.length} 个模型设置分组"${groupData.groupName}"`);
         loadProvidersAndModels();
         setShowCustomGroupModal(false);
         setSelectedProviderId('');
         setSelectedModelsForGroup([]);
       } else {
-        toast.error('所有模型分组设置失败');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '创建自定义分组失败';
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Create custom group error:', error);
@@ -845,7 +1183,27 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         }
       });
 
-      // 批量更新模型名称
+      // 保存原始模型名称
+      const originalNames = new Map<string, string>();
+      modelsToRename.forEach((model: any) => {
+        originalNames.set(model.id, model.name);
+      });
+
+      // 1. 立即更新UI显示新名称 (乐观更新)
+      setProviders(prev => prev.map(provider => ({
+        ...provider,
+        models: provider.models?.map(model => {
+          const newName = renameMap.get(model.modelId);
+          if (newName && modelsToRename.some((m: any) => m.id === model.id)) {
+            return { ...model, name: newName };
+          }
+          return model;
+        })
+      })));
+
+      toast.success(`AI重命名完成，正在保存...`);
+
+      // 2. 批量更新模型名称
       const updatePromises = modelsToRename.map((model: any) => {
         const newName = renameMap.get(model.modelId);
         if (newName) {
@@ -865,13 +1223,68 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       const successCount = responses.filter(r => r.ok).length;
       const failCount = responses.length - successCount;
 
+      // 3. 延迟验证 (2秒后)
+      setTimeout(async () => {
+        try {
+          // 验证每个模型的名称是否正确更新
+          const verifyPromises = modelsToRename.map((model: any) =>
+            fetch(`/api/admin/models/${model.id}`)
+          );
+
+          const verifyResponses = await Promise.all(verifyPromises);
+          const verifyResults = await Promise.all(
+            verifyResponses.map(r => r.ok ? r.json() : null)
+          );
+
+          // 检查哪些模型名称更新失败
+          const failedModels: any[] = [];
+          verifyResults.forEach((result, index) => {
+            if (result) {
+              const model = modelsToRename[index];
+              const expectedName = renameMap.get(model.modelId);
+              if (expectedName && result.name !== expectedName) {
+                failedModels.push(model);
+              }
+            }
+          });
+
+          // 回滚失败的模型名称
+          if (failedModels.length > 0) {
+            setProviders(prev => prev.map(provider => ({
+              ...provider,
+              models: provider.models?.map(model => {
+                if (failedModels.some(fm => fm.id === model.id)) {
+                  const originalName = originalNames.get(model.id);
+                  return originalName ? { ...model, name: originalName } : model;
+                }
+                return model;
+              })
+            })));
+
+            toast.warning(`${failedModels.length} 个模型重命名失败，已恢复原名称`);
+          }
+
+        } catch {
+          // 验证失败，重新加载数据
+          loadProvidersAndModels();
+          toast.warning('无法验证重命名结果，已重新加载数据');
+        }
+      }, 2000);
+
       if (successCount > 0) {
         toast.success(`AI成功重命名 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''}`);
-        loadProvidersAndModels();
         setShowAIRenameModal(false);
         setSelectedProviderId('');
       } else {
-        toast.error('AI重命名失败，请检查AI模型是否可用');
+        // 全部失败，回滚所有名称
+        setProviders(prev => prev.map(provider => ({
+          ...provider,
+          models: provider.models?.map(model => {
+            const originalName = originalNames.get(model.id);
+            return originalName ? { ...model, name: originalName } : model;
+          })
+        })));
+        toast.error('AI重命名失败，已恢复原名称');
       }
 
     } catch (error) {
@@ -880,10 +1293,27 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     }
   };
 
-  // 更新模型排序
+  // 更新模型排序 - 乐观更新 + 延迟验证
   const updateModelOrder = async (providerId: string, reorderedModels: any[]) => {
     if (!currentUser) return;
 
+    // 保存原始模型顺序
+    const originalProvider = providers.find(p => p.id === providerId);
+    const originalModels = originalProvider?.models || [];
+
+    // 1. 立即更新UI (保留拖拽动画效果)
+    setProviders(prevProviders =>
+      prevProviders.map(provider =>
+        provider.id === providerId
+          ? { ...provider, models: reorderedModels }
+          : provider
+      )
+    );
+
+    // 显示即时反馈
+    toast.success('模型排序已更新');
+
+    // 2. 发送API请求
     try {
       const response = await fetch('/api/admin/models', {
         method: 'PUT',
@@ -897,30 +1327,80 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         }),
       });
 
-      if (response.ok) {
-        // 更新本地状态
-        setProviders(prevProviders =>
-          prevProviders.map(provider =>
-            provider.id === providerId
-              ? { ...provider, models: reorderedModels }
-              : provider
-          )
-        );
-        toast.success('模型排序已更新');
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '更新排序失败';
-        toast.error(errorMessage);
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (2秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/models?providerId=${providerId}`);
+          if (verifyResponse.ok) {
+            const serverModels = await verifyResponse.json();
+
+            // 4. 验证排序是否正确
+            const isOrderCorrect = reorderedModels.every((model, index) => {
+              const serverModel = serverModels.find((m: any) => m.id === model.id);
+              return serverModel && serverModel.order === index;
+            });
+
+            if (!isOrderCorrect) {
+              // 回滚排序
+              setProviders(prevProviders =>
+                prevProviders.map(provider =>
+                  provider.id === providerId
+                    ? { ...provider, models: originalModels }
+                    : provider
+                )
+              );
+              toast.error('排序更新失败，已恢复原顺序');
+            }
+          }
+        } catch {
+          // 验证失败，回滚
+          setProviders(prevProviders =>
+            prevProviders.map(provider =>
+              provider.id === providerId
+                ? { ...provider, models: originalModels }
+                : provider
+            )
+          );
+          toast.error('无法验证排序更新，已恢复原顺序');
+        }
+      }, 2000);
+
     } catch (error) {
-      toast.error('更新排序失败');
+      // API调用失败，立即回滚
+      setProviders(prevProviders =>
+        prevProviders.map(provider =>
+          provider.id === providerId
+            ? { ...provider, models: originalModels }
+            : provider
+        )
+      );
+      toast.error('排序更新失败，已恢复原顺序');
     }
   };
 
-  // 用户管理函数
+  // 用户管理函数 - 乐观更新 + 延迟验证
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
     if (!currentUser) return;
 
+    // 保存原始用户状态
+    const originalUser = users.find(u => u.id === userId);
+    if (!originalUser) return;
+
+    // 1. 立即更新UI (乐观更新)
+    setUsers(prev => prev.map(user =>
+      user.id === userId
+        ? { ...user, isActive: !isActive }
+        : user
+    ));
+
+    // 显示即时反馈
+    toast.success(isActive ? '用户已禁用' : '用户已启用');
+
+    // 2. 发送API请求
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
@@ -931,16 +1411,47 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         }),
       });
 
-      if (response.ok) {
-        toast.success(isActive ? '用户已禁用' : '用户已启用');
-        loadUsers();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '操作失败';
-        toast.error(errorMessage);
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (1.5秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/users/${userId}`);
+          if (verifyResponse.ok) {
+            const user = await verifyResponse.json();
+
+            // 4. 验证状态是否正确
+            if (user.isActive !== !isActive) {
+              // 回滚状态
+              setUsers(prev => prev.map(u =>
+                u.id === userId
+                  ? { ...u, isActive: originalUser.isActive }
+                  : u
+              ));
+              toast.error('用户状态更新失败，已恢复原状态');
+            }
+          }
+        } catch {
+          // 验证失败，回滚
+          setUsers(prev => prev.map(u =>
+            u.id === userId
+              ? { ...u, isActive: originalUser.isActive }
+              : u
+          ));
+          toast.error('无法验证用户状态更新，已恢复原状态');
+        }
+      }, 1500);
+
     } catch (error) {
-      toast.error('操作失败');
+      // API调用失败，立即回滚
+      setUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, isActive: originalUser.isActive }
+          : u
+      ));
+      toast.error('操作失败，已恢复原状态');
     }
   };
 
@@ -951,6 +1462,15 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       return;
     }
 
+    // 保存原始用户数据
+    const originalUser = users.find(u => u.id === userId);
+    if (!originalUser) return;
+
+    // 1. 立即从UI移除 (淡出效果)
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    toast.success('用户删除成功');
+
+    // 2. 发送API请求
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
@@ -960,16 +1480,36 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         }),
       });
 
-      if (response.ok) {
-        toast.success('用户删除成功');
-        loadUsers();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '删除用户失败';
-        toast.error(errorMessage);
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
+
+      // 3. 延迟验证 (2秒后)
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch(`/api/admin/users/${userId}`);
+
+          // 4. 如果用户仍然存在，说明删除失败
+          if (verifyResponse.ok) {
+            // 恢复用户 (淡入效果)
+            setUsers(prev => [...prev, originalUser].sort((a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            ));
+            toast.error('用户删除失败，已恢复');
+          }
+        } catch {
+          // 404错误是正常的，说明删除成功
+          // 其他错误则提示验证失败但不恢复用户
+          console.log('用户删除验证完成');
+        }
+      }, 2000);
+
     } catch (error) {
-      toast.error('删除用户失败');
+      // API调用失败，立即恢复
+      setUsers(prev => [...prev, originalUser].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
+      toast.error('删除操作失败，已恢复用户');
     }
   };
 
@@ -1087,6 +1627,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       loadSystemSettings();
     } else if (activeTab === 'models') {
       loadProvidersAndModels();
+      loadGroupOrders(); // 加载分组排序配置
     }
   }, [activeTab, currentUser]);
 
@@ -1300,52 +1841,92 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                 {/* 模型列表 */}
                                 <div className="space-y-2">
                                   {provider.models && provider.models.length > 0 ? (
-                                    <div>
-                                      <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                                        拖拽左侧图标可调整模型顺序
-                                      </div>
-                                      <SortableList
-                                        items={provider.models}
-                                        onReorder={(reorderedModels) => updateModelOrder(provider.id, reorderedModels)}
-                                      >
-                                        {(model: any) => (
-                                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">
-                                            <div className="flex-1">
-                                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                {model.name}
+                                    (() => {
+                                      // 使用用户自定义分组排序对模型进行分组
+                                      const groupsWithOrder = getModelGroupsWithUserOrder(provider.models, userGroupOrders);
+
+                                      // 转换为SortableModelGroupList需要的格式
+                                      const groups = groupsWithOrder.map((group) => ({
+                                        id: `${provider.id}-${group.groupName}`,
+                                        name: group.groupName,
+                                        models: group.models,
+                                        expanded: expandedGroups.has(`${provider.id}-${group.groupName}`),
+                                        order: group.order
+                                      }));
+
+                                      return (
+                                        <SortableModelGroupList
+                                          groups={groups}
+                                          onGroupReorder={(reorderedGroups) => handleGroupReorder(provider.id, reorderedGroups)}
+                                          onGroupToggle={(groupId) => toggleGroupExpanded(groupId)}
+                                          onModelReorder={(groupId, reorderedModels) => handleGroupModelReorder(provider.id, groupId, reorderedModels)}
+                                          renderModel={(model: any) => (
+                                            <div className={`flex items-center justify-between p-3 rounded border ${
+                                              model._isTemporary
+                                                ? 'bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-500 opacity-70'
+                                                : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
+                                            }`}>
+                                              <div className="flex-1">
+                                                <div className={`text-sm font-medium ${
+                                                  model._isTemporary
+                                                    ? 'text-gray-600 dark:text-gray-400'
+                                                    : 'text-gray-900 dark:text-white'
+                                                }`}>
+                                                  {model.name}
+                                                  {model._isTemporary && (
+                                                    <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
+                                                      (导入中...)
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                  ID: {model.modelId}
+                                                  {model.group && (
+                                                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                                                      分组: {model.group}
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
-                                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                ID: {model.modelId}
+                                              <div className="flex items-center space-x-2">
+                                                {!model._isTemporary && (
+                                                  <>
+                                                    <button
+                                                      onClick={() => toggleModelStatus(model.id, model.isEnabled)}
+                                                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer transition-colors ${
+                                                        model.isEnabled
+                                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+                                                      }`}
+                                                    >
+                                                      {model.isEnabled ? '启用' : '禁用'}
+                                                    </button>
+                                                    <button
+                                                      onClick={() => editModel(model)}
+                                                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors"
+                                                    >
+                                                      编辑
+                                                    </button>
+                                                    <button
+                                                      onClick={() => deleteModel(model.id, model.name)}
+                                                      className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800 transition-colors"
+                                                    >
+                                                      删除
+                                                    </button>
+                                                  </>
+                                                )}
+                                                {model._isTemporary && (
+                                                  <div className="flex items-center space-x-1">
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                                                    <span className="text-xs text-orange-600 dark:text-orange-400">导入中</span>
+                                                  </div>
+                                                )}
                                               </div>
                                             </div>
-                                            <div className="flex items-center space-x-2">
-                                              <button
-                                                onClick={() => toggleModelStatus(model.id, model.isEnabled)}
-                                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer transition-colors ${
-                                                  model.isEnabled
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-                                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
-                                                }`}
-                                              >
-                                                {model.isEnabled ? '启用' : '禁用'}
-                                              </button>
-                                              <button
-                                                onClick={() => editModel(model)}
-                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors"
-                                              >
-                                                编辑
-                                              </button>
-                                              <button
-                                                onClick={() => deleteModel(model.id, model.name)}
-                                                className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800 transition-colors"
-                                              >
-                                                删除
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </SortableList>
-                                    </div>
+                                          )}
+                                        />
+                                      );
+                                    })()
                                   ) : (
                                     <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
                                       暂无模型，点击上方按钮添加模型
