@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Provider, Model } from '@prisma/client'
+import { withCache, cacheKeys, invalidateCache } from '@/lib/cache'
 
 export interface CreateProviderData {
   name: string
@@ -60,9 +61,9 @@ export async function createProvider(data: CreateProviderData): Promise<Provider
 }
 
 /**
- * 获取所有提供商
+ * 获取所有提供商（带缓存）
  */
-export async function getProviders(includeModels = false, enabledOnly = true): Promise<Provider[]> {
+const _getProviders = async (includeModels = false, enabledOnly = true): Promise<Provider[]> => {
   return prisma.provider.findMany({
     where: enabledOnly ? { isEnabled: true } : {},
     include: {
@@ -74,6 +75,12 @@ export async function getProviders(includeModels = false, enabledOnly = true): P
     orderBy: { order: 'asc' },
   })
 }
+
+export const getProviders = withCache(
+  _getProviders,
+  (includeModels, enabledOnly) => `${cacheKeys.providers(!enabledOnly)}:models:${includeModels}`,
+  300000 // 5分钟缓存
+)
 
 /**
  * 根据 ID 获取提供商
@@ -94,10 +101,15 @@ export async function getProviderById(id: string): Promise<Provider | null> {
  * 更新提供商
  */
 export async function updateProvider(id: string, data: UpdateProviderData): Promise<Provider> {
-  return prisma.provider.update({
+  const result = await prisma.provider.update({
     where: { id },
     data,
   })
+
+  // 清除相关缓存
+  invalidateCache.providers()
+
+  return result
 }
 
 /**

@@ -9,6 +9,7 @@ import { useToast, ToastContainer } from '@/components/Toast';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { MessageActions } from '@/components/MessageActions';
 import { AIIcon } from '@/components/AIIcon';
+import type { Message, AIProvider, AIModel, ChatHistory, TokenUsage } from '@/types';
 
 interface Message {
   id: string;
@@ -111,11 +112,6 @@ function ChatPageContent() {
         if (response.ok && isMounted) {
           const data = await response.json();
           setProviders(data);
-
-          // 设置默认模型
-          if (data.length > 0 && data[0].models.length > 0 && !selectedModelId) {
-            setSelectedModelId(data[0].models[0].id);
-          }
         }
       } catch (error) {
         if (isMounted) {
@@ -132,7 +128,17 @@ function ChatPageContent() {
     return () => {
       isMounted = false;
     };
-  }, [user, providers.length, selectedModelId]);
+  }, [user, providers.length, toast]);
+
+  // 设置默认模型（单独的effect避免循环依赖）
+  useEffect(() => {
+    if (providers.length > 0 && !selectedModelId) {
+      const firstProvider = providers[0];
+      if (firstProvider.models.length > 0) {
+        setSelectedModelId(firstProvider.models[0].id);
+      }
+    }
+  }, [providers, selectedModelId]);
 
   // 加载历史聊天记录
   useEffect(() => {

@@ -233,15 +233,18 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // 批量更新模型排序
-    const updatePromises = models.map((model: { id: string; order: number }) =>
-      prisma.model.update({
-        where: { id: model.id },
-        data: { order: model.order },
-      })
+    // 使用事务批量更新模型排序，避免并发冲突
+    await prisma.$transaction(
+      models.map((model: { id: string; order: number }) =>
+        prisma.model.update({
+          where: { id: model.id },
+          data: { order: model.order },
+        })
+      ),
+      {
+        timeout: 30000, // 30秒超时
+      }
     )
-
-    await Promise.all(updatePromises)
 
     return NextResponse.json({ success: true })
 

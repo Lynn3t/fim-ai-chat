@@ -1,26 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-
-export interface User {
-  id: string
-  username: string
-  email?: string
-  role: 'ADMIN' | 'USER' | 'GUEST'
-  isActive: boolean
-  canShareAccessCode: boolean
-  hostUserId?: string
-  createdAt: string
-}
-
-export interface ChatConfig {
-  role: string
-  canSaveToDatabase: boolean
-  allowedModels: string[]
-  tokenLimit?: number
-  tokenUsed?: number
-  hostUserId?: string
-}
+import type { User, ChatConfig, RegisterData } from '@/types'
 
 interface AuthContextType {
   user: User | null
@@ -33,12 +14,7 @@ interface AuthContextType {
   refreshChatConfig: () => Promise<void>
 }
 
-interface RegisterData {
-  username: string
-  email?: string
-  inviteCode?: string
-  accessCode?: string
-}
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -49,30 +25,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 从localStorage恢复用户状态
   useEffect(() => {
-    // 初始化系统设置
+    let isMounted = true;
+
+    // 初始化系统设置（只在首次加载时执行）
     const initializeSystem = async () => {
       try {
-        await fetch('/api/init', { method: 'POST' })
+        // 检查是否已经初始化过
+        const initialized = sessionStorage.getItem('fimai_initialized');
+        if (!initialized) {
+          await fetch('/api/init', { method: 'POST' });
+          sessionStorage.setItem('fimai_initialized', 'true');
+        }
       } catch (error) {
-        console.error('Failed to initialize system:', error)
+        console.error('Failed to initialize system:', error);
       }
-    }
+    };
 
-    initializeSystem()
+    const loadUserData = async () => {
+      await initializeSystem();
 
-    const savedUser = localStorage.getItem('fimai_user')
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser)
-        setUser(userData)
-        // 获取聊天配置
-        fetchChatConfig(userData.id)
-      } catch (error) {
-        console.error('Failed to parse saved user:', error)
-        localStorage.removeItem('fimai_user')
+      if (!isMounted) return;
+
+      const savedUser = localStorage.getItem('fimai_user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          if (isMounted) {
+            setUser(userData);
+            // 获取聊天配置
+            fetchChatConfig(userData.id);
+          }
+        } catch (error) {
+          console.error('Failed to parse saved user:', error);
+          localStorage.removeItem('fimai_user');
+        }
       }
-    }
-    setIsLoading(false)
+
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [])
 
   const fetchChatConfig = async (userId: string) => {

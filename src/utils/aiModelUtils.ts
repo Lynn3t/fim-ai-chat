@@ -172,7 +172,7 @@ export function sortModelsByOrder<T extends { order?: number; id: string }>(mode
 }
 
 // 获取模型的混合分组（自定义分组优先，然后是AI分类）
-export function getModelGroups<T extends { modelId: string; customGroup?: string; order?: number; id: string }>(
+export function getModelGroups<T extends { modelId: string; group?: string; order?: number; id: string }>(
   models: T[],
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   customGroups: { id: string; name: string }[] = []
@@ -180,7 +180,7 @@ export function getModelGroups<T extends { modelId: string; customGroup?: string
   const groups: Record<string, T[]> = {};
 
   models.forEach(model => {
-    const groupName = model.customGroup || getAIModelCategoryName(model.modelId);
+    const groupName = model.group || getAIModelCategoryName(model.modelId);
     if (!groups[groupName]) {
       groups[groupName] = [];
     }

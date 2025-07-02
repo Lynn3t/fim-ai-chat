@@ -194,6 +194,9 @@ export default function AdminConfig() {
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [showAddModelModal, setShowAddModelModal] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+  const [showCustomGroupModal, setShowCustomGroupModal] = useState(false);
+  const [showAIRenameModal, setShowAIRenameModal] = useState(false);
+  const [selectedModelsForGroup, setSelectedModelsForGroup] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // 用户管理相关状态
@@ -504,7 +507,13 @@ export default function AdminConfig() {
     }
 
     setIsLoading(true);
+    const startTime = Date.now();
+
     try {
+      // 添加超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
       const response = await fetch('/api/fetch-models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -512,7 +521,10 @@ export default function AdminConfig() {
           apiKey: provider.apiKey,
           baseUrl: provider.baseUrl,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -542,8 +554,9 @@ export default function AdminConfig() {
           const result = await batchResponse.json();
           const { successCount, failCount, errors } = result;
 
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
           if (successCount > 0) {
-            toast.success(`成功导入 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''}`);
+            toast.success(`成功导入 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''} (耗时 ${duration}s)`);
             loadProvidersAndModels(); // 重新加载数据
           } else {
             toast.error('所有模型导入失败');
@@ -564,8 +577,12 @@ export default function AdminConfig() {
         toast.error(errorMessage);
       }
     } catch (error) {
-      console.error('Fetch models error:', error);
-      toast.error('网络错误：无法获取模型');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('请求超时，请检查网络连接或API配置');
+      } else {
+        console.error('Fetch models error:', error);
+        toast.error('网络错误：无法获取模型');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -608,6 +625,258 @@ export default function AdminConfig() {
     } catch (error) {
       console.error('Create model error:', error);
       toast.error('网络错误：无法创建模型');
+    }
+  };
+
+  // 切换模型状态
+  const toggleModelStatus = async (modelId: string, isEnabled: boolean) => {
+    if (!currentUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/models/${modelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          isEnabled: !isEnabled,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(isEnabled ? '模型已禁用' : '模型已启用');
+        loadProvidersAndModels();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '操作失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('操作失败');
+    }
+  };
+
+  // 编辑模型
+  const editModel = (model: any) => {
+    // TODO: 实现编辑模型功能
+    toast.info('编辑功能开发中...');
+  };
+
+  // 删除模型
+  const deleteModel = async (modelId: string, modelName: string) => {
+    if (!currentUser) return;
+
+    if (!confirm(`确定要删除模型 "${modelName}" 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/models/${modelId}?adminUserId=${currentUser.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        toast.success('模型删除成功');
+        loadProvidersAndModels();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '删除模型失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('删除模型失败');
+    }
+  };
+
+  // 自动分组模型
+  const autoGroupModels = async (providerId: string) => {
+    if (!currentUser) return;
+
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider || !provider.models || provider.models.length === 0) {
+      toast.error('该提供商下没有模型可以分组');
+      return;
+    }
+
+    try {
+      // 导入分组工具函数
+      const { groupModelsByCategory, getAIModelCategoryName } = await import('@/utils/aiModelUtils');
+
+      // 按分类分组模型
+      const groupedModels = groupModelsByCategory(provider.models);
+
+      // 为每个模型设置分组
+      const updatePromises = provider.models.map((model: any) => {
+        const categoryName = getAIModelCategoryName(model.modelId);
+        return fetch(`/api/admin/models/${model.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminUserId: currentUser.id,
+            group: categoryName,
+          }),
+        });
+      });
+
+      await Promise.all(updatePromises);
+
+      toast.success(`已为 ${provider.models.length} 个模型自动分组`);
+      loadProvidersAndModels();
+    } catch (error) {
+      console.error('Auto group error:', error);
+      toast.error('自动分组失败');
+    }
+  };
+
+  // 打开自定义分组模态框
+  const openCustomGroupModal = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setSelectedModelsForGroup([]);
+    setShowCustomGroupModal(true);
+  };
+
+  // 打开AI重命名模态框
+  const openAIRenameModal = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setShowAIRenameModal(true);
+  };
+
+  // 创建自定义分组
+  const createCustomGroup = async (groupData: { groupName: string; modelIds: string[] }) => {
+    if (!currentUser) return;
+
+    try {
+      // 为选中的模型设置自定义分组
+      const updatePromises = groupData.modelIds.map((modelId: string) =>
+        fetch(`/api/admin/models/${modelId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminUserId: currentUser.id,
+            group: groupData.groupName,
+          }),
+        })
+      );
+
+      const responses = await Promise.all(updatePromises);
+      const successCount = responses.filter(r => r.ok).length;
+      const failCount = responses.length - successCount;
+
+      if (successCount > 0) {
+        toast.success(`成功为 ${successCount} 个模型设置分组"${groupData.groupName}"${failCount > 0 ? `，${failCount} 个失败` : ''}`);
+        loadProvidersAndModels();
+        setShowCustomGroupModal(false);
+        setSelectedProviderId('');
+        setSelectedModelsForGroup([]);
+      } else {
+        toast.error('所有模型分组设置失败');
+      }
+    } catch (error) {
+      console.error('Create custom group error:', error);
+      toast.error('创建自定义分组失败');
+    }
+  };
+
+  // 执行AI重命名
+  const performAIRename = async (renameData: { aiModelId: string; selectedModels: string[] }) => {
+    if (!currentUser) return;
+
+    try {
+      // 获取用于重命名的AI模型信息
+      const aiModel = providers.flatMap(p => p.models || []).find((m: any) => m.id === renameData.aiModelId);
+      if (!aiModel) {
+        toast.error('未找到指定的AI模型');
+        return;
+      }
+
+      // 获取要重命名的模型信息
+      const modelsToRename = providers.flatMap(p => p.models || []).filter((m: any) =>
+        renameData.selectedModels.includes(m.id)
+      );
+
+      if (modelsToRename.length === 0) {
+        toast.error('未找到要重命名的模型');
+        return;
+      }
+
+      // 构建AI重命名提示词
+      const prompt = `你是一名AI专家，擅长辨认模型。你会将 AI 的模型 ID 转化为人类易读的标题。以下是几个例子：
+
+gpt-4o-mini -> GPT-4o Mini
+deepseek-chat-v3-0324 -> DeepSeek V3 [0324]
+deepseek-ai/deepseek-r1 -> DeepSeek R1 {deepseek-ai}
+black-forest-labs/FLUX.1-dev -> FLUX.1 Dev {black-forest-labs}
+deepseek-ai/DeepSeek-R1-Distill-Qwen-14B -> DeepSeek R1 蒸馏版 Qwen 14B {deepseek-ai}
+Pro/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B -> DeepSeek R1 蒸馏版 Qwen 7B {Pro/deepseek-ai}
+Qwen/Qwen2.5-Coder-32B-Instruct -> Qwen2.5 Coder 32B 指示版 {Qwen}
+
+现在请为以下模型ID生成易读的标题，每行一个，格式为"原ID -> 新标题"：
+
+${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
+
+      // 调用AI模型进行重命名
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }],
+          modelId: aiModel.id,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI重命名请求失败');
+      }
+
+      const result = await response.json();
+      const aiResponse = result.content || result.message?.content || '';
+
+      // 解析AI返回的重命名结果
+      const renameMap = new Map<string, string>();
+      const lines = aiResponse.split('\n').filter((line: string) => line.includes('->'));
+
+      lines.forEach((line: string) => {
+        const match = line.match(/^(.+?)\s*->\s*(.+)$/);
+        if (match) {
+          const originalId = match[1].trim();
+          const newName = match[2].trim();
+          renameMap.set(originalId, newName);
+        }
+      });
+
+      // 批量更新模型名称
+      const updatePromises = modelsToRename.map((model: any) => {
+        const newName = renameMap.get(model.modelId);
+        if (newName) {
+          return fetch(`/api/admin/models/${model.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminUserId: currentUser.id,
+              name: newName,
+            }),
+          });
+        }
+        return Promise.resolve({ ok: false });
+      });
+
+      const responses = await Promise.all(updatePromises);
+      const successCount = responses.filter(r => r.ok).length;
+      const failCount = responses.length - successCount;
+
+      if (successCount > 0) {
+        toast.success(`AI成功重命名 ${successCount} 个模型${failCount > 0 ? `，${failCount} 个失败` : ''}`);
+        loadProvidersAndModels();
+        setShowAIRenameModal(false);
+        setSelectedProviderId('');
+      } else {
+        toast.error('AI重命名失败，请检查AI模型是否可用');
+      }
+
+    } catch (error) {
+      console.error('AI rename error:', error);
+      toast.error('AI重命名失败');
     }
   };
 
@@ -993,19 +1262,37 @@ export default function AdminConfig() {
                                   <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                                     模型管理
                                   </h4>
-                                  <div className="flex space-x-2">
+                                  <div className="flex flex-wrap gap-2">
                                     <button
                                       onClick={() => fetchModelsFromAPI(provider)}
                                       disabled={isLoading}
-                                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                       {isLoading ? '获取中...' : 'v1/models 获取'}
                                     </button>
                                     <button
                                       onClick={() => openAddModelModal(provider.id)}
-                                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800"
+                                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800 transition-colors"
                                     >
                                       自定义模型
+                                    </button>
+                                    <button
+                                      onClick={() => autoGroupModels(provider.id)}
+                                      className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:hover:bg-purple-800 transition-colors"
+                                    >
+                                      🤖 自动分组
+                                    </button>
+                                    <button
+                                      onClick={() => openCustomGroupModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:hover:bg-orange-800 transition-colors"
+                                    >
+                                      📁 自定义分组
+                                    </button>
+                                    <button
+                                      onClick={() => openAIRenameModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-800 transition-colors"
+                                    >
+                                      ✨ AI 起名
                                     </button>
                                   </div>
                                 </div>
@@ -1022,7 +1309,7 @@ export default function AdminConfig() {
                                         onReorder={(reorderedModels) => updateModelOrder(provider.id, reorderedModels)}
                                       >
                                         {(model: any) => (
-                                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border">
+                                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">
                                             <div className="flex-1">
                                               <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                 {model.name}
@@ -1032,17 +1319,26 @@ export default function AdminConfig() {
                                               </div>
                                             </div>
                                             <div className="flex items-center space-x-2">
-                                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                model.isEnabled
-                                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                              }`}>
+                                              <button
+                                                onClick={() => toggleModelStatus(model.id, model.isEnabled)}
+                                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer transition-colors ${
+                                                  model.isEnabled
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+                                                }`}
+                                              >
                                                 {model.isEnabled ? '启用' : '禁用'}
-                                              </span>
-                                              <button className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800">
+                                              </button>
+                                              <button
+                                                onClick={() => editModel(model)}
+                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors"
+                                              >
                                                 编辑
                                               </button>
-                                              <button className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
+                                              <button
+                                                onClick={() => deleteModel(model.id, model.name)}
+                                                className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800 transition-colors"
+                                              >
                                                 删除
                                               </button>
                                             </div>
@@ -1722,6 +2018,39 @@ export default function AdminConfig() {
             onSubmit={createCustomModel}
           />
         )}
+
+        {/* 自定义分组模态框 */}
+        {showCustomGroupModal && (
+          <CustomGroupModal
+            isOpen={showCustomGroupModal}
+            onClose={() => {
+              setShowCustomGroupModal(false);
+              setSelectedProviderId('');
+              setSelectedModelsForGroup([]);
+            }}
+            providerId={selectedProviderId}
+            providers={providers}
+            onSubmit={async (groupData) => {
+              await createCustomGroup(groupData);
+            }}
+          />
+        )}
+
+        {/* AI重命名模态框 */}
+        {showAIRenameModal && (
+          <AIRenameModal
+            isOpen={showAIRenameModal}
+            onClose={() => {
+              setShowAIRenameModal(false);
+              setSelectedProviderId('');
+            }}
+            providerId={selectedProviderId}
+            providers={providers}
+            onSubmit={async (renameData) => {
+              await performAIRename(renameData);
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -1861,7 +2190,7 @@ function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: Provid
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           {title}
@@ -2186,7 +2515,7 @@ function AddModelModal({ isOpen, onClose, onSubmit }: AddModelModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           添加自定义模型
@@ -2251,6 +2580,281 @@ function AddModelModal({ isOpen, onClose, onSubmit }: AddModelModalProps) {
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               添加模型
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// 自定义分组模态框组件
+interface CustomGroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  providerId: string;
+  providers: any[];
+  onSubmit: (data: { groupName: string; modelIds: string[] }) => void;
+}
+
+function CustomGroupModal({ isOpen, onClose, providerId, providers, onSubmit }: CustomGroupModalProps) {
+  const [formData, setFormData] = useState({
+    groupName: '',
+    modelIds: [] as string[],
+  });
+
+  const provider = providers.find(p => p.id === providerId);
+  const models = provider?.models || [];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.groupName.trim() || formData.modelIds.length === 0) {
+      return;
+    }
+    onSubmit(formData);
+    setFormData({ groupName: '', modelIds: [] });
+  };
+
+  const toggleModel = (modelId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      modelIds: prev.modelIds.includes(modelId)
+        ? prev.modelIds.filter(id => id !== modelId)
+        : [...prev.modelIds, modelId]
+    }));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          创建自定义分组
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              分组名称 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.groupName}
+              onChange={(e) => setFormData(prev => ({ ...prev, groupName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="例如: 对话模型"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              选择模型 <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
+              {models.map((model: any) => (
+                <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.modelIds.includes(model.id)}
+                    onChange={() => toggleModel(model.id)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {model.name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {model.modelId}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              已选择 {formData.modelIds.length} 个模型
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={!formData.groupName.trim() || formData.modelIds.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+            >
+              创建分组
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// AI重命名模态框组件
+interface AIRenameModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  providerId: string;
+  providers: any[];
+  onSubmit: (data: { aiModelId: string; selectedModels: string[] }) => void;
+}
+
+function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIRenameModalProps) {
+  const [formData, setFormData] = useState({
+    aiModelId: '',
+    selectedModels: [] as string[],
+  });
+
+  const provider = providers.find(p => p.id === providerId);
+  const models = provider?.models || [];
+
+  // 获取所有可用的AI模型（用于重命名）
+  const availableAIModels = providers.flatMap(p =>
+    p.models?.filter((m: any) => m.isEnabled) || []
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.aiModelId || formData.selectedModels.length === 0) {
+      return;
+    }
+    onSubmit(formData);
+    setFormData({ aiModelId: '', selectedModels: [] });
+  };
+
+  const toggleModel = (modelId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedModels: prev.selectedModels.includes(modelId)
+        ? prev.selectedModels.filter(id => id !== modelId)
+        : [...prev.selectedModels, modelId]
+    }));
+  };
+
+  const selectAll = () => {
+    setFormData(prev => ({
+      ...prev,
+      selectedModels: models.map((m: any) => m.id)
+    }));
+  };
+
+  const deselectAll = () => {
+    setFormData(prev => ({
+      ...prev,
+      selectedModels: []
+    }));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          🤖 AI 智能重命名
+        </h3>
+
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            AI将根据预设规则将模型ID转换为易读的名称，例如：
+          </p>
+          <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1">
+            <li>• gpt-4o-mini → GPT-4o Mini</li>
+            <li>• deepseek-chat-v3-0324 → DeepSeek V3 [0324]</li>
+            <li>• deepseek-ai/deepseek-r1 → DeepSeek R1 {`{deepseek-ai}`}</li>
+          </ul>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              选择AI模型进行重命名 <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.aiModelId}
+              onChange={(e) => setFormData(prev => ({ ...prev, aiModelId: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              required
+            >
+              <option value="">请选择用于重命名的AI模型</option>
+              {availableAIModels.map((model: any) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} ({model.modelId})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                选择要重命名的模型 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  全选
+                </button>
+                <button
+                  type="button"
+                  onClick={deselectAll}
+                  className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  全不选
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
+              {models.map((model: any) => (
+                <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.selectedModels.includes(model.id)}
+                    onChange={() => toggleModel(model.id)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {model.name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {model.modelId}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              已选择 {formData.selectedModels.length} 个模型
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={!formData.aiModelId || formData.selectedModels.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              🤖 开始AI重命名
             </button>
           </div>
         </form>

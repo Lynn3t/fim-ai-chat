@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getModels, createModel } from '@/lib/db/providers'
+import { withAuth, createApiResponse } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const providerId = searchParams.get('providerId')
-    
-    const models = await getModels(providerId || undefined)
-    return NextResponse.json(models)
-  } catch (error) {
-    console.error('Error fetching models:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch models' },
-      { status: 500 }
-    )
-  }
-}
+export const GET = withAuth(async (request: NextRequest, userId: string) => {
+  const { searchParams } = new URL(request.url)
+  const providerId = searchParams.get('providerId')
+
+  const models = await getModels(providerId || undefined)
+  return createApiResponse(models)
+})
 
 export async function POST(request: NextRequest) {
   try {

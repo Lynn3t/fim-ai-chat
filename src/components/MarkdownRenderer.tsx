@@ -24,24 +24,34 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
         components={{
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           code(props: any) {
-            const { inline, className, children } = props;
+            const { inline, className, children, ...rest } = props;
             const match = /language-(\w+)/.exec(className || '');
-            return !inline && match ? (
-              <SyntaxHighlighter
-                style={oneDark}
-                language={match[1]}
-                PreTag="div"
-                className="rounded-md"
-                {...props}
+
+            if (!inline && match) {
+              // 只传递必要的props给SyntaxHighlighter
+              return (
+                <SyntaxHighlighter
+                  style={oneDark}
+                  language={match[1]}
+                  PreTag="div"
+                  className="rounded-md"
+                  showLineNumbers={false}
+                  wrapLines={true}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              );
+            }
+
+            return (
+              <code
+                className={`${className || ''} ${
+                  isInverted
+                    ? 'bg-blue-700 text-blue-100'
+                    : 'bg-gray-100 dark:bg-gray-800'
+                } px-1 py-0.5 rounded text-sm`}
+                {...rest}
               >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            ) : (
-              <code className={`${className} ${
-                isInverted
-                  ? 'bg-blue-700 text-blue-100'
-                  : 'bg-gray-100 dark:bg-gray-800'
-              } px-1 py-0.5 rounded text-sm`}>
                 {children}
               </code>
             );

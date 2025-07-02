@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface ToastProps {
   message: string;
@@ -94,15 +94,27 @@ export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
 // Hook for managing toasts
 export function useToast() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const toastCounterRef = useRef(0);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration?: number) => {
-    const id = Date.now().toString();
+    // 生成唯一ID，避免重复
+    const id = `toast-${Date.now()}-${++toastCounterRef.current}`;
     const newToast: ToastMessage = { id, message, type, duration };
-    setToasts(prev => [...prev, newToast]);
+
+    setToasts(prev => {
+      // 限制最大toast数量为5个，移除最旧的
+      const newToasts = [...prev, newToast];
+      return newToasts.slice(-5);
+    });
   }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  // 清理所有toast
+  const clearAllToasts = useCallback(() => {
+    setToasts([]);
   }, []);
 
   const success = useCallback((message: string, duration?: number) => addToast(message, 'success', duration), [addToast]);
@@ -114,6 +126,7 @@ export function useToast() {
     toasts,
     addToast,
     removeToast,
+    clearAllToasts,
     success,
     error,
     warning,

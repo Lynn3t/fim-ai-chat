@@ -243,23 +243,36 @@ export async function getSystemStats(): Promise<{
     activeAccessCodes: accessCodeStats._count.id,
   }
 
-  // 模型和提供商统计
-  const [modelStats, providerStats] = await Promise.all([
-    prisma.model.groupBy({
-      by: ['isEnabled'],
-      _count: { id: true },
+  // 优化的模型和提供商统计 - 使用单个查询
+  const [modelCounts, providerCounts] = await Promise.all([
+    prisma.model.aggregate({
+      _count: {
+        id: true,
+      },
+      where: {},
     }),
-    prisma.provider.groupBy({
-      by: ['isEnabled'],
-      _count: { id: true },
+    prisma.provider.aggregate({
+      _count: {
+        id: true,
+      },
+      where: {},
     }),
-  ])
+  ]);
+
+  const [activeModelCount, activeProviderCount] = await Promise.all([
+    prisma.model.count({
+      where: { isEnabled: true },
+    }),
+    prisma.provider.count({
+      where: { isEnabled: true },
+    }),
+  ]);
 
   const modelUsage = {
-    totalModels: modelStats.reduce((sum, stat) => sum + stat._count.id, 0),
-    activeModels: modelStats.find(stat => stat.isEnabled)?._count.id || 0,
-    totalProviders: providerStats.reduce((sum, stat) => sum + stat._count.id, 0),
-    activeProviders: providerStats.find(stat => stat.isEnabled)?._count.id || 0,
+    totalModels: modelCounts._count.id,
+    activeModels: activeModelCount,
+    totalProviders: providerCounts._count.id,
+    activeProviders: activeProviderCount,
   }
 
   return {

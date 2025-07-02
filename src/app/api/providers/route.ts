@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProviders, createProvider } from '@/lib/db/providers'
+import { withAuth, sanitizeProviders, createApiResponse, createErrorResponse } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const includeDisabled = searchParams.get('includeDisabled') === 'true'
+export const GET = withAuth(async (request: NextRequest, userId: string) => {
+  const { searchParams } = new URL(request.url)
+  const includeDisabled = searchParams.get('includeDisabled') === 'true'
 
-    const providers = await getProviders(true, !includeDisabled)
-    return NextResponse.json(providers)
-  } catch (error) {
-    console.error('Error fetching providers:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch providers' },
-      { status: 500 }
-    )
-  }
-}
+  const providers = await getProviders(true, !includeDisabled)
+
+  // 过滤敏感信息（API密钥等）
+  const sanitizedProviders = sanitizeProviders(providers)
+
+  return createApiResponse(sanitizedProviders)
+})
 
 export async function POST(request: NextRequest) {
   try {

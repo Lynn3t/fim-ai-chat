@@ -48,6 +48,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    if (!model || !model.provider) {
+      return NextResponse.json(
+        { error: 'Model or provider not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!model.isEnabled || !model.provider.isEnabled) {
+      return NextResponse.json(
+        { error: 'Model or provider is disabled' },
+        { status: 403 }
+      );
+    }
+
     if (!model) {
       return NextResponse.json({ error: 'Model not found' }, { status: 404 });
     }
