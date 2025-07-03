@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,57 +10,114 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
+*.lcov
+.nyc_output
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production builds
 /build
+/dist/
 
-# misc
-.DS_Store
-*.pem
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# debug
+# Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
+# Prisma generated files
 /src/generated/prisma
 
-# Database files
+# Database files (本地调试时的数据库)
 *.db
 *.db-journal
+*.sqlite
+*.sqlite3
 prisma/dev.db*
+prisma/test.db*
+
+# Database migrations (保留schema，忽略迁移历史)
 prisma/migrations/
 
-# IDE files
+# IDE and Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
 # Temporary files
 *.tmp
 *.temp
 .cache/
+.parcel-cache/
 
-# Documentation and development files
-*.md
-!README.md
+# Debug and test files (本地调试文件)
+debug/
+test-output/
 test-*.js
 test-*.html
+test-*.ts
+debug-*.js
+debug-*.html
+debug-*.ts
+
+# Local development files
+local/
+dev-notes/
+scratch/
+playground/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Package manager lock files (可选择性忽略)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Build artifacts
+.turbo/
+.swc/
