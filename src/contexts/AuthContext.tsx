@@ -79,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const config = await response.json()
         setChatConfig(config)
+      } else if (response.status === 500) {
+        // 如果用户不存在，清除本地存储的用户数据
+        console.warn('User not found in database, clearing local storage')
+        localStorage.removeItem('fimai_user')
+        setUser(null)
+        setChatConfig(null)
       }
     } catch (error) {
       console.error('Failed to fetch chat config:', error)
