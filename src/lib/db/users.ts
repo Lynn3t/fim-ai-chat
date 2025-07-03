@@ -33,6 +33,55 @@ export async function createUser(data: CreateUserData): Promise<User> {
 }
 
 /**
+ * 获取用户设置
+ */
+export async function getUserSettings(userId: string): Promise<UserSettings | null> {
+  return prisma.userSettings.findUnique({
+    where: { userId },
+  })
+}
+
+/**
+ * 创建或更新用户设置
+ */
+export async function upsertUserSettings(
+  userId: string,
+  data: CreateUserSettingsData
+): Promise<UserSettings> {
+  return prisma.userSettings.upsert({
+    where: { userId },
+    update: {
+      ...data,
+      updatedAt: new Date(),
+    },
+    create: {
+      userId,
+      ...data,
+    },
+  })
+}
+
+/**
+ * 更新用户默认模型
+ */
+export async function updateUserDefaultModel(
+  userId: string,
+  defaultModelId: string
+): Promise<UserSettings> {
+  return prisma.userSettings.upsert({
+    where: { userId },
+    update: {
+      defaultModelId,
+      updatedAt: new Date(),
+    },
+    create: {
+      userId,
+      defaultModelId,
+    },
+  })
+}
+
+/**
  * 根据 ID 获取用户
  */
 export async function getUserById(id: string): Promise<User | null> {
@@ -87,28 +136,4 @@ export async function deleteUser(id: string): Promise<User> {
   })
 }
 
-/**
- * 创建或更新用户设置
- */
-export async function upsertUserSettings(
-  userId: string,
-  data: CreateUserSettingsData
-): Promise<UserSettings> {
-  return prisma.userSettings.upsert({
-    where: { userId },
-    update: data,
-    create: {
-      userId,
-      ...data,
-    },
-  })
-}
 
-/**
- * 获取用户设置
- */
-export async function getUserSettings(userId: string): Promise<UserSettings | null> {
-  return prisma.userSettings.findUnique({
-    where: { userId },
-  })
-}

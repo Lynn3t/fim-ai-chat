@@ -2544,6 +2544,37 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
               </div>
             </div>
 
+            {/* AI 设置 */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                AI 设置
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    标题生成模型
+                  </label>
+                  <select
+                    value={systemSettings.title_generation_model_id || ''}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, title_generation_model_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">选择用于生成对话标题的模型</option>
+                    {providers.flatMap(provider =>
+                      provider.models?.filter(model => model.isEnabled).map(model => (
+                        <option key={model.id} value={model.id}>
+                          {provider.displayName || provider.name} - {model.name}
+                        </option>
+                      )) || []
+                    )}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    选择用于自动生成对话标题的AI模型。如果不选择，将使用用户当前选择的模型。
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* 保存按钮 */}
             <div className="flex justify-end">
               <button

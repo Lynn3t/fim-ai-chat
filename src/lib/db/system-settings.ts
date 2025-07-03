@@ -45,6 +45,12 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingValue[] = [
     value: 100000,
     type: 'number',
     description: '默认用户Token限制'
+  },
+  {
+    key: 'title_generation_model_id',
+    value: null,
+    type: 'string',
+    description: '用于生成对话标题的模型ID'
   }
 ]
 

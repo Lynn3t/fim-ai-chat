@@ -90,6 +90,7 @@ function ChatPageContent() {
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [userGroupOrders, setUserGroupOrders] = useState<Array<{ groupName: string; order: number }>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [userSettings, setUserSettings] = useState<any>(null);
   const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('');
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
@@ -121,6 +122,54 @@ function ChatPageContent() {
         console.error('Error loading group orders:', error);
       }
     };
+
+    const loadUserSettings = async () => {
+      try {
+        const response = await fetch(`/api/user/settings?userId=${user.id}`);
+        if (response.ok) {
+          const settings = await response.json();
+          setUserSettings(settings);
+          return settings;
+        }
+      } catch (error) {
+        console.error('Error loading user settings:', error);
+      }
+      return null;
+    };
+
+  // 保存用户默认模型
+  const saveUserDefaultModel = async (modelId: string) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          defaultModelId: modelId,
+        }),
+      });
+
+      if (response.ok) {
+        // 更新本地状态
+        setUserSettings(prev => ({
+          ...prev,
+          defaultModelId: modelId,
+        }));
+      }
+    } catch (error) {
+      console.error('Error saving default model:', error);
+    }
+  };
+
+  // 处理模型选择
+  const handleModelSelect = (modelId: string) => {
+    setSelectedModelId(modelId);
+    setShowModelDropdown(false);
+    // 保存为用户默认模型
+    saveUserDefaultModel(modelId);
+  };
 
     const loadProviders = async () => {
       try {
@@ -165,6 +214,7 @@ function ChatPageContent() {
     if (user && Array.isArray(providers) && providers.length === 0) {
       loadProviders();
       loadGroupOrders(); // 同时加载分组排序
+      loadUserSettings(); // 同时加载用户设置
     }
 
     return () => {
@@ -175,12 +225,31 @@ function ChatPageContent() {
   // 设置默认模型（单独的effect避免循环依赖）
   useEffect(() => {
     if (Array.isArray(providers) && providers.length > 0 && !selectedModelId) {
-      const firstProvider = providers[0];
-      if (firstProvider && firstProvider.models && firstProvider.models.length > 0) {
-        setSelectedModelId(firstProvider.models[0].id);
+      // 收集所有可用的模型
+      const allModels = providers.flatMap(provider =>
+        provider.models?.filter(model => model.isEnabled) || []
+      );
+
+      let defaultModelId = null;
+
+      // 1. 优先使用用户设置中的默认模型
+      if (userSettings?.defaultModelId) {
+        const userDefaultModel = allModels.find(model => model.id === userSettings.defaultModelId);
+        if (userDefaultModel) {
+          defaultModelId = userSettings.defaultModelId;
+        }
+      }
+
+      // 2. 如果用户没有设置默认模型或默认模型不可用，使用第一个可用模型
+      if (!defaultModelId && allModels.length > 0) {
+        defaultModelId = allModels[0].id;
+      }
+
+      if (defaultModelId) {
+        setSelectedModelId(defaultModelId);
       }
     }
-  }, [providers, selectedModelId]);
+  }, [providers, selectedModelId, userSettings]);
 
   // 加载历史聊天记录
   useEffect(() => {
@@ -262,9 +331,35 @@ function ChatPageContent() {
 
   // 生成聊天标题
   const generateChatTitle = async (firstMessage: string): Promise<string> => {
-    const currentModel = getCurrentModel();
-    if (!currentModel) {
-      return firstMessage.slice(0, 20) + (firstMessage.length > 20 ? '...' : '');
+    // 获取系统配置的标题生成模型
+    let titleModelId = null;
+    try {
+      const settingsResponse = await fetch(`/api/admin/system-settings?adminUserId=${user.id}&key=title_generation_model_id`);
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        titleModelId = settingsData.value;
+      }
+    } catch (error) {
+      console.error('Error loading title generation model setting:', error);
+    }
+
+    // 如果没有配置标题生成模型，使用当前选择的模型
+    let modelToUse = null;
+    if (titleModelId) {
+      // 查找配置的标题生成模型
+      const allModels = providers.flatMap(provider =>
+        provider.models?.filter(model => model.isEnabled) || []
+      );
+      modelToUse = allModels.find(model => model.id === titleModelId);
+    }
+
+    // 如果没有找到配置的模型，使用当前选择的模型
+    if (!modelToUse) {
+      const currentModel = getCurrentModel();
+      if (!currentModel) {
+        return firstMessage.slice(0, 20) + (firstMessage.length > 20 ? '...' : '');
+      }
+      modelToUse = currentModel.model;
     }
 
     try {
@@ -281,7 +376,7 @@ function ChatPageContent() {
             }
           ],
           userId: user.id,
-          modelId: currentModel.model.id
+          modelId: modelToUse.id
         }),
       });
 
@@ -827,10 +922,7 @@ function ChatPageContent() {
                           {group.models.map((model) => (
                             <button
                               key={model.id}
-                              onClick={() => {
-                                setSelectedModelId(model.id);
-                                setShowModelDropdown(false);
-                              }}
+                              onClick={() => handleModelSelect(model.id)}
                               className={`w-full text-left px-6 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
                                 selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
                               }`}
