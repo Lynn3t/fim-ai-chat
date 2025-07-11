@@ -11,13 +11,22 @@ import 'katex/dist/katex.min.css';
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  isStreaming?: boolean;
+  randomChars?: string;
+  isLoading?: boolean;
 }
 
-export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
+export function MarkdownRenderer({ 
+  content, 
+  className = '', 
+  isStreaming = false, 
+  randomChars = '',
+  isLoading = false 
+}: MarkdownRendererProps) {
   const isInverted = className.includes('prose-invert');
 
   return (
-    <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
+    <div className={`prose prose-sm dark:prose-invert max-w-none ${className} ${isStreaming ? 'streaming-content' : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -144,6 +153,11 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
       >
         {content}
       </ReactMarkdown>
+      {isLoading && randomChars && (
+        <span className="random-chars" style={{animation: 'randomFade 1s infinite'}}>
+          {randomChars}
+        </span>
+      )}
     </div>
   );
 }

@@ -87,6 +87,9 @@ function ChatPageContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isWaitingFirstChar, setIsWaitingFirstChar] = useState(false); // 等待第一个字符
+  const [hasChinese, setHasChinese] = useState(false); // 是否包含中文字符
+  const [randomChars, setRandomChars] = useState(''); // 随机字符
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [userGroupOrders, setUserGroupOrders] = useState<Array<{ groupName: string; order: number }>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -104,6 +107,47 @@ function ChatPageContent() {
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+
+  // 生成随机汉字
+  const generateRandomChinese = (length = 5) => {
+    const result = [];
+    for (let i = 0; i < length; i++) {
+      // 常用汉字的Unicode范围大约是 0x4e00-0x9fff
+      const unicode = Math.floor(Math.random() * (0x9fff - 0x4e00) + 0x4e00);
+      result.push(String.fromCharCode(unicode));
+    }
+    return result.join('');
+  };
+
+  // 生成随机字母
+  const generateRandomLetters = (length = 8) => {
+    const result = [];
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (let i = 0; i < length; i++) {
+      result.push(chars.charAt(Math.floor(Math.random() * chars.length)));
+    }
+    return result.join('');
+  };
+
+  // 更新随机字符
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    if (isLoading) {
+      // 每200ms更新一次随机字符
+      intervalId = setInterval(() => {
+        if (hasChinese) {
+          setRandomChars(generateRandomChinese(5));
+        } else {
+          setRandomChars(generateRandomLetters(8));
+        }
+      }, 200);
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isLoading, hasChinese]);
 
   // 加载提供商和模型
   useEffect(() => {
@@ -137,39 +181,9 @@ function ChatPageContent() {
       return null;
     };
 
-  // 保存用户默认模型
-  const saveUserDefaultModel = async (modelId: string) => {
-    if (!user) return;
+  // saveUserDefaultModel functionality has been inlined where needed
 
-    try {
-      const response = await fetch('/api/user/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          defaultModelId: modelId,
-        }),
-      });
-
-      if (response.ok) {
-        // 更新本地状态
-        setUserSettings(prev => ({
-          ...prev,
-          defaultModelId: modelId,
-        }));
-      }
-    } catch (error) {
-      console.error('Error saving default model:', error);
-    }
-  };
-
-  // 处理模型选择
-  const handleModelSelect = (modelId: string) => {
-    setSelectedModelId(modelId);
-    setShowModelDropdown(false);
-    // 保存为用户默认模型
-    saveUserDefaultModel(modelId);
-  };
+  // handleModelSelect has been inlined where needed
 
     const loadProviders = async () => {
       try {
@@ -603,9 +617,36 @@ function ChatPageContent() {
       }
     };
 
+    // 检测是否包含中文
+    const containsChinese = /[\u4e00-\u9fff]/.test(input);
+    setHasChinese(containsChinese);
+    
+    // 先添加用户消息
     setMessages(prev => [...prev, userMessage]);
+    
+    // 然后添加AI回复消息（乐观估计）
+    // 为每条消息使用唯一ID以避免合并
+    const assistantMessage: Message = {
+      id: `assistant-${Date.now()}`, // 确保ID唯一性
+      conversationId: currentChatId || undefined,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      modelInfo: currentModel ? {
+        modelId: currentModel.model.modelId || currentModel.model.id,
+        modelName: currentModel.model.name,
+        providerId: currentModel.provider.id,
+        providerName: currentModel.provider.displayName || currentModel.provider.name
+      } : undefined
+    };
+    
+    // 单独添加AI消息，确保状态更新
+    setTimeout(() => {
+      setMessages(prev => [...prev, assistantMessage]);
+    }, 50);
     setInput('');
     setIsLoading(true);
+    setIsWaitingFirstChar(true);
 
     // 如果是新对话且可以保存到数据库，创建对话
     let conversationId = currentChatId;
@@ -677,21 +718,9 @@ function ChatPageContent() {
       const reader = response.body?.getReader();
       if (!reader) throw new Error('无法读取响应');
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        conversationId: conversationId || undefined,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        modelInfo: {
-          modelId: currentModel.model.modelId || currentModel.model.id,
-          modelName: currentModel.model.name,
-          providerId: currentModel.provider.id,
-          providerName: currentModel.provider.displayName || currentModel.provider.name
-        }
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      // 创建消息ID变量以供后续使用
+      // 我们使用之前创建的assistantMessage
+      const assistantMessageId = assistantMessage.id;
 
       let finalTokenUsage: any = null;
 
@@ -718,8 +747,13 @@ function ChatPageContent() {
               }
 
               if (content) {
+                // 如果是第一个字符，更新等待状态
+                if (isWaitingFirstChar) {
+                  setIsWaitingFirstChar(false);
+                }
+                
                 setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessage.id
+                  msg.id === assistantMessageId
                     ? { ...msg, content: msg.content + content }
                     : msg
                 ));
@@ -741,7 +775,7 @@ function ChatPageContent() {
 
         // 更新消息的token信息
         setMessages(prev => prev.map(msg =>
-          msg.id === assistantMessage.id
+          msg.id === assistantMessageId
             ? { ...msg, tokenUsage: finalTokenUsage }
             : msg
         ));
@@ -750,7 +784,7 @@ function ChatPageContent() {
       // 保存AI响应到数据库
       if (chatConfig?.canSaveToDatabase && conversationId) {
         try {
-          const finalMessage = messages.find(m => m.id === assistantMessage.id);
+          const finalMessage = messages.find(m => m.id === assistantMessageId);
           await fetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -760,10 +794,10 @@ function ChatPageContent() {
               providerId: currentModel.provider.id,
               modelId: currentModel.model.id,
               role: 'assistant',
-              content: finalMessage?.content || assistantMessage.content,
+              content: finalMessage?.content || '',
               tokenUsage: finalTokenUsage,
               inputText: userMessage.content,
-              outputText: finalMessage?.content || assistantMessage.content,
+              outputText: finalMessage?.content || '',
               saveToDatabase: true,
             }),
           });
@@ -773,16 +807,28 @@ function ChatPageContent() {
       }
     } catch (error) {
       console.error('发送消息失败:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '抱歉，发生了错误。请检查您的配置或稍后重试。',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // 错误情况下，使用新的错误消息替换之前的AI消息
+      setMessages(prev => {
+        // 移除最后一条消息，如果它是AI回复
+        const withoutLastMessage = prev.filter((msg, idx) => 
+          !(idx === prev.length - 1 && msg.role === 'assistant')
+        );
+        
+        // 添加新的错误消息
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: '抱歉，发生了错误。请检查您的配置或稍后重试。',
+          timestamp: new Date()
+        };
+        
+        return [...withoutLastMessage, errorMessage];
+      });
       toast.error('发送消息失败，请检查配置');
     } finally {
       setIsLoading(false);
+      setIsWaitingFirstChar(false);
+      setRandomChars(''); // 清除随机字符
       // 发送完成后保存聊天
       setTimeout(() => saveCurrentChat(), 1000);
     }
@@ -922,7 +968,30 @@ function ChatPageContent() {
                           {group.models.map((model) => (
                             <button
                               key={model.id}
-                              onClick={() => handleModelSelect(model.id)}
+                              onClick={() => {
+                                setSelectedModelId(model.id);
+                                setShowModelDropdown(false);
+                                // Save user's default model directly instead of calling the function
+                                if (user) {
+                                  fetch('/api/user/settings', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: user.id,
+                                      defaultModelId: model.id,
+                                    }),
+                                  })
+                                  .then(response => {
+                                    if (response.ok) {
+                                      setUserSettings(prev => ({
+                                        ...prev,
+                                        defaultModelId: model.id,
+                                      }));
+                                    }
+                                  })
+                                  .catch(error => console.error('Error saving default model:', error));
+                                }
+                              }}
                               className={`w-full text-left px-6 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
                                 selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
                               }`}
@@ -1101,6 +1170,16 @@ function ChatPageContent() {
                         <MarkdownRenderer
                           content={message.content}
                           className={message.role === 'user' ? 'prose-invert' : ''}
+                          isStreaming={
+                            message === messages[messages.length - 1] && 
+                            message.role === 'assistant' && 
+                            (isLoading || (!message.content && isWaitingFirstChar))
+                          }
+                          randomChars={
+                            isLoading && message === messages[messages.length - 1] && 
+                            message.role === 'assistant' ? randomChars : ''
+                          }
+                          isLoading={isLoading}
                         />
                       </div>
 
@@ -1120,16 +1199,7 @@ function ChatPageContent() {
               );
             })
           )}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2">
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                  <span className="text-gray-500 dark:text-gray-400">AI正在思考...</span>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* 加载状态已移至消息内部，这里不再需要单独的加载指示器 */}
           <div ref={messagesEndRef} />
         </div>
       </div>
