@@ -6,6 +6,24 @@ import { useToast } from '@/components/Toast';
 import Link from 'next/link';
 import { SortableList } from '@/components/SortableList';
 import {
+  Box,
+  Typography,
+  Container,
+  Paper,
+  Tabs,
+  Tab,
+  Button,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  IconButton
+} from '@mui/material';
+import {
   OpenAI,
   Anthropic,
   Google,
@@ -210,10 +228,14 @@ export default function AdminConfig() {
   // 邀请码管理相关状态
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [showCreateInviteModal, setShowCreateInviteModal] = useState(false);
-  const [inviteFormData, setInviteFormData] = useState({
-    count: 1,
-    maxUses: 1,
+  const [inviteFormData, setInviteFormData] = useState({ count: 1, maxUses: 1 });
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetPasswordData, setResetPasswordData] = useState({
+    userId: '',
+    username: '',
+    newPassword: ''
   });
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   // 系统设置相关状态
   const [systemSettings, setSystemSettings] = useState<any>({});
@@ -1633,54 +1655,45 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
   if (!currentUser || currentUser.role !== 'ADMIN') {
     return (
-      <div className="text-center py-8">
-        <p className="text-red-500">您没有管理员权限</p>
-        <Link href="/chat" className="text-blue-500 hover:underline">
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography color="error" variant="body1">您没有管理员权限</Typography>
+        <Link href="/chat" style={{ color: 'primary.main', textDecoration: 'underline' }}>
           返回聊天
         </Link>
-      </div>
+      </Box>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
+      <Container>
         {/* 页面标题 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
             管理员配置
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
             管理系统用户、邀请码和模型配置
-          </p>
-        </div>
+          </Typography>
+        </Box>
 
         {/* 导航标签 */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'dashboard', name: '仪表板' },
-                { id: 'users', name: '用户管理' },
-                { id: 'invites', name: '邀请码管理' },
-                { id: 'models', name: '模型管理' },
-                { id: 'system', name: '系统设置' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {tab.name}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+        <Box sx={{ mb: 3 }}>
+          <Paper sx={{ borderRadius: 1 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(_, newValue) => setActiveTab(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              <Tab label="仪表板" value="dashboard" />
+              <Tab label="用户管理" value="users" />
+              <Tab label="邀请码管理" value="invites" />
+              <Tab label="模型管理" value="models" />
+              <Tab label="系统设置" value="system" />
+            </Tabs>
+          </Paper>
+        </Box>
 
         {/* 模型管理 */}
         {activeTab === 'models' && (
@@ -1753,9 +1766,9 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                         {provider.isEnabled ? '启用' : '禁用'}
                                       </span>
                                     </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                      {provider.name} • {provider.baseUrl || '无Base URL'}
-                                    </div>
+                                                                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                    {provider.name}
+                                  </div>
                                     {provider.models && provider.models.length > 0 && (
                                       <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         {provider.models.length} 个模型
@@ -2111,138 +2124,137 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
         {/* 用户管理 */}
         {activeTab === 'users' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h2">
                 用户管理
-              </h2>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
                 共 {users.length} 个用户
-              </div>
-            </div>
+              </Typography>
+            </Box>
 
             {/* 用户列表 */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+            <Paper sx={{ borderRadius: 1, overflow: 'hidden' }}>
               {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-gray-500 mt-2">加载中...</p>
-                </div>
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Box sx={{ display: 'inline-block', animation: 'spin 1s linear infinite', mb: 1 }}>
+                    ⏳
+                  </Box>
+                  <Typography color="text.secondary">加载中...</Typography>
+                </Box>
               ) : users.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">暂无用户数据</p>
-                </div>
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography color="text.secondary">暂无用户数据</Typography>
+                </Box>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          用户信息
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          角色
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          状态
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          注册时间
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Token 使用
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          操作
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>用户信息</TableCell>
+                        <TableCell>角色</TableCell>
+                        <TableCell>状态</TableCell>
+                        <TableCell>Token 使用</TableCell>
+                        <TableCell>操作</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {users.map((user) => (
-                        <tr key={user.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="body2" fontWeight="medium">
                                 {user.username}
-                              </div>
+                              </Typography>
                               {user.email && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                <Typography variant="body2" color="text.secondary">
                                   {user.email}
-                                </div>
+                                </Typography>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              user.role === 'ADMIN'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                : user.role === 'USER'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                            }`}>
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              user.isActive
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                            }`}>
-                              {user.isActive ? '活跃' : '禁用'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {new Date(user.createdAt).toLocaleDateString('zh-CN')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={user.role}
+                              color={user.role === 'ADMIN' ? 'secondary' : 'primary'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={user.isActive ? '活跃' : '禁用'}
+                              color={user.isActive ? 'success' : 'error'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
                             {user.tokenUsage ? (
-                              <div>
-                                <div>{user.tokenUsage.totalTokens.toLocaleString()} tokens</div>
-                                <div className="text-xs text-gray-500">
+                              <Box>
+                                <Typography variant="body2">{user.tokenUsage.totalTokens.toLocaleString()} tokens</Typography>
+                                <Typography variant="caption" color="text.secondary">
                                   ¥{user.tokenUsage.cost.toFixed(2)}
-                                </div>
-                              </div>
+                                </Typography>
+                              </Box>
                             ) : (
                               '-'
                             )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
                               {user.role !== 'ADMIN' && (
                                 <>
-                                  <button
+                                  <Button
+                                    variant="text"
+                                    size="small"
+                                    color={user.isActive ? 'error' : 'success'}
                                     onClick={() => toggleUserStatus(user.id, user.isActive)}
-                                    className={`${
-                                      user.isActive
-                                        ? 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
-                                        : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                                    }`}
                                   >
                                     {user.isActive ? '禁用' : '启用'}
-                                  </button>
-                                  <span className="text-gray-300">|</span>
-                                  <button
+                                  </Button>
+                                  <Button
+                                    variant="text"
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => openResetPasswordModal(user.id, user.username)}
+                                  >
+                                    重置密码
+                                  </Button>
+                                  <Button
+                                    variant="text"
+                                    size="small"
+                                    color="error"
                                     onClick={() => deleteUser(user.id, user.username)}
-                                    className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                   >
                                     删除
-                                  </button>
+                                  </Button>
                                 </>
                               )}
                               {user.role === 'ADMIN' && (
-                                <span className="text-gray-400 text-xs">管理员</span>
+                                <>
+                                  <Button
+                                    variant="text"
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => openResetPasswordModal(user.id, user.username)}
+                                  >
+                                    重置密码
+                                  </Button>
+                                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1, alignSelf: 'center' }}>
+                                    (管理员)
+                                  </Typography>
+                                </>
                               )}
-                            </div>
-                          </td>
-                        </tr>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
-            </div>
-          </div>
+            </Paper>
+          </Box>
         )}
 
         {/* 邀请码管理 */}
@@ -2663,8 +2675,28 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
             }}
           />
         )}
-      </div>
-    </div>
+
+        {/* 创建邀请码对话框 */}
+        <CreateInviteModal
+          isOpen={showCreateInviteModal}
+          onClose={() => setShowCreateInviteModal(false)}
+          onSubmit={createInviteCodeFromForm}
+          formData={inviteFormData}
+          setFormData={setInviteFormData}
+        />
+
+        {/* 重置密码对话框 */}
+        <ResetPasswordModal
+          isOpen={showResetPasswordModal}
+          onClose={() => setShowResetPasswordModal(false)}
+          onSubmit={resetUserPassword}
+          username={resetPasswordData.username}
+          newPassword={resetPasswordData.newPassword}
+          setNewPassword={(newPassword) => setResetPasswordData({...resetPasswordData, newPassword})}
+          isLoading={isResettingPassword}
+        />
+      </Container>
+    </Box>
   );
 }
 
@@ -3470,6 +3502,138 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// 重置用户密码
+const resetUserPassword = async () => {
+  if (!currentUser || !resetPasswordData.userId || !resetPasswordData.newPassword) return;
+
+  setIsResettingPassword(true);
+  try {
+    const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminUserId: currentUser.id,
+        newPassword: resetPasswordData.newPassword
+      }),
+    });
+
+    if (response.ok) {
+      toast.success(`用户 "${resetPasswordData.username}" 的密码已重置`);
+      setShowResetPasswordModal(false);
+      setResetPasswordData({ userId: '', username: '', newPassword: '' });
+    } else {
+      const errorData = await response.json();
+      toast.error(errorData.error || '密码重置失败');
+    }
+  } catch (error) {
+    toast.error('密码重置失败');
+  } finally {
+    setIsResettingPassword(false);
+  }
+};
+
+// 打开重置密码对话框
+const openResetPasswordModal = (userId: string, username: string) => {
+  setResetPasswordData({ userId, username, newPassword: '' });
+  setShowResetPasswordModal(true);
+};
+
+// 重置密码对话框
+interface ResetPasswordModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+  username: string;
+  newPassword: string;
+  setNewPassword: (password: string) => void;
+  isLoading: boolean;
+}
+
+function ResetPasswordModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  username, 
+  newPassword, 
+  setNewPassword,
+  isLoading 
+}: ResetPasswordModalProps) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+        </div>
+
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                  重置用户密码
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    您正在为用户 <span className="font-bold">{username}</span> 重置密码。
+                  </p>
+                  <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        新密码
+                      </label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="输入新密码"
+                        minLength={6}
+                        required
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        密码长度至少需要6个字符
+                      </p>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={isLoading || !newPassword || newPassword.length < 6}
+              className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                (isLoading || !newPassword || newPassword.length < 6) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isLoading ? '处理中...' : '重置密码'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              取消
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

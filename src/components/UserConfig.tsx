@@ -4,6 +4,43 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Toast';
 import Link from 'next/link';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Tabs, 
+  Tab, 
+  Grid, 
+  Card, 
+  CardContent, 
+  Button, 
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Chip,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
+  Alert,
+  Stack
+} from '@mui/material';
+import {
+  Dashboard as DashboardIcon,
+  Key as KeyIcon,
+  SmartToy as SmartToyIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  ContentCopy as CopyIcon
+} from '@mui/icons-material';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface TokenStats {
   totalTokens: number;
@@ -45,15 +82,44 @@ interface Model {
   };
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 export default function UserConfig() {
   const { user, chatConfig } = useAuth();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'codes' | 'models'>('dashboard');
+  const [tabValue, setTabValue] = useState(0);
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const { mode } = useTheme();
 
   // 加载用户仪表板
   const loadDashboard = async () => {
@@ -97,6 +163,7 @@ export default function UserConfig() {
       if (response.ok) {
         toast.success('访问码创建成功');
         loadDashboard();
+        setCreateDialogOpen(false);
       } else {
         toast.error('创建访问码失败');
       }
@@ -159,323 +226,418 @@ export default function UserConfig() {
     }
   };
 
+  // 复制代码到剪贴板
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('已复制到剪贴板');
+  };
+
   useEffect(() => {
     loadDashboard();
   }, [user]);
 
   if (!user || user.role === 'GUEST') {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">访客用户无法访问配置页面</p>
-        <Link href="/chat" className="text-blue-500 hover:underline">
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Typography variant="body1" color="text.secondary" gutterBottom>
+          访客用户无法访问配置页面
+        </Typography>
+        <Button component={Link} href="/chat" color="primary">
           返回聊天
-        </Link>
-      </div>
+        </Button>
+      </Box>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* 页面标题 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            用户配置
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            管理您的访问码、查看使用统计和模型权限
-          </p>
-        </div>
+    <Paper elevation={2} sx={{ p: 0, borderRadius: 2, overflow: 'hidden' }}>
+      {/* 标签页导航 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs 
+          value={tabValue} 
+          onChange={(_, newValue) => setTabValue(newValue)}
+          variant="fullWidth"
+        >
+          <Tab icon={<DashboardIcon />} label="仪表板" />
+          <Tab icon={<KeyIcon />} label="访问码管理" />
+          <Tab icon={<SmartToyIcon />} label="模型权限" />
+        </Tabs>
+      </Box>
 
-        {/* 标签页导航 */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'dashboard', name: '仪表板', icon: '📊' },
-                { id: 'codes', name: '访问码管理', icon: '🎫' },
-                { id: 'models', name: '模型权限', icon: '🤖' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.name}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+      {/* 仪表板标签页 */}
+      <TabPanel value={tabValue} index={0}>
+        <Box sx={{ px: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            使用统计
+          </Typography>
+          
+          {/* 用户信息卡片 */}
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              mb: 3, 
+              bgcolor: mode === 'light' ? 'primary.50' : 'primary.900',
+              borderRadius: 2
+            }}
+          >
+            <Typography 
+              variant="subtitle1" 
+              sx={{ 
+                mb: 2, 
+                color: mode === 'light' ? 'primary.900' : 'primary.100',
+                fontWeight: 500
+              }}
+            >
+              账户信息
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <Typography variant="body2" color="text.secondary">用户名：</Typography>
+                <Typography variant="body1">{user.username}</Typography>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Typography variant="body2" color="text.secondary">角色：</Typography>
+                <Typography variant="body1">
+                  {user.role === 'ADMIN' ? '管理员' : '普通用户'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Typography variant="body2" color="text.secondary">注册时间：</Typography>
+                <Typography variant="body1">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+          
 
-        {/* 标签页内容 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-          {activeTab === 'dashboard' && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                使用统计
-              </h2>
-              
-              {/* 用户信息 */}
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
-                  账户信息
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400">用户名：</span>
-                    <span className="text-blue-900 dark:text-blue-100">{user.username}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400">角色：</span>
-                    <span className="text-blue-900 dark:text-blue-100">
-                      {user.role === 'ADMIN' ? '管理员' : '普通用户'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400">注册时间：</span>
-                    <span className="text-blue-900 dark:text-blue-100">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Token统计 */}
-              {tokenStats ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-green-600 dark:text-green-400">
-                      总Token使用
-                    </h3>
-                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                      {(tokenStats.totalTokens || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                      今日Token
-                    </h3>
-                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                      {(tokenStats.todayTokens || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                      总成本
-                    </h3>
-                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                      ${(tokenStats.totalCost || 0).toFixed(4)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-gray-500 mt-2">加载中...</p>
-                </div>
-              )}
-
-              {/* 快速统计 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    访问码
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    已创建 {accessCodes.length} 个访问码
-                  </p>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    活跃 {accessCodes.filter(c => c.isActive).length} 个
-                  </p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    邀请码
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    已创建 {inviteCodes.length} 个邀请码
-                  </p>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    可用 {inviteCodes.filter(c => !c.isUsed).length} 个
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Token统计卡片 */}
+          {tokenStats ? (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card elevation={1} sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      总计使用
+                    </Typography>
+                    <Typography variant="h3" color="primary" gutterBottom>
+                      {tokenStats?.totalTokens?.toLocaleString() || '0'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Tokens
+                    </Typography>
+                    <Divider sx={{ my: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          输入 Tokens:
+                        </Typography>
+                        <Typography variant="body1">
+                          {tokenStats?.promptTokens?.toLocaleString() || '0'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          输出 Tokens:
+                        </Typography>
+                        <Typography variant="body1">
+                          {tokenStats?.completionTokens?.toLocaleString() || '0'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card elevation={1} sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      今日使用
+                    </Typography>
+                    <Typography variant="h3" color="secondary" gutterBottom>
+                      {tokenStats?.todayTokens?.toLocaleString() || '0'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Tokens
+                    </Typography>
+                    <Divider sx={{ my: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          估算成本:
+                        </Typography>
+                        <Typography variant="body1">
+                          ${tokenStats?.todayCost?.toFixed(4) || '0.0000'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          总成本:
+                        </Typography>
+                        <Typography variant="body1">
+                          ${tokenStats?.totalCost?.toFixed(4) || '0.0000'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
           )}
+        </Box>
+      </TabPanel>
 
-          {activeTab === 'codes' && (
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  访问码管理
-                </h2>
-                <div className="space-x-2">
-                  <button
-                    onClick={createInviteCode}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    创建邀请码
-                  </button>
-                  <button
-                    onClick={() => {
-                      // 简单示例：选择所有可用模型
-                      const allModelIds = availableModels.map(m => m.id);
-                      createAccessCode(allModelIds);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    创建访问码
-                  </button>
-                </div>
-              </div>
+      {/* 访问码管理标签页 */}
+      <TabPanel value={tabValue} index={1}>
+        <Box sx={{ px: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6">
+              访问码管理
+            </Typography>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              创建访问码
+            </Button>
+          </Box>
 
-              {/* 访问码列表 */}
-              <div className="mb-8">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  访问码列表
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          访问码
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          使用情况
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          状态
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          创建时间
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          操作
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {accessCodes.map((code) => (
-                        <tr key={code.id}>
-                          <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900 dark:text-white">
-                            {code.code}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {code.currentUses} / {code.maxUses}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              code.isActive 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                            }`}>
-                              {code.isActive ? '活跃' : '禁用'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(code.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => deleteAccessCode(code.id)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+          {/* 访问码列表 */}
+          <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <List>
+              {accessCodes.length > 0 ? (
+                accessCodes.map((code) => (
+                  <React.Fragment key={code.id}>
+                    <ListItem>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="body1" sx={{ mr: 1 }}>
+                              {code.code}
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => copyToClipboard(code.code)}
                             >
-                              删除
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              使用次数: {code.currentUses} / {code.maxUses || '无限'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              创建时间: {new Date(code.createdAt).toLocaleString()}
+                            </Typography>
+                            <Box sx={{ mt: 1 }}>
+                              {code.allowedModelIds?.length > 0 ? (
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                  {code.allowedModelIds.map(modelId => {
+                                    const model = availableModels.find(m => m.id === modelId);
+                                    return (
+                                      <Chip 
+                                        key={modelId}
+                                        label={model?.name || modelId}
+                                        size="small"
+                                        sx={{ mb: 1 }}
+                                      />
+                                    );
+                                  })}
+                                </Stack>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  允许所有模型
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        }
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          edge="end" 
+                          onClick={() => deleteAccessCode(code.id)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                    <Divider />
+                  </React.Fragment>
+                ))
+              ) : (
+                <ListItem>
+                  <ListItemText 
+                    primary="暂无访问码" 
+                    secondary="点击右上角按钮创建新的访问码" 
+                  />
+                </ListItem>
+              )}
+            </List>
+          </Paper>
 
-              {/* 邀请码列表 */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  邀请码列表
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          邀请码
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          使用情况
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          状态
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          创建时间
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {inviteCodes.map((code) => (
-                        <tr key={code.id}>
-                          <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900 dark:text-white">
-                            {code.code}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {code.currentUses} / {code.maxUses}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              code.isUsed 
-                                ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                                : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            }`}>
-                              {code.isUsed ? '已使用' : '可用'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(code.createdAt).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* 邀请码部分 */}
+          <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              邀请码
+            </Typography>
+            <Button 
+              variant="outlined" 
+              startIcon={<AddIcon />}
+              onClick={createInviteCode}
+            >
+              创建邀请码
+            </Button>
+          </Box>
 
-          {activeTab === 'models' && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                模型权限
-              </h2>
-              <div className="space-y-4">
-                {availableModels.map((model) => (
-                  <div key={model.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">
+          {/* 邀请码列表 */}
+          <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <List>
+              {inviteCodes.length > 0 ? (
+                inviteCodes.map((code) => (
+                  <React.Fragment key={code.id}>
+                    <ListItem>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="body1" sx={{ mr: 1 }}>
+                              {code.code}
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => copyToClipboard(code.code)}
+                            >
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                            {code.isUsed && (
+                              <Chip 
+                                label="已使用" 
+                                color="default" 
+                                size="small" 
+                                sx={{ ml: 1 }} 
+                              />
+                            )}
+                          </Box>
+                        }
+                        secondary={
+                          <Typography variant="body2" color="text.secondary">
+                            创建时间: {new Date(code.createdAt).toLocaleString()}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                    <Divider />
+                  </React.Fragment>
+                ))
+              ) : (
+                <ListItem>
+                  <ListItemText 
+                    primary="暂无邀请码" 
+                    secondary="点击右上角按钮创建新的邀请码" 
+                  />
+                </ListItem>
+              )}
+            </List>
+          </Paper>
+        </Box>
+      </TabPanel>
+
+      {/* 模型权限标签页 */}
+      <TabPanel value={tabValue} index={2}>
+        <Box sx={{ px: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            可用模型
+          </Typography>
+
+          {availableModels.length > 0 ? (
+            <Grid container spacing={2}>
+              {availableModels.map((model) => (
+                <Grid item xs={12} sm={6} md={4} key={model.id}>
+                  <Card elevation={1} sx={{ borderRadius: 2 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
                         {model.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {model.provider.name} - {model.modelId}
-                      </p>
-                    </div>
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                      已授权
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        模型ID: {model.modelId}
+                      </Typography>
+                      <Chip 
+                        label={model.provider.name} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined" 
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Alert severity="info">
+              您没有可用的模型权限，请联系管理员。
+            </Alert>
           )}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </TabPanel>
+
+      {/* 创建访问码对话框 */}
+      <Dialog 
+        open={createDialogOpen} 
+        onClose={() => setCreateDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>创建访问码</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            选择允许访问的模型（不选择则允许所有可用模型）
+          </Typography>
+          
+          <Grid container spacing={1}>
+            {availableModels.map((model) => (
+              <Grid item xs={12} sm={6} key={model.id}>
+                <FormControlLabel
+                  control={
+                    <Checkbox 
+                      checked={selectedModelIds.includes(model.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedModelIds([...selectedModelIds, model.id]);
+                        } else {
+                          setSelectedModelIds(selectedModelIds.filter(id => id !== model.id));
+                        }
+                      }}
+                    />
+                  }
+                  label={`${model.name} (${model.provider.name})`}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)}>
+            取消
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => createAccessCode(selectedModelIds)}
+          >
+            创建
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Paper>
   );
 }

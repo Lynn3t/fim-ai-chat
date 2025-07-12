@@ -107,7 +107,7 @@ export async function getUserTokenStats(
   userId: string,
   startDate?: Date,
   endDate?: Date
-): Promise<TokenUsageStats> {
+): Promise<TokenUsageStats & { todayTokens: number; todayCost: number }> {
   const whereClause: any = { userId }
   
   if (startDate || endDate) {
@@ -137,6 +137,23 @@ export async function getUserTokenStats(
     distinct: ['conversationId'],
   })
 
+  // 获取今日使用量
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const todayStats = await prisma.tokenUsage.aggregate({
+    where: {
+      userId,
+      createdAt: {
+        gte: today
+      }
+    },
+    _sum: {
+      totalTokens: true,
+      cost: true
+    }
+  });
+
   return {
     totalTokens: stats._sum.totalTokens || 0,
     totalCost: stats._sum.cost || 0,
@@ -144,6 +161,8 @@ export async function getUserTokenStats(
     completionTokens: stats._sum.completionTokens || 0,
     messageCount: stats._count.id || 0,
     conversationCount: uniqueConversations.length,
+    todayTokens: todayStats._sum.totalTokens || 0,
+    todayCost: todayStats._sum.cost || 0
   }
 }
 

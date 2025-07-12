@@ -21,7 +21,7 @@ export const AI_MODEL_CATEGORIES: AIModelCategory[] = [
   { name: 'GLM', pattern: /glm/i, iconName: 'Zhipu' },
   { name: 'Llama', pattern: /llama/i, iconName: 'Meta' },
   { name: 'Qwen', pattern: /(qwen|qwq|qvq)/i, iconName: 'Alibaba' },
-  { name: 'ChatGPT', pattern: /(gpt|o1|o3|openai)/i, iconName: 'OpenAI' },
+  { name: 'ChatGPT', pattern: /(gpt|o1|o3|o4|openai)/i, iconName: 'OpenAI' },
   { name: 'Mistral', pattern: /mistral/i, iconName: 'Mistral' },
   { name: 'Yi', pattern: /yi/i, iconName: 'Yi' },
   { name: 'SenseNova', pattern: /(sensenova|sense)/i, iconName: 'SenseTime' },
@@ -165,30 +165,30 @@ export function groupModelsByCategory<T extends { modelId: string }>(models: T[]
 
 /**
  * 获取分组的排序顺序
- * 按照用户要求的顺序：OpenAI, ChatGPT, Anthropic, DeepSeek, Gemini, Grok, Qwen, GLM, LLAMA 剩下的字母排序，最后Other
+ * 按照用户要求的顺序
  */
 export function getCategorySortOrder(): string[] {
   return [
     'ChatGPT',
-    'Anthropic',
+    'Claude',
     'DeepSeek',
     'Gemini',
     'Grok',
     'Qwen',
-    'GLM',
     'Llama',
+    'DouBao',
+    'Gemma',
+    'Mistral',
     // 剩下的按字母排序
     'Baichuan',
     'Cohere',
     'ComfyUI',
     'DALL-E',
-    'DouBao',
     'Flux',
-    'Gemma',
+    'GLM',
     'HaiLuo',
     'HunYuan',
     'MiniMax',
-    'Mistral',
     'MoonShot',
     'Ollama',
     'Perplexity',
@@ -201,7 +201,6 @@ export function getCategorySortOrder(): string[] {
     'VolcEngine',
     'WenXin',
     'Yi',
-    // Other 放在最后
     'Other'
   ];
 }

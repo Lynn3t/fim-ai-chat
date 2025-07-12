@@ -15,6 +15,7 @@ export interface UpdateUserData {
 
 export interface CreateUserSettingsData {
   defaultModelId?: string
+  aiAssistantName?: string
   theme?: string
   language?: string
   enableMarkdown?: boolean

@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Box, CircularProgress } from '@mui/material'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -19,9 +20,15 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+  
+  // Only render content client-side to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && mounted) {
       if (requireAuth && !user) {
         router.push(redirectTo)
         return
@@ -32,13 +39,36 @@ export default function ProtectedRoute({
         return
       }
     }
-  }, [user, isLoading, requireAuth, allowedRoles, redirectTo, router])
+  }, [user, isLoading, requireAuth, allowedRoles, redirectTo, router, mounted])
+
+  // During SSR or before mounting, render a placeholder with same structure
+  if (!mounted) {
+    return (
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}
+      >
+        <CircularProgress size={64} />
+      </Box>
+    )
+  }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}
+      >
+        <CircularProgress size={64} />
+      </Box>
     )
   }
 

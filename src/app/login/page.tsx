@@ -4,17 +4,38 @@ import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { 
+  Button, 
+  Card, 
+  Container, 
+  TextField, 
+  AlertMessage, 
+  ThemeToggle 
+} from '@/components/MaterialUI'
+import { 
+  Box, 
+  Typography, 
+  Tabs, 
+  Tab, 
+  Paper,
+  InputAdornment,
+  IconButton 
+} from '@mui/material'
+import { Visibility, VisibilityOff } from '@mui/icons-material'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function LoginPage() {
   const [loginType, setLoginType] = useState<'user' | 'guest'>('user')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [accessCode, setAccessCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   const { login, loginWithAccessCode } = useAuth()
   const router = useRouter()
+  const { mode } = useTheme()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,164 +64,166 @@ export default function LoginPage() {
     }
   }
 
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword)
+  }
+
+  const handleLoginTypeChange = (_: React.SyntheticEvent, newValue: 'user' | 'guest') => {
+    setLoginType(newValue)
+    setError('')
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: 'background.default',
+      p: 2
+    }}>
+      <Box sx={{ position: 'absolute', top: 20, right: 20 }}>
+        <ThemeToggle />
+      </Box>
+      
+      <Container maxWidth="sm">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🤖</div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography variant="h2" component="div" sx={{ mb: 2 }}>
+            🤖
+          </Typography>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 1 }}>
             FimAI Chat
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
             登录您的账户
-          </p>
-        </div>
+          </Typography>
+        </Box>
 
-        {/* 登录类型切换 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => setLoginType('user')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                loginType === 'user'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
+        <Card sx={{ 
+          boxShadow: 3,
+          bgcolor: 'background.paper'
+        }}>
+          <Paper sx={{ borderRadius: '8px 8px 0 0' }}>
+            <Tabs
+              value={loginType}
+              onChange={handleLoginTypeChange}
+              variant="fullWidth"
+              textColor="primary"
+              indicatorColor="primary"
+              sx={{ mb: 3 }}
             >
-              用户登录
-            </button>
-            <button
-              type="button"
-              onClick={() => setLoginType('guest')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                loginType === 'guest'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              访问码登录
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 用户名（仅用户登录时显示） */}
-            {loginType === 'user' && (
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  用户名
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="请输入用户名"
-                  required
-                />
-              </div>
-            )}
-
-            {/* 访客用户名（访问码登录时可选） */}
-            {loginType === 'guest' && (
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  用户名 <span className="text-gray-500 text-xs">(可选，留空将自动生成)</span>
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="请输入用户名（可选）"
-                />
-              </div>
-            )}
+              <Tab value="user" label="用户登录" />
+              <Tab value="guest" label="访问码登录" />
+            </Tabs>
+          </Paper>
+          
+          <Box component="form" onSubmit={handleSubmit} sx={{ px: 3, pb: 3 }}>
+            {/* 用户名（根据登录类型显示不同的帮助文字） */}
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="用户名"
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={loginType === 'user' ? "请输入用户名" : "请输入用户名（可选）"}
+                required={loginType === 'user'}
+                helperText={loginType === 'guest' ? "可选，留空将自动生成" : ""}
+                fullWidth
+              />
+            </Box>
 
             {/* 密码（仅用户登录时显示） */}
             {loginType === 'user' && (
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  密码
-                </label>
-                <input
-                  type="password"
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  label="密码"
                   id="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   placeholder="请输入密码"
                   required
+                  fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle password visibility"
+                          onClick={handleTogglePassword}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
-              </div>
+              </Box>
             )}
 
             {/* 访问码（仅访客登录时显示） */}
             {loginType === 'guest' && (
-              <div>
-                <label htmlFor="accessCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  访问码
-                </label>
-                <input
-                  type="text"
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  label="访问码"
                   id="accessCode"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   placeholder="请输入访问码 (fimai_xxxxxxxxxxxxxxxx)"
                   required
+                  fullWidth
                 />
-              </div>
+              </Box>
             )}
 
             {/* 错误信息 */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
+              <Box sx={{ mb: 3 }}>
+                <AlertMessage severity="error">{error}</AlertMessage>
+              </Box>
             )}
 
             {/* 登录按钮 */}
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              fullWidth
+              size="large"
+              sx={{ mb: 2 }}
             >
               {isLoading ? '登录中...' : '登录'}
-            </button>
-          </form>
-        </div>
+            </Button>
+          </Box>
+        </Card>
 
         {/* 其他操作 */}
-        <div className="text-center space-y-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+        <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             还没有账户？{' '}
-            <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/register" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
               立即注册
             </Link>
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            <Link href="/" className="text-blue-600 hover:text-blue-700 font-medium">
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            <Link href="/" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
               返回首页
             </Link>
-          </div>
-        </div>
+          </Typography>
+        </Box>
 
         {/* 说明 */}
-        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
-          <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+        <Paper sx={{ mt: 4, p: 2, bgcolor: 'background.paper', boxShadow: 1, borderRadius: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
             登录说明
-          </h3>
-          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+          </Typography>
+          <Typography variant="body2" component="ul" sx={{ pl: 2 }}>
             <li>• 用户登录：使用已注册的用户名登录</li>
             <li>• 访问码登录：使用他人分享的访问码临时登录</li>
             <li>• 访客用户的聊天记录仅保存在本地</li>
-          </ul>
-        </div>
-      </div>
-    </div>
+          </Typography>
+        </Paper>
+      </Container>
+    </Box>
   )
 }

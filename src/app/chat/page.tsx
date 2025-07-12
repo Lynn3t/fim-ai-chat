@@ -12,6 +12,8 @@ import { AIIcon } from '@/components/AIIcon';
 import { getModelGroups, getCategorySortOrder, getGroupIcon, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
 import type { Message, AIProvider, AIModel, ChatHistory, TokenUsage } from '@/types';
 import React from 'react'; // Added for useRef
+import { MaterialChatLayout } from '@/components/MaterialChatLayout';
+import { Box, Typography } from '@mui/material';
 
 interface Message {
   id: string;
@@ -948,367 +950,84 @@ function ChatPageContent() {
     toast.success('消息已复制到剪贴板');
   };
 
+  // 只替换return部分
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 头部 */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              FimAI Chat
-            </h1>
-            {/* 模型选择器 */}
-            {providers && Array.isArray(providers) && providers.some(p => p.models && p.models.length > 0) && (
-              <div className="relative" ref={modelDropdownRef}>
-                <button
-                  onClick={() => setShowModelDropdown(!showModelDropdown)}
-                  className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center space-x-1"
-                >
-                  <span>
-                    {(() => {
-                      const current = getCurrentModel();
-                      return current ? `${current.model.name}` : '选择模型';
-                    })()}
-                  </span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {showModelDropdown && (
-                  <div className="absolute left-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto">
-                    {(() => {
-                      // 收集所有启用的模型
-                      const allEnabledModels = (Array.isArray(providers) ? providers : []).flatMap(provider =>
-                        (provider.models || [])
-                          .filter(m => m.isEnabled)
-                          .map(model => ({
-                            ...model,
-                            providerName: provider.displayName || provider.name,
-                            providerId: provider.id
-                          }))
-                      );
-
-                      if (allEnabledModels.length === 0) {
-                        return (
-                          <div className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                            没有可用的模型
-                          </div>
-                        );
-                      }
-
-                      // 使用用户自定义分组排序对模型进行分组
-                      const groupsWithOrder = getModelGroupsWithUserOrder(allEnabledModels, userGroupOrders);
-
-                      return groupsWithOrder.map((group) => (
-                        <div key={group.groupName} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                          {/* 分组标题 */}
-                          <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-2">
-                            <AIIcon modelId={group.models[0]?.modelId || ''} size={16} />
-                            <span>{group.groupName} ({group.models.length})</span>
-                          </div>
-
-                          {/* 分组内的模型列表 */}
-                          {group.models.map((model) => (
-                            <div
-                              key={model.id}
-                              className={`w-full flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                                selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
-                              }`}
-                            >
-                              <button
-                                onClick={() => {
-                                  setSelectedModelId(model.id);
-                                  setShowModelDropdown(false);
-                                }}
-                                className="flex-1 text-left px-6 py-2 flex items-center space-x-3"
-                              >
-                                <AIIcon modelId={model.modelId} size={16} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                    {model.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                    {model.modelId} • {model.providerName}
-                                  </div>
-                                </div>
-                                {userSettings?.defaultModelId === model.id && (
-                                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 py-0.5 px-2 rounded-full">
-                                    默认
-                                  </span>
-                                )}
-                              </button>
-                              
-                              <button
-                                onClick={() => {
-                                  if (user) {
-                                    fetch(`/api/user/settings?userId=${user.id}`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        defaultModelId: model.id,
-                                      }),
-                                    })
-                                    .then(response => {
-                                      if (response.ok) {
-                                        setUserSettings(prev => ({
-                                          ...prev,
-                                          defaultModelId: model.id,
-                                        }));
-                                        toast.success(`已将 ${model.name} 设为默认模型`);
-                                      } else {
-                                        toast.error('设置默认模型失败');
-                                      }
-                                    })
-                                    .catch(error => {
-                                      console.error('Error saving default model:', error);
-                                      toast.error('设置默认模型失败');
-                                    });
-                                  }
-                                }}
-                                className="p-2 mr-2 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                title="设为默认模型"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center space-x-2">
-            {/* 历史聊天选择器 */}
-            <div className="relative" ref={historyDropdownRef}>
-              <button
-                onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
-                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center space-x-1"
-              >
-                <span>历史聊天</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {showHistoryDropdown && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-2">
-                    <button
-                      onClick={createNewChat}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                    >
-                      + 新建对话
-                    </button>
-                  </div>
-                  <div className="border-t border-gray-200 dark:border-gray-700">
-                    {chatHistories.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-                        暂无历史聊天记录
-                      </div>
-                    ) : (
-                      chatHistories.map((history) => (
-                        <div
-                          key={history.id}
-                          className={`flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                            currentChatId === history.id ? 'bg-gray-100 dark:bg-gray-700' : ''
-                          }`}
-                        >
-                          <button
-                            onClick={() => loadChatHistory(history.id)}
-                            className="flex-1 text-left"
-                          >
-                            <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                              {history.title}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {history.updatedAt && history.updatedAt.toLocaleDateString()} {history.updatedAt && history.updatedAt.toLocaleTimeString()}
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => deleteChatHistory(history.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            title="删除"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleClear}
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              清空对话
-            </button>
-            <Link
-              href="/config"
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              配置
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* 消息区域 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
-              <h2 className="text-2xl font-semibold mb-4">欢迎使用 FimAI Chat</h2>
-              <p>开始您的AI对话之旅吧！</p>
-              {user && (
-                <p className="mt-2 text-sm">
-                  欢迎，{user.username}！您的角色：{user.role === 'ADMIN' ? '管理员' : user.role === 'USER' ? '用户' : '访客'}
-                </p>
-              )}
-              {(!providers || !Array.isArray(providers) || providers.length === 0 || !providers.some(p => p.models && p.models.length > 0)) && (
-                <p className="mt-4 text-red-500">
-                  请先 <Link href="/config" className="underline">配置AI服务提供商</Link>
-                </p>
-              )}
-            </div>
-          ) : (
-            messages.map((message) => {
-              // 使用消息中保存的模型信息，如果没有则使用当前选中的模型信息（兼容旧消息）
-              const modelInfo = message.modelInfo ? {
-                name: message.modelInfo.modelName,
-                id: message.modelInfo.modelId
-              } : getModelDisplayInfo();
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group mb-4`}
-                >
-                  <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start ${message.role === 'user' ? 'space-x-reverse space-x-3' : 'space-x-3'} max-w-[85%]`}>
-                    {/* 头像区域 */}
-                    <div className="flex-shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        message.role === 'user'
-                          ? 'bg-gray-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                      }`}>
-                        {message.role === 'user' ? (
-                          'U'
-                        ) : (
-                          <AIIcon modelId={modelInfo.id} size={20} />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 消息内容区域 */}
-                    <div className="flex-1">
-                      {/* 发送者名称和模型信息 */}
-                      <div className={`flex items-center space-x-2 mb-1 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {message.role === 'user' ? (user?.username || 'User') : modelInfo.name}
-                        </span>
-                        {message.role === 'assistant' && modelInfo.id && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            ({modelInfo.id})
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {message.timestamp && message.timestamp.toLocaleTimeString()}
-                        </span>
-                      </div>
-
-                      {/* 消息气泡 */}
-                      <div
-                        className={`rounded-lg px-4 py-3 ${
-                          message.role === 'user'
-                            ? 'bg-gray-600 text-white'
-                            : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
-                        }`}
-                        data-message-id={message.id}
-                      >
-                        {/* 消息内容 - 都使用Markdown渲染 */}
-                        <MarkdownRenderer
-                          content={message.content}
-                          className={message.role === 'user' ? 'prose-invert' : ''}
-                          isStreaming={
-                            message === messages[messages.length - 1] && 
-                            message.role === 'assistant' && 
-                            (isLoading || (!message.content && isWaitingFirstChar))
-                          }
-                          randomChars={
-                            isLoading && message === messages[messages.length - 1] && 
-                            message.role === 'assistant' ? randomChars : ''
-                          }
-                          isLoading={isLoading}
-                        />
-                      </div>
-
-                      {/* 消息操作按钮 - 移到气泡外 */}
-                      <div className={`mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                        <MessageActions
-                          content={message.content}
-                          messageRole={message.role}
-                          onDelete={() => handleDeleteMessage(message.id)}
-                          onEdit={(newContent) => handleEditMessage(message.id, newContent)}
-                          onResend={() => handleResendMessage(message.id)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+    <MaterialChatLayout
+      title="FimAI Chat"
+      chatHistories={chatHistories}
+      messages={messages}
+      input={input}
+      isLoading={isLoading}
+      onInputChange={(e) => setInput(e.target.value)}
+      onSend={handleSend}
+      onNewChat={createNewChat}
+      onSelectChat={loadChatHistory}
+      onDeleteChat={deleteChatHistory}
+      onKeyPress={handleKeyPress}
+      onLogout={() => { router.push('/login'); localStorage.removeItem('accessToken'); }}
+      onSettings={() => router.push('/config')}
+      renderMessageContent={(message) => (
+        <Box>
+          <MarkdownRenderer
+            content={message.content}
+            isStreaming={
+              message === messages[messages.length - 1] && 
+              message.role === 'assistant' && 
+              (isLoading || (!message.content && isWaitingFirstChar))
+            }
+            randomChars={
+              isLoading && message === messages[messages.length - 1] && 
+              message.role === 'assistant' ? randomChars : ''
+            }
+            isLoading={isLoading}
+          />
+          {message.tokenUsage && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+              Tokens: {message.tokenUsage.total_tokens || 0}
+            </Typography>
           )}
-          {/* 加载状态已移至消息内部，这里不再需要单独的加载指示器 */}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* 输入区域 */}
-      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Token统计显示 */}
-          <div className="flex justify-end mb-3">
-            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-              <span>Input: {tokenStats.input}</span>
-              <span>Output: {tokenStats.output}</span>
-              <span>Total: {tokenStats.total}</span>
-            </div>
-          </div>
-
-          <div className="flex space-x-4">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="输入您的消息... (Shift+Enter换行，Enter发送)"
-              className="flex-1 resize-none border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
-              rows={3}
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              发送
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Toast容器 */}
-      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
-    </div>
+        </Box>
+      )}
+      userName={user?.username || "用户"}
+      modelName={getCurrentModel()?.model?.name}
+      providerName={getCurrentModel()?.provider?.displayName || getCurrentModel()?.provider?.name}
+      models={
+        Array.isArray(providers) ? providers
+          .flatMap(p => 
+            Array.isArray(p.models) ? p.models
+              .filter(m => m.isEnabled || m.enabled)
+              .map(m => ({ 
+                id: m.id, 
+                name: `${m.name} (${p.displayName || p.name})` 
+              }))
+            : []
+          )
+          .sort((a, b) => a.name.localeCompare(b.name))
+        : []
+      }
+      onModelSelect={(modelId) => {
+        setSelectedModelId(modelId);
+        
+        // 保存用户默认模型设置
+        if (user && user.id) {
+          fetch('/api/user/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.id,
+              defaultModelId: modelId
+            }),
+          }).then(async (response) => {
+            if (response.ok) {
+              toast.success('已设置为默认模型');
+            }
+          }).catch(error => {
+            console.error('保存默认模型设置失败:', error);
+          });
+        }
+      }}
+      currentModelId={selectedModelId}
+    />
   );
 }
 

@@ -1,29 +1,8 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* 移除root变量，我们现在使用Material UI的主题系统 */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-/* Toast animations */
+/* 动画效果 */
 @keyframes slide-in {
   from {
     transform: translateX(100%);
@@ -92,4 +71,10 @@ body {
 
 .streaming-content > p:last-child {
   display: inline-block;
+}
+
+/* Material UI专用样式 */
+a {
+  text-decoration: none;
+  color: inherit;
 }

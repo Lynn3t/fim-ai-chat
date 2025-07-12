@@ -4,6 +4,30 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { 
+  Button, 
+  Card, 
+  Container, 
+  TextField, 
+  AlertMessage, 
+  ThemeToggle 
+} from '@/components/MaterialUI'
+import { 
+  Box, 
+  Typography, 
+  Paper,
+  InputAdornment,
+  IconButton,
+  CircularProgress,
+  Tooltip
+} from '@mui/material'
+import { 
+  Visibility, 
+  VisibilityOff, 
+  CheckCircleOutline, 
+  Cancel 
+} from '@mui/icons-material'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -12,6 +36,7 @@ export default function RegisterPage() {
     password: '',
     inviteCode: '',
   })
+  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [isValidating, setIsValidating] = useState(false)
@@ -20,6 +45,7 @@ export default function RegisterPage() {
 
   const { register } = useAuth()
   const router = useRouter()
+  const { mode } = useTheme()
 
   // 检查是否已有管理员
   useEffect(() => {
@@ -72,12 +98,18 @@ export default function RegisterPage() {
     }
   }
 
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
-    if (inviteCodeStatus !== 'valid') {
+    if (!hasAdmin && !formData.inviteCode) {
+      // 如果是首个管理员，可以跳过邀请码验证
+    } else if (inviteCodeStatus !== 'valid') {
       setError('请输入有效的邀请码')
       setIsLoading(false)
       return
@@ -110,158 +142,176 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: 'background.default',
+      p: 2
+    }}>
+      <Box sx={{ position: 'absolute', top: 20, right: 20 }}>
+        <ThemeToggle />
+      </Box>
+      
+      <Container maxWidth="sm">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🤖</div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography variant="h2" component="div" sx={{ mb: 2 }}>
+            🤖
+          </Typography>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 1 }}>
             FimAI Chat
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
             创建您的账户
-          </p>
-        </div>
+          </Typography>
+        </Box>
 
         {/* 注册表单 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <Card sx={{ 
+          boxShadow: 3,
+          bgcolor: 'background.paper'
+        }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ p: 3 }}>
             {/* 用户名 */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                用户名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="用户名"
                 id="username"
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="请输入用户名"
                 required
+                fullWidth
               />
-            </div>
+            </Box>
 
             {/* 邮箱 */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                邮箱 <span className="text-gray-400">(重置密码需要)</span>
-              </label>
-              <input
-                type="email"
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="邮箱"
                 id="email"
                 name="email"
+                type="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="请输入邮箱地址"
+                helperText="重置密码需要"
+                fullWidth
               />
-            </div>
+            </Box>
 
             {/* 密码 */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                密码 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="密码"
                 id="password"
                 name="password"
+                type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="请输入密码"
                 required
-                minLength={6}
+                helperText="密码至少6位字符"
+                fullWidth
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={handleTogglePassword}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                密码至少6位字符
-              </p>
-            </div>
+            </Box>
 
             {/* 邀请码 */}
-            <div>
-              <label htmlFor="inviteCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                邀请码 <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="inviteCode"
-                  name="inviteCode"
-                  value={formData.inviteCode}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
-                    inviteCodeStatus === 'valid'
-                      ? 'border-green-300 dark:border-green-600'
-                      : inviteCodeStatus === 'invalid'
-                      ? 'border-red-300 dark:border-red-600'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}
-                  placeholder="请输入邀请码 (fimai_xxxxxxxxxxxxxxxx)"
-                  required
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  {isValidating ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  ) : inviteCodeStatus === 'valid' ? (
-                    <span className="text-green-500">✓</span>
-                  ) : inviteCodeStatus === 'invalid' ? (
-                    <span className="text-red-500">✗</span>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="邀请码"
+                id="inviteCode"
+                name="inviteCode"
+                value={formData.inviteCode}
+                onChange={handleInputChange}
+                placeholder="请输入邀请码 (fimai_xxxxxxxxxxxxxxxx)"
+                required={hasAdmin}
+                fullWidth
+                error={inviteCodeStatus === 'invalid'}
+                color={inviteCodeStatus === 'valid' ? 'success' : undefined}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {isValidating ? (
+                        <CircularProgress size={20} />
+                      ) : inviteCodeStatus === 'valid' ? (
+                        <Tooltip title="邀请码有效">
+                          <CheckCircleOutline color="success" />
+                        </Tooltip>
+                      ) : inviteCodeStatus === 'invalid' ? (
+                        <Tooltip title="邀请码无效">
+                          <Cancel color="error" />
+                        </Tooltip>
+                      ) : null}
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
 
             {/* 错误信息 */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
+              <Box sx={{ mb: 3 }}>
+                <AlertMessage severity="error">{error}</AlertMessage>
+              </Box>
             )}
 
             {/* 注册按钮 */}
-            <button
+            <Button
               type="submit"
-              disabled={isLoading || inviteCodeStatus !== 'valid'}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isLoading || (hasAdmin && inviteCodeStatus !== 'valid')}
+              fullWidth
+              size="large"
+              sx={{ mb: 2 }}
             >
               {isLoading ? '注册中...' : '注册'}
-            </button>
-          </form>
-        </div>
+            </Button>
+          </Box>
+        </Card>
 
         {/* 其他操作 */}
-        <div className="text-center space-y-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+        <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             已有账户？{' '}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/login" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
               立即登录
             </Link>
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            <Link href="/" className="text-blue-600 hover:text-blue-700 font-medium">
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            <Link href="/" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
               返回首页
             </Link>
-          </div>
-        </div>
+          </Typography>
+        </Box>
 
         {/* 说明 */}
-        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
-          <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+        <Paper sx={{ mt: 4, p: 2, bgcolor: 'background.paper', boxShadow: 1, borderRadius: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
             注册说明
-          </h3>
-          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-            <li>• 需要有效的邀请码才能注册</li>
-            {!hasAdmin && (
-              <li>• 管理员邀请码：<code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">fimai_ADMIN_MASTER_KEY</code>（首次注册管理员）</li>
-            )}
-            <li>• 普通用户邀请码由管理员或其他用户分发</li>
-            <li>• 邮箱为可选项，用于找回账户</li>
-          </ul>
-        </div>
-      </div>
-    </div>
+          </Typography>
+          <Typography variant="body2" component="ul" sx={{ pl: 2 }}>
+            <li>• 用户名和密码为必填项</li>
+            <li>• 邮箱用于找回密码，建议填写</li>
+            <li>• 邀请码必须是有效的系统生成码</li>
+          </Typography>
+        </Paper>
+      </Container>
+    </Box>
   )
 }
