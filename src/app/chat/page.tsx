@@ -11,13 +11,15 @@ import { MessageActions } from '@/components/MessageActions';
 import { AIIcon } from '@/components/AIIcon';
 import { getModelGroups, getCategorySortOrder, getGroupIcon, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
 import type { Message, AIProvider, AIModel, ChatHistory, TokenUsage } from '@/types';
+import React from 'react'; // Added for useRef
 
 interface Message {
   id: string;
   conversationId?: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp?: Date;
+  createdAt?: string; // For API response compatibility
   modelInfo?: {
     modelId: string;
     modelName: string;
@@ -440,7 +442,10 @@ function ChatPageContent() {
     const previousChatId = currentChatId;
 
     // 1. 立即更新UI (保留滚动位置)
-    setMessages(history.messages);
+    setMessages(history.messages.map(msg => ({
+      ...msg,
+      timestamp: msg.timestamp || new Date(msg.createdAt || Date.now())
+    })));
     setCurrentChatId(historyId);
     setShowHistoryDropdown(false);
 
@@ -452,11 +457,17 @@ function ChatPageContent() {
           const response = await fetch(`/api/conversations/${historyId}/messages`);
           if (response.ok) {
             const serverMessages = await response.json();
+            
+            // Convert string timestamps to Date objects
+            const processedMessages = serverMessages.map((msg: any) => ({
+              ...msg,
+              timestamp: msg.createdAt ? new Date(msg.createdAt) : undefined
+            }));
 
             // 3. 验证消息是否完整
             if (serverMessages.length !== history.messages.length) {
               // 使用服务器数据更新
-              setMessages(serverMessages);
+              setMessages(processedMessages);
               toast.warning('聊天记录已从服务器同步');
             }
           }
@@ -530,6 +541,21 @@ function ChatPageContent() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // 创建一个引用来存储最新的AI回复
+  const latestAIReply = React.useRef<{id: string, content: string} | null>(null);
+  
+  // 更新引用，在消息更改时
+  useEffect(() => {
+    // 找到最后一条AI消息并更新引用
+    const lastAIMessage = messages.filter(m => m.role === 'assistant').pop();
+    if (lastAIMessage) {
+      latestAIReply.current = {
+        id: lastAIMessage.id,
+        content: lastAIMessage.content
+      };
+    }
+  }, [messages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -640,6 +666,10 @@ function ChatPageContent() {
       } : undefined
     };
     
+    // 存储AI消息ID以便后续使用
+    const assistantMessageId = assistantMessage.id;
+    latestAIReply.current = { id: assistantMessageId, content: '' };
+    
     // 单独添加AI消息，确保状态更新
     setTimeout(() => {
       setMessages(prev => [...prev, assistantMessage]);
@@ -720,7 +750,7 @@ function ChatPageContent() {
 
       // 创建消息ID变量以供后续使用
       // 我们使用之前创建的assistantMessage
-      const assistantMessageId = assistantMessage.id;
+      // const assistantMessageId = assistantMessage.id; // This line is no longer needed
 
       let finalTokenUsage: any = null;
 
@@ -752,11 +782,17 @@ function ChatPageContent() {
                   setIsWaitingFirstChar(false);
                 }
                 
+                // 更新消息内容
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
                     ? { ...msg, content: msg.content + content }
                     : msg
                 ));
+                
+                // 同时更新引用中的内容
+                if (latestAIReply.current && latestAIReply.current.id === assistantMessageId) {
+                  latestAIReply.current.content = latestAIReply.current.content + content;
+                }
               }
             } catch {
               // 忽略解析错误
@@ -784,7 +820,15 @@ function ChatPageContent() {
       // 保存AI响应到数据库
       if (chatConfig?.canSaveToDatabase && conversationId) {
         try {
-          const finalMessage = messages.find(m => m.id === assistantMessageId);
+          // 使用存储在引用中的最新AI回复内容
+          const finalContent = latestAIReply.current?.content || '';
+          
+          console.log('Saving AI response to database:', {
+            messageId: assistantMessageId,
+            content: finalContent.slice(0, 50) + (finalContent.length > 50 ? '...' : ''),
+            length: finalContent.length
+          });
+
           await fetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -794,10 +838,10 @@ function ChatPageContent() {
               providerId: currentModel.provider.id,
               modelId: currentModel.model.id,
               role: 'assistant',
-              content: finalMessage?.content || '',
+              content: finalContent,
               tokenUsage: finalTokenUsage,
               inputText: userMessage.content,
-              outputText: finalMessage?.content || '',
+              outputText: finalContent,
               saveToDatabase: true,
             }),
           });
@@ -966,46 +1010,70 @@ function ChatPageContent() {
 
                           {/* 分组内的模型列表 */}
                           {group.models.map((model) => (
-                            <button
+                            <div
                               key={model.id}
-                              onClick={() => {
-                                setSelectedModelId(model.id);
-                                setShowModelDropdown(false);
-                                // Save user's default model directly instead of calling the function
-                                if (user) {
-                                  fetch('/api/user/settings', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      userId: user.id,
-                                      defaultModelId: model.id,
-                                    }),
-                                  })
-                                  .then(response => {
-                                    if (response.ok) {
-                                      setUserSettings(prev => ({
-                                        ...prev,
-                                        defaultModelId: model.id,
-                                      }));
-                                    }
-                                  })
-                                  .catch(error => console.error('Error saving default model:', error));
-                                }
-                              }}
-                              className={`w-full text-left px-6 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center space-x-3 ${
+                              className={`w-full flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
                                 selectedModelId === model.id ? 'bg-gray-100 dark:bg-gray-700' : ''
                               }`}
                             >
-                              <AIIcon modelId={model.modelId} size={16} />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                  {model.name}
+                              <button
+                                onClick={() => {
+                                  setSelectedModelId(model.id);
+                                  setShowModelDropdown(false);
+                                }}
+                                className="flex-1 text-left px-6 py-2 flex items-center space-x-3"
+                              >
+                                <AIIcon modelId={model.modelId} size={16} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                    {model.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                    {model.modelId} • {model.providerName}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                  {model.modelId} • {model.providerName}
-                                </div>
-                              </div>
-                            </button>
+                                {userSettings?.defaultModelId === model.id && (
+                                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 py-0.5 px-2 rounded-full">
+                                    默认
+                                  </span>
+                                )}
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  if (user) {
+                                    fetch(`/api/user/settings?userId=${user.id}`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        defaultModelId: model.id,
+                                      }),
+                                    })
+                                    .then(response => {
+                                      if (response.ok) {
+                                        setUserSettings(prev => ({
+                                          ...prev,
+                                          defaultModelId: model.id,
+                                        }));
+                                        toast.success(`已将 ${model.name} 设为默认模型`);
+                                      } else {
+                                        toast.error('设置默认模型失败');
+                                      }
+                                    })
+                                    .catch(error => {
+                                      console.error('Error saving default model:', error);
+                                      toast.error('设置默认模型失败');
+                                    });
+                                  }
+                                }}
+                                className="p-2 mr-2 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                title="设为默认模型"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                            </div>
                           ))}
                         </div>
                       ));
@@ -1059,7 +1127,7 @@ function ChatPageContent() {
                               {history.title}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {history.updatedAt.toLocaleDateString()} {history.updatedAt.toLocaleTimeString()}
+                              {history.updatedAt && history.updatedAt.toLocaleDateString()} {history.updatedAt && history.updatedAt.toLocaleTimeString()}
                             </div>
                           </button>
                           <button
@@ -1154,7 +1222,7 @@ function ChatPageContent() {
                           </span>
                         )}
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {message.timestamp.toLocaleTimeString()}
+                          {message.timestamp && message.timestamp.toLocaleTimeString()}
                         </span>
                       </div>
 
@@ -1165,6 +1233,7 @@ function ChatPageContent() {
                             ? 'bg-gray-600 text-white'
                             : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                         }`}
+                        data-message-id={message.id}
                       >
                         {/* 消息内容 - 都使用Markdown渲染 */}
                         <MarkdownRenderer
