@@ -379,24 +379,6 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
             
             <Box sx={{ flexGrow: 1 }} />
             
-            {(modelName || providerName) && (
-              <Tooltip title={`模型: ${modelName || 'Unknown'} | 提供商: ${providerName || 'Unknown'}`}>
-                <Box
-                  sx={{
-                    mr: 2,
-                    px: 1.5,
-                    py: 0.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    display: { xs: 'none', sm: 'block' }
-                  }}
-                >
-                  {modelName || 'Unknown'}
-                </Box>
-              </Tooltip>
-            )}
             <IconButton
               aria-label="more"
               aria-controls="menu-appbar"

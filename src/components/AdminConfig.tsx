@@ -116,89 +116,89 @@ interface SystemStats {
   usedAccessCodes: number;
 }
 
-// 图标映射 - 优先使用 lobehub icons，其次使用 emoji
-const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any>, emoji: string }> = {
+// 图标映射 - 仅使用黑白风格的图标组件
+const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any>, emoji?: string }> = {
   // 国际主流 AI 提供商
-  openai: { component: OpenAI, emoji: '🤖' },
-  anthropic: { component: Anthropic, emoji: '🧠' },
-  google: { component: Google, emoji: '🔍' },
-  microsoft: { component: Microsoft, emoji: '🪟' },
-  meta: { component: Meta, emoji: '📘' },
-  huggingface: { component: HuggingFace, emoji: '🤗' },
-  cohere: { component: Cohere, emoji: '🌊' },
-  stability: { component: Stability, emoji: '🎨' },
-  replicate: { component: Replicate, emoji: '🔄' },
-  together: { component: Together, emoji: '🤝' },
-  perplexity: { component: Perplexity, emoji: '❓' },
-  mistral: { component: Mistral, emoji: '🌪️' },
-  groq: { component: Groq, emoji: '⚡' },
-  fireworks: { component: Fireworks, emoji: '🎆' },
-  openrouter: { component: OpenRouter, emoji: '🛣️' },
-  bedrock: { component: Bedrock, emoji: '🏔️' },
-  azure: { component: Azure, emoji: '☁️' },
-  vertexai: { component: VertexAI, emoji: '🔺' },
-  claude: { component: Claude, emoji: '🤖' },
-  gemini: { component: Gemini, emoji: '♊' },
-  xai: { component: XAI, emoji: '❌' },
+  openai: { component: OpenAI },
+  anthropic: { component: Anthropic },
+  google: { component: Google },
+  microsoft: { component: Microsoft },
+  meta: { component: Meta },
+  huggingface: { component: HuggingFace },
+  cohere: { component: Cohere },
+  stability: { component: Stability },
+  replicate: { component: Replicate },
+  together: { component: Together },
+  perplexity: { component: Perplexity },
+  mistral: { component: Mistral },
+  groq: { component: Groq },
+  fireworks: { component: Fireworks },
+  openrouter: { component: OpenRouter },
+  bedrock: { component: Bedrock },
+  azure: { component: Azure },
+  vertexai: { component: VertexAI },
+  claude: { component: Claude },
+  gemini: { component: Gemini },
+  xai: { component: XAI },
 
   // 中国 AI 提供商
-  baidu: { component: Baidu, emoji: '🐻' },
-  alibaba: { component: Alibaba, emoji: '🛒' },
-  tencent: { component: Tencent, emoji: '🐧' },
-  bytedance: { component: ByteDance, emoji: '🎵' },
-  deepseek: { component: DeepSeek, emoji: '🔍' },
-  moonshot: { component: Moonshot, emoji: '🌙' },
-  zhipu: { component: Zhipu, emoji: '🧠' },
-  yi: { component: Yi, emoji: '🔤' },
-  sensenova: { component: SenseNova, emoji: '🌟' },
-  spark: { component: Spark, emoji: '⚡' },
-  qwen: { component: Qwen, emoji: '🤖' },
-  hunyuan: { component: Hunyuan, emoji: '🌀' },
-  wenxin: { component: Wenxin, emoji: '📝' },
-  doubao: { component: Doubao, emoji: '🫘' },
-  stepfun: { component: Stepfun, emoji: '👣' },
+  baidu: { component: Baidu },
+  alibaba: { component: Alibaba },
+  tencent: { component: Tencent },
+  bytedance: { component: ByteDance },
+  deepseek: { component: DeepSeek },
+  moonshot: { component: Moonshot },
+  zhipu: { component: Zhipu },
+  yi: { component: Yi },
+  sensenova: { component: SenseNova },
+  spark: { component: Spark },
+  qwen: { component: Qwen },
+  hunyuan: { component: Hunyuan },
+  wenxin: { component: Wenxin },
+  doubao: { component: Doubao },
+  stepfun: { component: Stepfun },
 
   // 开源和部署平台
-  ollama: { component: Ollama, emoji: '🦙' },
-  comfyui: { component: ComfyUI, emoji: '🎨' },
-  siliconcloud: { component: SiliconCloud, emoji: '☁️' },
-  deepinfra: { component: DeepInfra, emoji: '🏗️' },
-  anyscale: { component: Anyscale, emoji: '📏' },
-  novita: { component: Novita, emoji: '🆕' },
+  ollama: { component: Ollama },
+  comfyui: { component: ComfyUI },
+  siliconcloud: { component: SiliconCloud },
+  deepinfra: { component: DeepInfra },
+  anyscale: { component: Anyscale },
+  novita: { component: Novita },
 
   // 多媒体 AI
-  flux: { component: Flux, emoji: '🌊' },
-  runway: { component: Runway, emoji: '🛫' },
-  pika: { component: Pika, emoji: '⚡' },
-  suno: { component: Suno, emoji: '🎵' },
-  ideogram: { component: Ideogram, emoji: '💭' },
-  recraft: { component: Recraft, emoji: '🎨' },
+  flux: { component: Flux },
+  runway: { component: Runway },
+  pika: { component: Pika },
+  suno: { component: Suno },
+  ideogram: { component: Ideogram },
+  recraft: { component: Recraft },
 
   // 自定义选项
-  custom: { emoji: '⚙️' },
+  custom: {},
 };
 
 // 获取提供商图标的函数
 function getProviderIcon(iconKey?: string): React.ReactNode {
-  if (!iconKey) return '🤖';
+  if (!iconKey) return <span style={{ fontWeight: 'bold' }}>AI</span>;
 
-  // 处理自定义 emoji
+  // 处理自定义图标，显示实际的emoji
   if (iconKey.startsWith('custom:')) {
     const customEmoji = iconKey.replace('custom:', '');
-    return customEmoji || '⚙️';
+    return <span style={{ fontSize: '16px' }}>{customEmoji || '⚙️'}</span>;
   }
 
   const iconConfig = PROVIDER_ICON_MAPPING[iconKey.toLowerCase()];
-  if (!iconConfig) return '🤖';
+  if (!iconConfig) return <span style={{ fontWeight: 'bold' }}>AI</span>;
 
-  // 优先使用 lobehub icon 组件
+  // 只使用组件图标，不使用emoji
   if (iconConfig.component) {
     const IconComponent = iconConfig.component;
-    return <IconComponent size={16} />;
+    return <IconComponent size={16} style={{ color: '#000000' }} />;
   }
 
-  // 其次使用 emoji
-  return iconConfig.emoji;
+  // 如果没有组件图标，使用文本替代
+  return <span style={{ fontWeight: 'bold' }}>AI</span>;
 }
 
 export default function AdminConfig() {
@@ -214,6 +214,8 @@ export default function AdminConfig() {
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showAddModelModal, setShowAddModelModal] = useState(false);
+  const [showEditModelModal, setShowEditModelModal] = useState(false);
+  const [editingModel, setEditingModel] = useState<any>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [showCustomGroupModal, setShowCustomGroupModal] = useState(false);
   const [showAIRenameModal, setShowAIRenameModal] = useState(false);
@@ -1025,8 +1027,110 @@ export default function AdminConfig() {
 
   // 编辑模型
   const editModel = (model: any) => {
-    // TODO: 实现编辑模型功能
-    toast.info('编辑功能开发中...');
+    // 打开编辑模型对话框
+    setEditingModel(model);
+    setShowEditModelModal(true);
+  };
+
+  // 更新编辑后的模型
+  const updateEditedModel = async (data: { id: string; name: string; group?: string }) => {
+    if (!currentUser) return;
+
+    // 保存原始模型数据
+    let originalModel: any = null;
+    let originalProviderIndex = -1;
+    let originalModelIndex = -1;
+
+    // 找到原始模型
+    for (let i = 0; i < providers.length; i++) {
+      const modelIndex = providers[i].models?.findIndex((m: any) => m.id === data.id) ?? -1;
+      if (modelIndex !== -1) {
+        originalModel = providers[i].models![modelIndex];
+        originalProviderIndex = i;
+        originalModelIndex = modelIndex;
+        break;
+      }
+    }
+
+    if (!originalModel) {
+      toast.error('找不到要编辑的模型');
+      return;
+    }
+
+    // 乐观更新UI
+    setProviders(prev => prev.map((provider, pIndex) => {
+      if (pIndex === originalProviderIndex) {
+        return {
+          ...provider,
+          models: provider.models?.map((model: any, mIndex: number) =>
+            mIndex === originalModelIndex
+              ? { 
+                  ...model, 
+                  name: data.name, 
+                  group: data.group
+                }
+              : model
+          )
+        };
+      }
+      return provider;
+    }));
+
+    // 关闭对话框
+    setShowEditModelModal(false);
+    setEditingModel(null);
+    toast.success('模型更新成功');
+
+    try {
+      // 发送API请求
+      const response = await fetch(`/api/admin/models/${data.id}?adminUserId=${currentUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          name: data.name,
+          group: data.group
+        }),
+      });
+
+      if (!response.ok) {
+        // 如果API失败，回滚UI
+        setProviders(prev => prev.map((provider, pIndex) => {
+          if (pIndex === originalProviderIndex) {
+            return {
+              ...provider,
+              models: provider.models?.map((m: any, mIndex: number) =>
+                mIndex === originalModelIndex ? originalModel : m
+              )
+            };
+          }
+          return provider;
+        }));
+
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`模型更新失败: ${errorMessage}`);
+      } else {
+        // 成功后重新加载数据确保一致性
+        setTimeout(() => {
+          loadProvidersAndModels();
+        }, 1000);
+      }
+    } catch (error) {
+      // API调用失败，回滚UI
+      setProviders(prev => prev.map((provider, pIndex) => {
+        if (pIndex === originalProviderIndex) {
+          return {
+            ...provider,
+            models: provider.models?.map((m: any, mIndex: number) =>
+              mIndex === originalModelIndex ? originalModel : m
+            )
+          };
+        }
+        return provider;
+      }));
+      toast.error('网络错误，模型更新失败');
+    }
   };
 
   // 删除模型
@@ -1656,8 +1760,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
   if (!currentUser || currentUser.role !== 'ADMIN') {
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>
-        <Typography color="error" variant="body1">您没有管理员权限</Typography>
-        <Link href="/chat" style={{ color: 'primary.main', textDecoration: 'underline' }}>
+        <Typography color="inherit" sx={{ color: '#000000' }} variant="body1">您没有管理员权限</Typography>
+                  <Link href="/chat" style={{ color: '#000000', textDecoration: 'underline' }}>
           返回聊天
         </Link>
       </Box>
@@ -2285,7 +2389,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   <Button
                                     variant="text"
                                     size="small"
-                                    color={user.isActive ? 'error' : 'success'}
+                                    color="inherit"
+                                    sx={{ color: '#000000' }}
                                     onClick={() => toggleUserStatus(user.id, user.isActive)}
                                   >
                                     {user.isActive ? '禁用' : '启用'}
@@ -2293,7 +2398,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   <Button
                                     variant="text"
                                     size="small"
-                                    color="primary"
+                                    color="inherit"
+                                    sx={{ color: '#000000' }}
                                     onClick={() => openResetPasswordModal(user.id, user.username)}
                                   >
                                     重置密码
@@ -2301,7 +2407,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   <Button
                                     variant="text"
                                     size="small"
-                                    color="error"
+                                    color="inherit"
+                                    sx={{ color: '#000000' }}
                                     onClick={() => deleteUser(user.id, user.username)}
                                   >
                                     删除
@@ -2313,7 +2420,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   <Button
                                     variant="text"
                                     size="small"
-                                    color="primary"
+                                    color="inherit"
+                                    sx={{ color: '#000000' }}
                                     onClick={() => openResetPasswordModal(user.id, user.username)}
                                   >
                                     重置密码
@@ -2344,7 +2452,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
               </h2>
               <button
                 onClick={() => setShowCreateInviteModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
               >
                 创建邀请码
               </button>
@@ -2398,7 +2506,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
               {isLoading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 mx-auto"></div>
                   <p className="text-gray-500 mt-2">加载中...</p>
                 </div>
               ) : inviteCodes.length === 0 ? (
@@ -2497,7 +2605,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                       type="text"
                       value={systemSettings.systemNameSuffix || ' Chat'}
                       onChange={(e) => setSystemSettings((prev: any) => ({ ...prev, systemNameSuffix: e.target.value }))}
-                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                       placeholder=" Chat"
                     />
                   </div>
@@ -2522,7 +2630,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                     id="allowRegistration"
                     checked={systemSettings.allowRegistration ?? true}
                     onChange={(e) => setSystemSettings(prev => ({ ...prev, allowRegistration: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
                   />
                   <label htmlFor="allowRegistration" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                     允许用户注册
@@ -2535,7 +2643,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                     id="requireInviteCode"
                     checked={systemSettings.requireInviteCode ?? true}
                     onChange={(e) => setSystemSettings(prev => ({ ...prev, requireInviteCode: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
                   />
                   <label htmlFor="requireInviteCode" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                     注册需要邀请码
@@ -2580,7 +2688,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                     id="enableTokenTracking"
                     checked={systemSettings.enableTokenTracking ?? true}
                     onChange={(e) => setSystemSettings(prev => ({ ...prev, enableTokenTracking: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
                   />
                   <label htmlFor="enableTokenTracking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                     启用 Token 使用统计
@@ -2741,6 +2849,16 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
           newPassword={resetPasswordData.newPassword}
           setNewPassword={(newPassword) => setResetPasswordData({...resetPasswordData, newPassword})}
           isLoading={isResettingPassword}
+        />
+        <EditModelModal
+          isOpen={showEditModelModal}
+          onClose={() => {
+            setShowEditModelModal(false);
+            setEditingModel(null);
+          }}
+          onSubmit={updateEditedModel}
+          model={editingModel}
+          groupOptions={userGroupOrders.map(g => g.groupName)}
         />
       </Container>
     </Box>
@@ -3681,6 +3799,154 @@ function ResetPasswordModal({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// 编辑模型对话框组件
+interface EditModelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: { id: string, name: string, group?: string }) => void;
+  model: any;
+  groupOptions: string[];
+}
+
+function EditModelModal({ isOpen, onClose, onSubmit, model, groupOptions = [] }: EditModelModalProps) {
+  const { error: toastError } = useToast();
+  const [formData, setFormData] = useState({
+    id: '',
+    modelId: '',
+    name: '',
+    group: '',
+  });
+
+  // 初始化表单数据
+  useEffect(() => {
+    if (model) {
+      setFormData({
+        id: model.id || '',
+        modelId: model.modelId || '',
+        name: model.name || '',
+        group: model.group || '',
+      });
+    }
+  }, [model]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toastError('请填写模型名称');
+      return;
+    }
+
+    onSubmit({
+      id: formData.id,
+      name: formData.name.trim(),
+      group: formData.group || undefined,
+    });
+  };
+
+  if (!isOpen || !model) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          编辑模型
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              模型ID
+            </label>
+            <input
+              type="text"
+              value={formData.modelId}
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              模型ID不可修改
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              模型名称 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="例如: GPT-4o"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              显示在界面上的模型名称
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              模型分组
+            </label>
+            <div className="relative">
+              <select
+                value={formData.group || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, group: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none"
+              >
+                <option value="">-- 无分组 --</option>
+                {groupOptions.map((group) => (
+                  <option key={group} value={group}>
+                    {group}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              模型将在分组中按顺序显示
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              描述（可选）
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              rows={3}
+              placeholder="模型描述..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              保存更改
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
