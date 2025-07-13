@@ -102,6 +102,7 @@ function ChatPageContent() {
   const [currentChatId, setCurrentChatId] = useState<string>('');
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [tokenStats, setTokenStats] = useState({
     input: 0,
     output: 0,
@@ -340,6 +341,17 @@ function ChatPageContent() {
     loadChatHistories();
   }, [user, chatConfig]);
 
+  // 当侧边栏打开时，加载聊天历史记录
+  const handleDrawerToggle = () => {
+    const newState = !drawerOpen;
+    setDrawerOpen(newState);
+    
+    // 当打开侧边栏时，重新加载聊天历史
+    if (newState && user && chatConfig?.canSaveToDatabase) {
+      loadChatHistories();
+    }
+  };
+
   // 保存聊天历史（对于访客用户，使用localStorage）
   const saveChatHistories = (histories: ChatHistory[]) => {
     if (user?.role === 'GUEST') {
@@ -433,7 +445,7 @@ function ChatPageContent() {
           messages: [
             {
               role: 'user',
-              content: `请为以下对话生成一个简短的标题（不超过15个字符）：\n\n${firstMessage}`
+              content: `使用4到8个字直接返回这句话的简要主题，在 8 个字以内，不要解释、不要标点、不要语气词、不要多余文本，不要加粗，如果没有主题，请直接返回"闲聊"：\n\n${firstMessage}`
             }
           ],
           userId: user.id,
@@ -467,14 +479,14 @@ function ChatPageContent() {
               }
             }
           }
-          return title.trim().slice(0, 15) || firstMessage.slice(0, 15);
+          return title.trim().slice(0, 8) || '闲聊';
         }
       }
     } catch {
       // 如果生成失败，使用默认标题
     }
 
-    return firstMessage.slice(0, 15) + (firstMessage.length > 15 ? '...' : '');
+    return firstMessage.slice(0, 8) + (firstMessage.length > 8 ? '' : '') || '闲聊';
   };
 
   // 加载历史聊天 - 乐观更新 + 延迟验证
@@ -648,7 +660,35 @@ function ChatPageContent() {
     };
   };
 
+  // 发送完成后保存聊天
+  const saveMessageToDatabase = async (messageContent: string, messageRole: 'user' | 'assistant', tokenUsage?: any) => {
+    if (!user || !currentChatId || !chatConfig?.canSaveToDatabase) return;
+    
+    const currentModel = getCurrentModel();
+    if (!currentModel) return;
 
+    try {
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: currentChatId,
+          userId: user.id,
+          providerId: currentModel.provider.id,
+          modelId: currentModel.model.id,
+          role: messageRole,
+          content: messageContent,
+          tokenUsage: tokenUsage,
+          saveToDatabase: true,
+        }),
+      });
+      
+      // 保存后更新本地聊天历史
+      saveCurrentChat();
+    } catch (error) {
+      console.error(`保存${messageRole === 'user' ? '用户' : 'AI'}消息失败:`, error);
+    }
+  };
 
   // 发送消息
   const handleSend = async () => {
@@ -752,19 +792,7 @@ function ChatPageContent() {
     // 保存用户消息到数据库
     if (chatConfig?.canSaveToDatabase && conversationId) {
       try {
-        await fetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            conversationId,
-            userId: user.id,
-            providerId: currentModel.provider.id,
-            modelId: currentModel.model.id,
-            role: 'user',
-            content: userMessage.content,
-            saveToDatabase: true,
-          }),
-        });
+        await saveMessageToDatabase(userMessage.content, 'user');
       } catch (error) {
         console.error('保存用户消息失败:', error);
       }
@@ -874,22 +902,7 @@ function ChatPageContent() {
             length: finalContent.length
           });
 
-          await fetch('/api/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              conversationId,
-              userId: user.id,
-              providerId: currentModel.provider.id,
-              modelId: currentModel.model.id,
-              role: 'assistant',
-              content: finalContent,
-              tokenUsage: finalTokenUsage,
-              inputText: userMessage.content,
-              outputText: finalContent,
-              saveToDatabase: true,
-            }),
-          });
+          await saveMessageToDatabase(finalContent, 'assistant', finalTokenUsage);
         } catch (error) {
           console.error('保存AI响应失败:', error);
         }
@@ -938,43 +951,68 @@ function ChatPageContent() {
   };
 
   // 删除消息
-  const handleDeleteMessage = (messageId: string) => {
-    setMessages(prev => {
-      const messageIndex = prev.findIndex(m => m.id === messageId);
-      if (messageIndex === -1) return prev;
-
-      const message = prev[messageIndex];
-
-      // 如果删除的是用户消息，同时删除后面的AI回复
-      if (message.role === 'user') {
-        const nextMessage = prev[messageIndex + 1];
-        if (nextMessage && nextMessage.role === 'assistant') {
-          return prev.filter(m => m.id !== messageId && m.id !== nextMessage.id);
-        }
-      }
-
-      return prev.filter(m => m.id !== messageId);
-    });
-    toast.success('消息已删除');
-  };
-
-  // 重新发送消息
-  const handleResendMessage = async (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (!message || message.role !== 'user') return;
-
-    // 删除该消息及其后面的所有消息
+  const handleDeleteMessage = async (messageId: string) => {
+    // 查找要删除的消息
     const messageIndex = messages.findIndex(m => m.id === messageId);
-    const newMessages = messages.slice(0, messageIndex);
+    if (messageIndex === -1) return;
+    
+    const message = messages[messageIndex];
+    let newMessages = [...messages];
+    
+    // 如果删除的是用户消息，同时删除后面的AI回复
+    if (message.role === 'user') {
+      const nextMessage = messages[messageIndex + 1];
+      if (nextMessage && nextMessage.role === 'assistant') {
+        newMessages = messages.filter(m => m.id !== messageId && m.id !== nextMessage.id);
+      } else {
+        newMessages = messages.filter(m => m.id !== messageId);
+      }
+    } else {
+      newMessages = messages.filter(m => m.id !== messageId);
+    }
+    
     setMessages(newMessages);
-
-    // 重新发送
-    setInput(message.content);
-    setTimeout(() => handleSend(), 100);
+    
+    // 从数据库中删除消息
+    if (currentChatId && chatConfig?.canSaveToDatabase) {
+      try {
+        // 使用软删除API
+        await fetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
+          method: 'DELETE'
+        });
+        
+        // 如果删除的是用户消息，也删除相应的AI回复
+        if (message.role === 'user') {
+          const nextMessage = messages[messageIndex + 1];
+          if (nextMessage && nextMessage.role === 'assistant') {
+            await fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
+              method: 'DELETE'
+            });
+          }
+        }
+        
+        toast.success('消息已删除');
+      } catch (error) {
+        console.error('删除消息失败:', error);
+        toast.error('删除消息失败');
+      }
+    } else {
+      toast.success('消息已删除');
+    }
+    
+    // 保存更新后的聊天历史
+    saveCurrentChat();
   };
 
-  // 编辑并重新发送消息
-  const handleEditMessage = async (messageId: string, newContent: string) => {
+  // 复制消息
+  const handleCopyMessage = (messageId: string, content: string) => {
+    navigator.clipboard.writeText(content)
+      .then(() => toast.success('消息已复制到剪贴板'))
+      .catch(() => toast.error('复制失败'));
+  };
+
+  // 编辑消息
+  const handleEditMessage = (messageId: string, content: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
     if (messageIndex === -1) return;
 
@@ -982,15 +1020,59 @@ function ChatPageContent() {
     const newMessages = messages.slice(0, messageIndex);
     setMessages(newMessages);
 
+    // 如果删除的是用户消息，也从数据库中删除相应的消息
+    if (currentChatId && chatConfig?.canSaveToDatabase) {
+      const message = messages[messageIndex];
+      if (message.role === 'user') {
+        // 删除用户消息
+        fetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
+          method: 'DELETE'
+        }).catch(error => console.error('删除消息失败:', error));
+        
+        // 删除后面的AI回复
+        const nextMessage = messages[messageIndex + 1];
+        if (nextMessage && nextMessage.role === 'assistant') {
+          fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
+            method: 'DELETE'
+          }).catch(error => console.error('删除消息失败:', error));
+        }
+      }
+    }
+
     // 重新发送编辑后的消息
-    setInput(newContent);
+    setInput(content);
     setTimeout(() => handleSend(), 100);
   };
 
-  // 复制消息
-  const handleCopyMessage = (content: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success('消息已复制到剪贴板');
+  // 重试消息
+  const handleRetryMessage = (messageId: string) => {
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+    
+    const message = messages[messageIndex];
+    if (message.role !== 'user') return;
+
+    // 删除该消息后面的AI回复
+    const newMessages = [...messages];
+    if (messageIndex < messages.length - 1) {
+      const nextMessage = messages[messageIndex + 1];
+      if (nextMessage.role === 'assistant') {
+        // 删除AI回复
+        newMessages.splice(messageIndex + 1, 1);
+        setMessages(newMessages);
+        
+        // 从数据库中删除消息
+        if (currentChatId && chatConfig?.canSaveToDatabase) {
+          fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
+            method: 'DELETE'
+          }).catch(error => console.error('删除消息失败:', error));
+        }
+      }
+    }
+
+    // 重新发送用户消息
+    setInput(message.content);
+    setTimeout(() => handleSend(), 100);
   };
 
   // 处理模型选择
@@ -1037,6 +1119,29 @@ function ChatPageContent() {
       });
   };
 
+  // 更新聊天标题
+  const handleChatTitleChange = async (newTitle: string) => {
+    if (!currentChatId || !chatConfig?.canSaveToDatabase) return;
+    
+    try {
+      await fetch(`/api/conversations/${currentChatId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      
+      // 更新本地聊天历史
+      const updatedHistories = chatHistories.map(h => 
+        h.id === currentChatId ? { ...h, title: newTitle } : h
+      );
+      saveChatHistories(updatedHistories);
+      toast.success('标题已更新');
+    } catch (error) {
+      toast.error('更新标题失败');
+      console.error('更新标题失败:', error);
+    }
+  };
+
   // 只替换return部分
   return (
     <MaterialChatLayout
@@ -1053,6 +1158,12 @@ function ChatPageContent() {
       onKeyPress={handleKeyPress}
       onLogout={() => { router.push('/login'); localStorage.removeItem('accessToken'); }}
       onSettings={() => router.push('/config')}
+      onCopyMessage={handleCopyMessage}
+      onDeleteMessage={handleDeleteMessage}
+      onEditMessage={handleEditMessage}
+      onRetryMessage={handleRetryMessage}
+      drawerOpen={drawerOpen}
+      onDrawerToggle={handleDrawerToggle}
       renderMessageContent={(message) => (
         <Box>
           <MarkdownRenderer
@@ -1078,6 +1189,8 @@ function ChatPageContent() {
       userName={user?.username || "用户"}
       modelName={getCurrentModel()?.model?.name}
       providerName={getCurrentModel()?.provider?.displayName || getCurrentModel()?.provider?.name}
+      chatTitle={currentChatId ? chatHistories.find(h => h.id === currentChatId)?.title || '新对话' : '新对话'}
+      onChatTitleChange={handleChatTitleChange}
       models={
         Array.isArray(providers) ? providers
           .flatMap(p => 

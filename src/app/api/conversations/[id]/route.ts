@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getConversationById, updateConversation, deleteConversation } from '@/lib/db/conversations'
+import {
+  getConversationById,
+  updateConversation,
+  deleteConversation,
+} from '@/lib/db/conversations'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params
+    const { id } = params
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
     const conversation = await getConversationById(id)
     if (!conversation) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
+
     return NextResponse.json(conversation)
   } catch (error) {
     console.error('Error fetching conversation:', error)
@@ -24,15 +30,26 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params
+    const { id } = params
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
     const data = await request.json()
-    const conversation = await updateConversation(id, data)
-    return NextResponse.json(conversation)
+    const { title, isArchived, isPinned } = data
+
+    const updatedConversation = await updateConversation(id, {
+      ...(title !== undefined && { title }),
+      ...(isArchived !== undefined && { isArchived }),
+      ...(isPinned !== undefined && { isPinned }),
+    })
+
+    return NextResponse.json(updatedConversation)
   } catch (error) {
     console.error('Error updating conversation:', error)
     return NextResponse.json(
@@ -44,12 +61,16 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params
-    await deleteConversation(id)
-    return NextResponse.json({ success: true })
+    const { id } = params
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
+    const deletedConversation = await deleteConversation(id)
+    return NextResponse.json(deletedConversation)
   } catch (error) {
     console.error('Error deleting conversation:', error)
     return NextResponse.json(

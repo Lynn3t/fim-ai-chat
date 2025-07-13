@@ -13,19 +13,28 @@ export function estimateTokens(text: string, language: 'zh' | 'en' = 'zh'): numb
   if (!text) return 0
 
   // 移除多余的空白字符
-  const cleanText = text.trim().replace(/\s+/g, ' ')
+  const cleanText = text.trim()
   
   if (language === 'zh') {
-    // 中文：大约1个汉字 = 1.5个token，1个英文单词 = 1个token
-    const chineseChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length
-    const englishWords = (cleanText.match(/[a-zA-Z]+/g) || []).length
-    const numbers = (cleanText.match(/\d+/g) || []).length
-    const punctuation = (cleanText.match(/[^\w\s\u4e00-\u9fff]/g) || []).length
+    // 按照要求统计：
+    // 1. 随机1-2个中文字符算1个token
+    // 2. 一个英文单词（空格分隔）算1个token
     
-    return Math.ceil(chineseChars * 1.5 + englishWords + numbers * 0.5 + punctuation * 0.3)
+    // 分离中文字符和非中文部分
+    const chineseChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).join('')
+    // 计算中文token数量：每1-2个汉字为1个token
+    const chineseTokens = Math.ceil(chineseChars.length / 2)
+    
+    // 提取所有非中文部分，按空格分割成单词
+    const nonChineseText = cleanText.replace(/[\u4e00-\u9fff]/g, ' ')
+    const englishWords = nonChineseText.split(/\s+/).filter(word => word.length > 0)
+    const englishTokens = englishWords.length
+    
+    return chineseTokens + englishTokens
   } else {
-    // 英文：大约4个字符 = 1个token
-    return Math.ceil(cleanText.length / 4)
+    // 英文：按照空格分隔的单词数量
+    const words = cleanText.split(/\s+/).filter(word => word.length > 0)
+    return words.length || 1 // 至少返回1个token
   }
 }
 

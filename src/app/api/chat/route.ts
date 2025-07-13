@@ -135,9 +135,19 @@ export async function POST(request: NextRequest) {
                 }
 
                 try {
-                  // 验证JSON格式
-                  JSON.parse(data);
-                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                  // 验证JSON格式并过滤敏感信息
+                  const jsonData = JSON.parse(data);
+                  // 移除可能包含的敏感信息
+                  delete jsonData.user;
+                  delete jsonData.provider;
+                  if (jsonData.model) {
+                    // 保留基本模型信息，移除详细配置
+                    jsonData.model = typeof jsonData.model === 'string' ? 
+                      jsonData.model : 
+                      { name: jsonData.model.name, id: jsonData.model.id };
+                  }
+                  
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(jsonData)}\n\n`));
                 } catch {
                   // 忽略无效的JSON数据
                 }

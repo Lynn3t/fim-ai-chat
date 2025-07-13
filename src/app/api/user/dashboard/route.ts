@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/api-utils';
 import { prisma } from '@/lib/prisma';
-import { getUserTokenUsage } from '@/lib/db/token-usage';
+import { getUserTokenStats } from '@/lib/db/token-usage';
 import { getUserAccessCodes, getUserInviteCodes } from '@/lib/db/codes';
 import { getUserSettings } from '@/lib/db/users';
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取用户的 Token 使用情况
-    const tokenStats = await getUserTokenUsage(userId);
+    const tokenStats = await getUserTokenStats(userId);
     
     // 获取用户创建的访问码
     const accessCodes = await getUserAccessCodes(userId);

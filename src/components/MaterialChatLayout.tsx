@@ -20,7 +20,8 @@ import {
   Tooltip,
   Menu,
   MenuItem,
-  Avatar
+  Avatar,
+  Stack
 } from '@mui/material';
 import { 
   Menu as MenuIcon,
@@ -33,11 +34,15 @@ import {
   History as HistoryIcon,
   Close as CloseIcon,
   Person as PersonIcon,
-  SmartToy as SmartToyIcon
+  SmartToy as SmartToyIcon,
+  ContentCopy as CopyIcon,
+  Edit as EditIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { ThemeToggle } from './MaterialUI';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sortGroupsByUserOrder, getModelGroups } from '@/utils/aiModelUtils';
+import { AIIcon } from './AIIcon';
 
 interface ChatMessage {
   id: string;
@@ -84,6 +89,14 @@ interface MaterialChatLayoutProps {
   modelGroups?: Array<{ groupName: string; order: number }>;
   onModelSelect?: (modelId: string) => void;
   currentModelId?: string;
+  chatTitle?: string;
+  onChatTitleChange?: (newTitle: string) => void;
+  onCopyMessage?: (messageId: string, content: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  onEditMessage?: (messageId: string, content: string) => void;
+  onRetryMessage?: (messageId: string) => void;
+  drawerOpen?: boolean;
+  onDrawerToggle?: () => void;
 }
 
 const DRAWER_WIDTH = 280;
@@ -109,11 +122,21 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
   models = [],
   modelGroups = [],
   onModelSelect,
-  currentModelId
+  currentModelId,
+  chatTitle = '',
+  onChatTitleChange,
+  onCopyMessage,
+  onDeleteMessage,
+  onEditMessage,
+  onRetryMessage,
+  drawerOpen = false,
+  onDrawerToggle
 }) => {
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  // Remove the internal drawer state and use props instead
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [modelMenuAnchorEl, setModelMenuAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [editableTitle, setEditableTitle] = React.useState(chatTitle);
   const { mode } = useTheme();
   
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -132,8 +155,11 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
     setModelMenuAnchorEl(null);
   };
 
+  // 使用从外部传入的状态和处理器
   const handleDrawerToggle = () => {
-    setDrawerOpen(!drawerOpen);
+    if (onDrawerToggle) {
+      onDrawerToggle();
+    }
   };
 
   const handleSettings = () => {
@@ -150,6 +176,28 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
     if (onModelSelect) {
       onModelSelect(modelId);
       handleModelMenuClose();
+    }
+  };
+
+  // 处理标题编辑
+  const handleTitleEdit = () => {
+    setEditableTitle(chatTitle);
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSave = () => {
+    // 限制标题长度为8字
+    const trimmedTitle = editableTitle.trim().slice(0, 8);
+    if (onChatTitleChange && trimmedTitle) {
+      onChatTitleChange(trimmedTitle);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
     }
   };
 
@@ -307,6 +355,38 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
               {title}
             </Typography>
             
+            {/* 中间空间用于居中显示聊天标题 */}
+            <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+              {messages.length > 0 && (
+                <Box 
+                  sx={{ 
+                    display: 'flex',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  onClick={!isEditingTitle ? handleTitleEdit : undefined}
+                >
+                  {isEditingTitle ? (
+                    <TextField
+                      value={editableTitle}
+                      onChange={(e) => setEditableTitle(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyPress={handleTitleKeyPress}
+                      size="small"
+                      autoFocus
+                      inputProps={{ maxLength: 8 }}
+                      sx={{ width: '200px' }}
+                      placeholder="输入标题（最多8字）"
+                    />
+                  ) : (
+                    <Typography variant="subtitle1" fontWeight="medium">
+                      {chatTitle || '新对话'}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
+            
             {/* 模型选择器 */}
             {models.length > 0 && (
               <>
@@ -376,8 +456,6 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                 </Menu>
               </>
             )}
-            
-            <Box sx={{ flexGrow: 1 }} />
             
             <IconButton
               aria-label="more"
@@ -476,10 +554,18 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                         ? (mode === 'light' ? '#fff' : '#000')
                         : (mode === 'light' ? '#fff' : '#000'),
                       width: 36,
-                      height: 36
+                      height: 36,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center'
                     }}
                   >
-                    {message.role === 'user' ? <PersonIcon /> : <SmartToyIcon />}
+                    {message.role === 'user' ? 
+                      <PersonIcon /> : 
+                      (message.modelInfo?.modelId ? 
+                        <AIIcon modelId={message.modelInfo.modelId} size={24} /> : 
+                        <SmartToyIcon />)
+                    }
                   </Avatar>
                   
                   <Box sx={{ maxWidth: '85%' }}>
@@ -507,6 +593,65 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                       }}
                     >
                       {renderMessageContent(message)}
+
+                      {/* 消息操作按钮 */}
+                      <Stack 
+                        direction="row" 
+                        spacing={1} 
+                        sx={{ 
+                          mt: 1, 
+                          justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                          opacity: 0.5,
+                          '&:hover': {
+                            opacity: 1
+                          }
+                        }}
+                      >
+                        {message.role === 'assistant' && (
+                          <>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => onCopyMessage?.(message.id, message.content)}
+                              title="复制"
+                            >
+                              <CopyIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => onDeleteMessage?.(message.id)}
+                              title="删除"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
+                        
+                        {message.role === 'user' && (
+                          <>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => onEditMessage?.(message.id, message.content)}
+                              title="编辑"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => onRetryMessage?.(message.id)}
+                              title="重试"
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => onDeleteMessage?.(message.id)}
+                              title="删除"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
+                      </Stack>
                     </Paper>
                   </Box>
                 </Box>
