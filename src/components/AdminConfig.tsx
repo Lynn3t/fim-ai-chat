@@ -116,87 +116,89 @@ interface SystemStats {
   usedAccessCodes: number;
 }
 
-// 图标映射 - 只保留组件引用，删除所有emoji
-const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any> }> = {
+// 图标映射 - 优先使用 lobehub icons，其次使用 emoji
+const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any>, emoji: string }> = {
   // 国际主流 AI 提供商
-  openai: { component: OpenAI },
-  anthropic: { component: Anthropic },
-  google: { component: Google },
-  microsoft: { component: Microsoft },
-  meta: { component: Meta },
-  huggingface: { component: HuggingFace },
-  cohere: { component: Cohere },
-  stability: { component: Stability },
-  replicate: { component: Replicate },
-  together: { component: Together },
-  perplexity: { component: Perplexity },
-  mistral: { component: Mistral },
-  groq: { component: Groq },
-  fireworks: { component: Fireworks },
-  openrouter: { component: OpenRouter },
-  bedrock: { component: Bedrock },
-  azure: { component: Azure },
-  vertexai: { component: VertexAI },
-  claude: { component: Claude },
-  gemini: { component: Gemini },
-  xai: { component: XAI },
+  openai: { component: OpenAI, emoji: '🤖' },
+  anthropic: { component: Anthropic, emoji: '🧠' },
+  google: { component: Google, emoji: '🔍' },
+  microsoft: { component: Microsoft, emoji: '🪟' },
+  meta: { component: Meta, emoji: '📘' },
+  huggingface: { component: HuggingFace, emoji: '🤗' },
+  cohere: { component: Cohere, emoji: '🌊' },
+  stability: { component: Stability, emoji: '🎨' },
+  replicate: { component: Replicate, emoji: '🔄' },
+  together: { component: Together, emoji: '🤝' },
+  perplexity: { component: Perplexity, emoji: '❓' },
+  mistral: { component: Mistral, emoji: '🌪️' },
+  groq: { component: Groq, emoji: '⚡' },
+  fireworks: { component: Fireworks, emoji: '🎆' },
+  openrouter: { component: OpenRouter, emoji: '🛣️' },
+  bedrock: { component: Bedrock, emoji: '🏔️' },
+  azure: { component: Azure, emoji: '☁️' },
+  vertexai: { component: VertexAI, emoji: '🔺' },
+  claude: { component: Claude, emoji: '🤖' },
+  gemini: { component: Gemini, emoji: '♊' },
+  xai: { component: XAI, emoji: '❌' },
 
   // 中国 AI 提供商
-  baidu: { component: Baidu },
-  alibaba: { component: Alibaba },
-  tencent: { component: Tencent },
-  bytedance: { component: ByteDance },
-  deepseek: { component: DeepSeek },
-  moonshot: { component: Moonshot },
-  zhipu: { component: Zhipu },
-  yi: { component: Yi },
-  sensenova: { component: SenseNova },
-  spark: { component: Spark },
-  qwen: { component: Qwen },
-  hunyuan: { component: Hunyuan },
-  wenxin: { component: Wenxin },
-  doubao: { component: Doubao },
-  stepfun: { component: Stepfun },
+  baidu: { component: Baidu, emoji: '🐻' },
+  alibaba: { component: Alibaba, emoji: '🛒' },
+  tencent: { component: Tencent, emoji: '🐧' },
+  bytedance: { component: ByteDance, emoji: '🎵' },
+  deepseek: { component: DeepSeek, emoji: '🔍' },
+  moonshot: { component: Moonshot, emoji: '🌙' },
+  zhipu: { component: Zhipu, emoji: '🧠' },
+  yi: { component: Yi, emoji: '🔤' },
+  sensenova: { component: SenseNova, emoji: '🌟' },
+  spark: { component: Spark, emoji: '⚡' },
+  qwen: { component: Qwen, emoji: '🤖' },
+  hunyuan: { component: Hunyuan, emoji: '🌀' },
+  wenxin: { component: Wenxin, emoji: '📝' },
+  doubao: { component: Doubao, emoji: '🫘' },
+  stepfun: { component: Stepfun, emoji: '👣' },
 
   // 开源和部署平台
-  ollama: { component: Ollama },
-  comfyui: { component: ComfyUI },
-  siliconcloud: { component: SiliconCloud },
-  deepinfra: { component: DeepInfra },
-  anyscale: { component: Anyscale },
-  novita: { component: Novita },
+  ollama: { component: Ollama, emoji: '🦙' },
+  comfyui: { component: ComfyUI, emoji: '🎨' },
+  siliconcloud: { component: SiliconCloud, emoji: '☁️' },
+  deepinfra: { component: DeepInfra, emoji: '🏗️' },
+  anyscale: { component: Anyscale, emoji: '📏' },
+  novita: { component: Novita, emoji: '🆕' },
 
   // 多媒体 AI
-  flux: { component: Flux },
-  runway: { component: Runway },
-  pika: { component: Pika },
-  suno: { component: Suno },
-  ideogram: { component: Ideogram },
-  recraft: { component: Recraft },
+  flux: { component: Flux, emoji: '🌊' },
+  runway: { component: Runway, emoji: '🛫' },
+  pika: { component: Pika, emoji: '⚡' },
+  suno: { component: Suno, emoji: '🎵' },
+  ideogram: { component: Ideogram, emoji: '💭' },
+  recraft: { component: Recraft, emoji: '🎨' },
 
   // 自定义选项
-  custom: {},
+  custom: { emoji: '⚙️' },
 };
 
 // 获取提供商图标的函数
 function getProviderIcon(iconKey?: string): React.ReactNode {
-  if (!iconKey) return null;
+  if (!iconKey) return '🤖';
 
-  // 处理自定义 icon key
+  // 处理自定义 emoji
   if (iconKey.startsWith('custom:')) {
-    return null;
+    const customEmoji = iconKey.replace('custom:', '');
+    return customEmoji || '⚙️';
   }
 
   const iconConfig = PROVIDER_ICON_MAPPING[iconKey.toLowerCase()];
-  if (!iconConfig) return null;
+  if (!iconConfig) return '🤖';
 
-  // 使用 lobehub icon 组件
+  // 优先使用 lobehub icon 组件
   if (iconConfig.component) {
     const IconComponent = iconConfig.component;
     return <IconComponent size={16} />;
   }
 
-  return null;
+  // 其次使用 emoji
+  return iconConfig.emoji;
 }
 
 export default function AdminConfig() {
@@ -1832,16 +1834,13 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                       <div className="text-sm font-medium text-gray-900 dark:text-white">
                                         {provider.displayName}
                                       </div>
-                                      <Chip 
-                                        label={provider.isEnabled ? "已启用" : "已禁用"} 
-                                        color="default" 
-                                        variant={provider.isEnabled ? "outlined" : "filled"}
-                                        sx={{ 
-                                          backgroundColor: provider.isEnabled ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
-                                          borderColor: provider.isEnabled ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
-                                          color: 'text.primary'
-                                        }}
-                                      />
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        provider.isEnabled
+                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                      }`}>
+                                        {provider.isEnabled ? '启用' : '禁用'}
+                                      </span>
                                     </div>
                                                                       <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                     {provider.name}
@@ -1860,51 +1859,28 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   >
                                     {expandedProviders.has(provider.id) ? '收起模型' : '管理模型'}
                                   </button>
-                                  <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                  <button
                                     onClick={() => toggleProviderStatus(provider.id, provider.isEnabled)}
+                                    className={`px-3 py-1 text-xs rounded ${
+                                      provider.isEnabled
+                                        ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800'
+                                    }`}
                                   >
                                     {provider.isEnabled ? '禁用' : '启用'}
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                  </button>
+                                  <button
                                     onClick={() => setEditingProvider(provider)}
+                                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
                                   >
                                     编辑
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                  </button>
+                                  <button
                                     onClick={() => deleteProvider(provider.id, provider.displayName)}
+                                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800"
                                   >
                                     删除
-                                  </Button>
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1917,82 +1893,37 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                     模型管理
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
-                                    <Button
-                                      variant="outlined"
-                                      color="inherit"
-                                      sx={{ 
-                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                        color: 'text.primary',
-                                        '&:hover': {
-                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                        }
-                                      }}
+                                    <button
                                       onClick={() => fetchModelsFromAPI(provider)}
                                       disabled={isLoading}
+                                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                       {isLoading ? '获取中...' : 'v1/models 获取'}
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      color="inherit"
-                                      sx={{ 
-                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                        color: 'text.primary',
-                                        '&:hover': {
-                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                        }
-                                      }}
+                                    </button>
+                                    <button
                                       onClick={() => openAddModelModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800 transition-colors"
                                     >
                                       自定义模型
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      color="inherit"
-                                      sx={{ 
-                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                        color: 'text.primary',
-                                        '&:hover': {
-                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                        }
-                                      }}
+                                    </button>
+                                    <button
                                       onClick={() => autoGroupModels(provider.id)}
+                                      className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:hover:bg-purple-800 transition-colors"
                                     >
                                       🤖 自动分组
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      color="inherit"
-                                      sx={{ 
-                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                        color: 'text.primary',
-                                        '&:hover': {
-                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                        }
-                                      }}
+                                    </button>
+                                    <button
                                       onClick={() => openCustomGroupModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:hover:bg-orange-800 transition-colors"
                                     >
                                       📁 自定义分组
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      color="inherit"
-                                      sx={{ 
-                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                        color: 'text.primary',
-                                        '&:hover': {
-                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                        }
-                                      }}
+                                    </button>
+                                    <button
                                       onClick={() => openAIRenameModal(provider.id)}
+                                      className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-800 transition-colors"
                                     >
                                       ✨ AI 起名
-                                    </Button>
+                                    </button>
                                   </div>
                                 </div>
 
@@ -2051,51 +1982,28 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                               <div className="flex items-center space-x-2">
                                                 {!model._isTemporary && (
                                                   <>
-                                                    <Button
-                                                      variant="outlined"
-                                                      color="inherit"
-                                                      sx={{ 
-                                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                                        color: 'text.primary',
-                                                        '&:hover': {
-                                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                                        }
-                                                      }}
+                                                    <button
                                                       onClick={() => toggleModelStatus(model.id, model.isEnabled)}
+                                                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer transition-colors ${
+                                                        model.isEnabled
+                                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+                                                      }`}
                                                     >
                                                       {model.isEnabled ? '启用' : '禁用'}
-                                                    </Button>
-                                                    <Button
-                                                      variant="outlined"
-                                                      color="inherit"
-                                                      sx={{ 
-                                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                                        color: 'text.primary',
-                                                        '&:hover': {
-                                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                                        }
-                                                      }}
+                                                    </button>
+                                                    <button
                                                       onClick={() => editModel(model)}
+                                                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors"
                                                     >
                                                       编辑
-                                                    </Button>
-                                                    <Button
-                                                      variant="outlined"
-                                                      color="inherit"
-                                                      sx={{ 
-                                                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                                                        color: 'text.primary',
-                                                        '&:hover': {
-                                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                                          borderColor: 'rgba(0, 0, 0, 0.5)'
-                                                        }
-                                                      }}
+                                                    </button>
+                                                    <button
                                                       onClick={() => deleteModel(model.id, model.name)}
+                                                      className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800 transition-colors"
                                                     >
                                                       删除
-                                                    </Button>
+                                                    </button>
                                                   </>
                                                 )}
                                                 {model._isTemporary && (
@@ -2228,65 +2136,38 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                 快速操作
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => setActiveTab('users')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-2xl mb-2">👥</div>
                     <div className="text-sm font-medium text-gray-900 dark:text-white">管理用户</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">查看和管理系统用户</div>
                   </div>
-                </Button>
+                </button>
 
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => setActiveTab('models')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-2xl mb-2">🤖</div>
                     <div className="text-sm font-medium text-gray-900 dark:text-white">模型管理</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">配置 AI 模型和提供商</div>
                   </div>
-                </Button>
+                </button>
 
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => setActiveTab('invites')}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-2xl mb-2">🎫</div>
                     <div className="text-sm font-medium text-gray-900 dark:text-white">邀请码管理</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">创建和管理邀请码</div>
                   </div>
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -2402,46 +2283,25 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                               {user.role !== 'ADMIN' && (
                                 <>
                                   <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                    variant="text"
+                                    size="small"
+                                    color={user.isActive ? 'error' : 'success'}
                                     onClick={() => toggleUserStatus(user.id, user.isActive)}
                                   >
                                     {user.isActive ? '禁用' : '启用'}
                                   </Button>
                                   <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                    variant="text"
+                                    size="small"
+                                    color="primary"
                                     onClick={() => openResetPasswordModal(user.id, user.username)}
                                   >
                                     重置密码
                                   </Button>
                                   <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                    variant="text"
+                                    size="small"
+                                    color="error"
                                     onClick={() => deleteUser(user.id, user.username)}
                                   >
                                     删除
@@ -2451,16 +2311,9 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                               {user.role === 'ADMIN' && (
                                 <>
                                   <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    sx={{ 
-                                      borderColor: 'rgba(0, 0, 0, 0.23)',
-                                      color: 'text.primary',
-                                      '&:hover': {
-                                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                        borderColor: 'rgba(0, 0, 0, 0.5)'
-                                      }
-                                    }}
+                                    variant="text"
+                                    size="small"
+                                    color="primary"
                                     onClick={() => openResetPasswordModal(user.id, user.username)}
                                   >
                                     重置密码
@@ -2503,62 +2356,35 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                 快速创建
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => createInviteCode(1, 1)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-lg font-medium text-gray-900 dark:text-white">单次使用</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">创建 1 个单次使用邀请码</div>
                   </div>
-                </Button>
+                </button>
 
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => createInviteCode(5, 1)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-lg font-medium text-gray-900 dark:text-white">批量创建</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">创建 5 个单次使用邀请码</div>
                   </div>
-                </Button>
+                </button>
 
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
                   onClick={() => createInviteCode(1, 10)}
+                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="text-center">
                     <div className="text-lg font-medium text-gray-900 dark:text-white">多次使用</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">创建 1 个可用 10 次的邀请码</div>
                   </div>
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -2616,16 +2442,13 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                             {code.currentUses} / {code.maxUses}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Chip 
-                              label={code.currentUses >= code.maxUses ? '已用完' : '可用'}
-                              color="default" 
-                              variant={code.currentUses >= code.maxUses ? "filled" : "outlined"}
-                              sx={{ 
-                                backgroundColor: code.currentUses >= code.maxUses ? 'rgba(255, 0, 0, 0.1)' : 'transparent',
-                                borderColor: code.currentUses >= code.maxUses ? 'rgba(255, 0, 0, 0.3)' : 'transparent',
-                                color: 'text.primary'
-                              }}
-                            />
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              code.currentUses >= code.maxUses
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            }`}>
+                              {code.currentUses >= code.maxUses ? '已用完' : '可用'}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             {code.creator.username}
@@ -2634,21 +2457,12 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                             {new Date(code.createdAt).toLocaleDateString('zh-CN')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <Button
-                              variant="outlined"
-                              color="inherit"
-                              sx={{ 
-                                borderColor: 'rgba(0, 0, 0, 0.23)',
-                                color: 'text.primary',
-                                '&:hover': {
-                                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                                }
-                              }}
+                            <button
                               onClick={() => deleteInviteCode(code.id, code.code)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                             >
                               删除
-                            </Button>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2822,21 +2636,12 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
             {/* 保存按钮 */}
             <div className="flex justify-end">
-              <Button
-                variant="outlined"
-                color="inherit"
-                sx={{ 
-                  borderColor: 'rgba(0, 0, 0, 0.23)',
-                  color: 'text.primary',
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                    borderColor: 'rgba(0, 0, 0, 0.5)'
-                  }
-                }}
+              <button
                 onClick={() => updateSystemSettings(systemSettings)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 保存设置
-              </Button>
+              </button>
             </div>
           </div>
         )}
@@ -2984,60 +2789,60 @@ function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: Provid
   // 常用的 AI 提供商图标选项 - 优先使用 lobehub icons，其次使用 emoji
   const iconOptions = [
     // 国际主流 AI 提供商
-    { value: 'openai', label: 'OpenAI', component: OpenAI },
-    { value: 'anthropic', label: 'Anthropic', component: Anthropic },
-    { value: 'google', label: 'Google', component: Google },
-    { value: 'microsoft', label: 'Microsoft', component: Microsoft },
-    { value: 'meta', label: 'Meta', component: Meta },
-    { value: 'huggingface', label: 'Hugging Face', component: HuggingFace },
-    { value: 'cohere', label: 'Cohere', component: Cohere },
-    { value: 'stability', label: 'Stability AI', component: Stability },
-    { value: 'replicate', label: 'Replicate', component: Replicate },
-    { value: 'together', label: 'Together AI', component: Together },
-    { value: 'perplexity', label: 'Perplexity', component: Perplexity },
-    { value: 'mistral', label: 'Mistral AI', component: Mistral },
-    { value: 'groq', label: 'Groq', component: Groq },
-    { value: 'fireworks', label: 'Fireworks AI', component: Fireworks },
-    { value: 'openrouter', label: 'OpenRouter', component: OpenRouter },
-    { value: 'bedrock', label: 'AWS Bedrock', component: Bedrock },
-    { value: 'azure', label: 'Azure AI', component: Azure },
-    { value: 'vertexai', label: 'Vertex AI', component: VertexAI },
-    { value: 'claude', label: 'Claude', component: Claude },
-    { value: 'gemini', label: 'Gemini', component: Gemini },
-    { value: 'xai', label: 'xAI', component: XAI },
+    { value: 'openai', label: 'OpenAI', component: OpenAI, emoji: '🤖' },
+    { value: 'anthropic', label: 'Anthropic', component: Anthropic, emoji: '🧠' },
+    { value: 'google', label: 'Google', component: Google, emoji: '🔍' },
+    { value: 'microsoft', label: 'Microsoft', component: Microsoft, emoji: '🪟' },
+    { value: 'meta', label: 'Meta', component: Meta, emoji: '📘' },
+    { value: 'huggingface', label: 'Hugging Face', component: HuggingFace, emoji: '🤗' },
+    { value: 'cohere', label: 'Cohere', component: Cohere, emoji: '🌊' },
+    { value: 'stability', label: 'Stability AI', component: Stability, emoji: '🎨' },
+    { value: 'replicate', label: 'Replicate', component: Replicate, emoji: '🔄' },
+    { value: 'together', label: 'Together AI', component: Together, emoji: '🤝' },
+    { value: 'perplexity', label: 'Perplexity', component: Perplexity, emoji: '❓' },
+    { value: 'mistral', label: 'Mistral AI', component: Mistral, emoji: '🌪️' },
+    { value: 'groq', label: 'Groq', component: Groq, emoji: '⚡' },
+    { value: 'fireworks', label: 'Fireworks AI', component: Fireworks, emoji: '🎆' },
+    { value: 'openrouter', label: 'OpenRouter', component: OpenRouter, emoji: '🛣️' },
+    { value: 'bedrock', label: 'AWS Bedrock', component: Bedrock, emoji: '🏔️' },
+    { value: 'azure', label: 'Azure AI', component: Azure, emoji: '☁️' },
+    { value: 'vertexai', label: 'Vertex AI', component: VertexAI, emoji: '🔺' },
+    { value: 'claude', label: 'Claude', component: Claude, emoji: '🤖' },
+    { value: 'gemini', label: 'Gemini', component: Gemini, emoji: '♊' },
+    { value: 'xai', label: 'xAI', component: XAI, emoji: '❌' },
 
     // 中国 AI 提供商
-    { value: 'baidu', label: '百度', component: Baidu },
-    { value: 'alibaba', label: '阿里巴巴', component: Alibaba },
-    { value: 'tencent', label: '腾讯', component: Tencent },
-    { value: 'bytedance', label: '字节跳动', component: ByteDance },
-    { value: 'deepseek', label: 'DeepSeek', component: DeepSeek },
-    { value: 'moonshot', label: 'Moonshot', component: Moonshot },
-    { value: 'zhipu', label: '智谱AI', component: Zhipu },
-    { value: 'yi', label: '零一万物', component: Yi },
-    { value: 'sensenova', label: '商汤', component: SenseNova },
-    { value: 'spark', label: '讯飞星火', component: Spark },
-    { value: 'qwen', label: '通义千问', component: Qwen },
-    { value: 'hunyuan', label: '腾讯混元', component: Hunyuan },
-    { value: 'wenxin', label: '文心一言', component: Wenxin },
-    { value: 'doubao', label: '豆包', component: Doubao },
-    { value: 'stepfun', label: 'StepFun', component: Stepfun },
+    { value: 'baidu', label: '百度', component: Baidu, emoji: '🐻' },
+    { value: 'alibaba', label: '阿里巴巴', component: Alibaba, emoji: '🛒' },
+    { value: 'tencent', label: '腾讯', component: Tencent, emoji: '🐧' },
+    { value: 'bytedance', label: '字节跳动', component: ByteDance, emoji: '🎵' },
+    { value: 'deepseek', label: 'DeepSeek', component: DeepSeek, emoji: '🔍' },
+    { value: 'moonshot', label: 'Moonshot', component: Moonshot, emoji: '🌙' },
+    { value: 'zhipu', label: '智谱AI', component: Zhipu, emoji: '🧠' },
+    { value: 'yi', label: '零一万物', component: Yi, emoji: '🔤' },
+    { value: 'sensenova', label: '商汤', component: SenseNova, emoji: '🌟' },
+    { value: 'spark', label: '讯飞星火', component: Spark, emoji: '⚡' },
+    { value: 'qwen', label: '通义千问', component: Qwen, emoji: '🤖' },
+    { value: 'hunyuan', label: '腾讯混元', component: Hunyuan, emoji: '🌀' },
+    { value: 'wenxin', label: '文心一言', component: Wenxin, emoji: '📝' },
+    { value: 'doubao', label: '豆包', component: Doubao, emoji: '🫘' },
+    { value: 'stepfun', label: 'StepFun', component: Stepfun, emoji: '👣' },
 
     // 开源和部署平台
-    { value: 'ollama', label: 'Ollama', component: Ollama },
-    { value: 'comfyui', label: 'ComfyUI', component: ComfyUI },
-    { value: 'siliconcloud', label: 'SiliconCloud', component: SiliconCloud },
-    { value: 'deepinfra', label: 'DeepInfra', component: DeepInfra },
-    { value: 'anyscale', label: 'Anyscale', component: Anyscale },
-    { value: 'novita', label: 'Novita AI', component: Novita },
+    { value: 'ollama', label: 'Ollama', component: Ollama, emoji: '🦙' },
+    { value: 'comfyui', label: 'ComfyUI', component: ComfyUI, emoji: '🎨' },
+    { value: 'siliconcloud', label: 'SiliconCloud', component: SiliconCloud, emoji: '☁️' },
+    { value: 'deepinfra', label: 'DeepInfra', component: DeepInfra, emoji: '🏗️' },
+    { value: 'anyscale', label: 'Anyscale', component: Anyscale, emoji: '📏' },
+    { value: 'novita', label: 'Novita AI', component: Novita, emoji: '🆕' },
 
     // 多媒体 AI
-    { value: 'flux', label: 'Flux', component: Flux },
-    { value: 'runway', label: 'Runway', component: Runway },
-    { value: 'pika', label: 'Pika', component: Pika },
-    { value: 'suno', label: 'Suno', component: Suno },
-    { value: 'ideogram', label: 'Ideogram', component: Ideogram },
-    { value: 'recraft', label: 'Recraft', component: Recraft },
+    { value: 'flux', label: 'Flux', component: Flux, emoji: '🌊' },
+    { value: 'runway', label: 'Runway', component: Runway, emoji: '🛫' },
+    { value: 'pika', label: 'Pika', component: Pika, emoji: '⚡' },
+    { value: 'suno', label: 'Suno', component: Suno, emoji: '🎵' },
+    { value: 'ideogram', label: 'Ideogram', component: Ideogram, emoji: '💭' },
+    { value: 'recraft', label: 'Recraft', component: Recraft, emoji: '🎨' },
 
     // 自定义选项
     { value: 'custom', label: '自定义 Emoji', emoji: '⚙️' },
@@ -3229,36 +3034,19 @@ function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: Provid
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               取消
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
               type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               {initialData ? '更新' : '创建'}
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -3353,36 +3141,19 @@ function CreateInviteModal({ isOpen, onClose, onSubmit, formData, setFormData }:
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               取消
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
               type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               创建邀请码
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -3488,36 +3259,19 @@ function AddModelModal({ isOpen, onClose, onSubmit }: AddModelModalProps) {
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               取消
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
               type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               添加模型
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -3615,37 +3369,20 @@ function CustomGroupModal({ isOpen, onClose, providerId, providers, onSubmit }: 
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               取消
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
               type="submit"
               disabled={!formData.groupName.trim() || formData.modelIds.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
             >
               创建分组
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -3754,36 +3491,20 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
                 选择要重命名的模型 <span className="text-red-500">*</span>
               </label>
               <div className="flex space-x-2">
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                <button
+                  type="button"
                   onClick={selectAll}
+                  className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   全选
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ 
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    color: 'text.primary',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      borderColor: 'rgba(0, 0, 0, 0.5)'
-                    }
-                  }}
+                </button>
+                <button
+                  type="button"
                   onClick={deselectAll}
+                  className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
                 >
                   全不选
-                </Button>
+                </button>
               </div>
             </div>
             <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
@@ -3812,37 +3533,20 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               取消
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
               type="submit"
               disabled={!formData.aiModelId || formData.selectedModels.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               🤖 开始AI重命名
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -3957,38 +3661,24 @@ function ResetPasswordModal({
             </div>
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            <button
+              type="button"
               onClick={onSubmit}
               disabled={isLoading || !newPassword || newPassword.length < 6}
+              className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                (isLoading || !newPassword || newPassword.length < 6) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               {isLoading ? '处理中...' : '重置密码'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{ 
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                color: 'text.primary',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              }}
+            </button>
+            <button
+              type="button"
               onClick={onClose}
               disabled={isLoading}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
             >
               取消
-            </Button>
+            </button>
           </div>
         </div>
       </div>
