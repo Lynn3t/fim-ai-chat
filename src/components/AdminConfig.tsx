@@ -21,19 +21,59 @@ import {
   TableHead,
   TableRow,
   Chip,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Checkbox,
-  Switch
+  IconButton
 } from '@mui/material';
+import {
+  OpenAI,
+  Anthropic,
+  Google,
+  Microsoft,
+  Meta,
+  HuggingFace,
+  Cohere,
+  Stability,
+  Replicate,
+  Together,
+  Perplexity,
+  Mistral,
+  // 添加更多 AI 提供商图标
+  Baidu,
+  Alibaba,
+  Tencent,
+  ByteDance,
+  DeepSeek,
+  Moonshot,
+  Zhipu,
+  Yi,
+  SenseNova,
+  Spark,
+  Ollama,
+  ComfyUI,
+  SiliconCloud,
+  Flux,
+  XAI,
+  Groq,
+  Fireworks,
+  OpenRouter,
+  Bedrock,
+  Azure,
+  VertexAI,
+  Claude,
+  Gemini,
+  Qwen,
+  Hunyuan,
+  Wenxin,
+  Doubao,
+  Stepfun,
+  DeepInfra,
+  Anyscale,
+  Novita,
+  Runway,
+  Pika,
+  Suno,
+  Ideogram,
+  Recraft
+} from '@lobehub/icons';
 import { getModelGroups, getCategorySortOrder, sortGroupsByUserOrder, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
 import { SortableModelGroupList } from './SortableModelGroupList';
 
@@ -76,41 +116,87 @@ interface SystemStats {
   usedAccessCodes: number;
 }
 
-// 获取提供商显示名称的函数
-function getProviderDisplayName(providerKey?: string): string {
-  if (!providerKey) return '未知';
-  
-  // 处理自定义名称
-  if (providerKey.startsWith('custom:')) {
-    return providerKey.replace('custom:', '') || '自定义';
+// 图标映射 - 只保留组件引用，删除所有emoji
+const PROVIDER_ICON_MAPPING: Record<string, { component?: React.ComponentType<any> }> = {
+  // 国际主流 AI 提供商
+  openai: { component: OpenAI },
+  anthropic: { component: Anthropic },
+  google: { component: Google },
+  microsoft: { component: Microsoft },
+  meta: { component: Meta },
+  huggingface: { component: HuggingFace },
+  cohere: { component: Cohere },
+  stability: { component: Stability },
+  replicate: { component: Replicate },
+  together: { component: Together },
+  perplexity: { component: Perplexity },
+  mistral: { component: Mistral },
+  groq: { component: Groq },
+  fireworks: { component: Fireworks },
+  openrouter: { component: OpenRouter },
+  bedrock: { component: Bedrock },
+  azure: { component: Azure },
+  vertexai: { component: VertexAI },
+  claude: { component: Claude },
+  gemini: { component: Gemini },
+  xai: { component: XAI },
+
+  // 中国 AI 提供商
+  baidu: { component: Baidu },
+  alibaba: { component: Alibaba },
+  tencent: { component: Tencent },
+  bytedance: { component: ByteDance },
+  deepseek: { component: DeepSeek },
+  moonshot: { component: Moonshot },
+  zhipu: { component: Zhipu },
+  yi: { component: Yi },
+  sensenova: { component: SenseNova },
+  spark: { component: Spark },
+  qwen: { component: Qwen },
+  hunyuan: { component: Hunyuan },
+  wenxin: { component: Wenxin },
+  doubao: { component: Doubao },
+  stepfun: { component: Stepfun },
+
+  // 开源和部署平台
+  ollama: { component: Ollama },
+  comfyui: { component: ComfyUI },
+  siliconcloud: { component: SiliconCloud },
+  deepinfra: { component: DeepInfra },
+  anyscale: { component: Anyscale },
+  novita: { component: Novita },
+
+  // 多媒体 AI
+  flux: { component: Flux },
+  runway: { component: Runway },
+  pika: { component: Pika },
+  suno: { component: Suno },
+  ideogram: { component: Ideogram },
+  recraft: { component: Recraft },
+
+  // 自定义选项
+  custom: {},
+};
+
+// 获取提供商图标的函数
+function getProviderIcon(iconKey?: string): React.ReactNode {
+  if (!iconKey) return null;
+
+  // 处理自定义 icon key
+  if (iconKey.startsWith('custom:')) {
+    return null;
   }
-  
-  // 常见提供商名称映射
-  const nameMapping: Record<string, string> = {
-    openai: 'OpenAI',
-    anthropic: 'Anthropic',
-    google: 'Google',
-    microsoft: 'Microsoft',
-    meta: 'Meta',
-    huggingface: 'Hugging Face',
-    cohere: 'Cohere',
-    stability: 'Stability AI',
-    replicate: 'Replicate',
-    together: 'Together AI',
-    perplexity: 'Perplexity',
-    mistral: 'Mistral AI',
-    groq: 'Groq',
-    fireworks: 'Fireworks AI',
-    baidu: '百度',
-    alibaba: '阿里巴巴',
-    tencent: '腾讯',
-    bytedance: '字节跳动',
-    zhipu: '智谱 AI',
-    ollama: 'Ollama',
-    custom: '自定义'
-  };
-  
-  return nameMapping[providerKey.toLowerCase()] || providerKey;
+
+  const iconConfig = PROVIDER_ICON_MAPPING[iconKey.toLowerCase()];
+  if (!iconConfig) return null;
+
+  // 使用 lobehub icon 组件
+  if (iconConfig.component) {
+    const IconComponent = iconConfig.component;
+    return <IconComponent size={16} />;
+  }
+
+  return null;
 }
 
 export default function AdminConfig() {
@@ -1736,11 +1822,11 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                             <div className="p-4">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center flex-1">
-                                        <div className="h-10 w-10 flex items-center justify-center mr-4">
-                                      <Typography variant="caption" sx={{ fontWeight: 'bold', letterSpacing: 0.5 }}>
-                                        {getProviderDisplayName(provider.icon).substring(0, 2).toUpperCase()}
-                                      </Typography>
-                                    </div>
+                                  <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center mr-4">
+                                    <span className="text-xl">
+                                      {getProviderIcon(provider.icon)}
+                                    </span>
+                                  </div>
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-3">
                                       <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1862,51 +1948,51 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                     >
                                       自定义模型
                                     </Button>
-                                                                         <Button
-                                       variant="outlined"
-                                       color="inherit"
-                                       sx={{ 
-                                         borderColor: 'rgba(0, 0, 0, 0.23)',
-                                         color: 'text.primary',
-                                         '&:hover': {
-                                           backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                           borderColor: 'rgba(0, 0, 0, 0.5)'
-                                         }
-                                       }}
-                                        onClick={() => autoGroupModels(provider.id)}
-                                      >
-                                        自动分组
-                                     </Button>
-                                                                         <Button
-                                       variant="outlined"
-                                       color="inherit"
-                                       sx={{ 
-                                         borderColor: 'rgba(0, 0, 0, 0.23)',
-                                         color: 'text.primary',
-                                         '&:hover': {
-                                           backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                           borderColor: 'rgba(0, 0, 0, 0.5)'
-                                         }
-                                       }}
-                                        onClick={() => openCustomGroupModal(provider.id)}
-                                      >
-                                        自定义分组
-                                     </Button>
-                                                                         <Button
-                                       variant="outlined"
-                                       color="inherit"
-                                       sx={{ 
-                                         borderColor: 'rgba(0, 0, 0, 0.23)',
-                                         color: 'text.primary',
-                                         '&:hover': {
-                                           backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                                           borderColor: 'rgba(0, 0, 0, 0.5)'
-                                         }
-                                       }}
-                                        onClick={() => openAIRenameModal(provider.id)}
-                                      >
-                                        AI 起名
-                                     </Button>
+                                    <Button
+                                      variant="outlined"
+                                      color="inherit"
+                                      sx={{ 
+                                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                                        color: 'text.primary',
+                                        '&:hover': {
+                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                                          borderColor: 'rgba(0, 0, 0, 0.5)'
+                                        }
+                                      }}
+                                      onClick={() => autoGroupModels(provider.id)}
+                                    >
+                                      🤖 自动分组
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      color="inherit"
+                                      sx={{ 
+                                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                                        color: 'text.primary',
+                                        '&:hover': {
+                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                                          borderColor: 'rgba(0, 0, 0, 0.5)'
+                                        }
+                                      }}
+                                      onClick={() => openCustomGroupModal(provider.id)}
+                                    >
+                                      📁 自定义分组
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      color="inherit"
+                                      sx={{ 
+                                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                                        color: 'text.primary',
+                                        '&:hover': {
+                                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                                          borderColor: 'rgba(0, 0, 0, 0.5)'
+                                        }
+                                      }}
+                                      onClick={() => openAIRenameModal(provider.id)}
+                                    >
+                                      ✨ AI 起名
+                                    </Button>
                                   </div>
                                 </div>
 
@@ -3752,11 +3838,11 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
                   borderColor: 'rgba(0, 0, 0, 0.5)'
                 }
               }}
-                              type="submit"
-                disabled={!formData.aiModelId || formData.selectedModels.length === 0}
-              >
-                开始AI重命名
-              </Button>
+              type="submit"
+              disabled={!formData.aiModelId || formData.selectedModels.length === 0}
+            >
+              🤖 开始AI重命名
+            </Button>
           </div>
         </form>
       </div>

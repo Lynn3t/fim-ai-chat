@@ -20,7 +20,8 @@ import {
   Tooltip,
   Menu,
   MenuItem,
-  Avatar
+  Avatar,
+  Button
 } from '@mui/material';
 import { 
   Menu as MenuIcon,
@@ -37,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { ThemeToggle } from './MaterialUI';
 import { useTheme } from '@/contexts/ThemeContext';
+import { sortGroupsByUserOrder, getModelGroups } from '@/utils/aiModelUtils';
 
 interface ChatMessage {
   id: string;
@@ -74,11 +76,18 @@ interface MaterialChatLayoutProps {
   modelName?: string;
   providerName?: string;
   userName?: string;
-  models?: Array<{id: string, name: string}>;
+  models?: Array<{
+    id: string, 
+    name: string,
+    group?: string,
+    provider?: string
+  }>;
+  modelGroups?: Array<{ groupName: string; order: number }>;
   onModelSelect?: (modelId: string) => void;
   currentModelId?: string;
 }
 
+// 使用中性黑白配色
 const DRAWER_WIDTH = 280;
 
 export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
@@ -100,6 +109,7 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
   providerName,
   userName = '用户',
   models = [],
+  modelGroups = [],
   onModelSelect,
   currentModelId
 }) => {
@@ -217,6 +227,115 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
     </>
   );
 
+  // 获取带有自定义分组的模型数据
+  const getGroupedModels = () => {
+    // 首先按分组归类模型
+    const modelsByGroup: Record<string, Array<{id: string, name: string, provider?: string}>> = {};
+    
+    models.forEach(model => {
+      const groupName = model.group || '其他';
+      if (!modelsByGroup[groupName]) {
+        modelsByGroup[groupName] = [];
+      }
+      modelsByGroup[groupName].push({
+        id: model.id,
+        name: model.name,
+        provider: model.provider
+      });
+    });
+    
+    // 使用用户自定义排序对分组进行排序
+    const sortedGroups = sortGroupsByUserOrder(modelsByGroup, modelGroups);
+    
+    return sortedGroups.map(groupName => ({
+      groupName,
+      models: modelsByGroup[groupName]
+    }));
+  };
+
+  const groupedModels = getGroupedModels();
+
+  // 消息展示区域
+  const messagesList = (
+    <Box 
+      sx={{ 
+        flexGrow: 1, 
+        p: 2, 
+        overflowY: 'auto',
+        display: 'flex', 
+        flexDirection: 'column',
+        gap: 2
+      }}
+    >
+      {messages.length === 0 && (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          height: '100%',
+          opacity: 0.7
+        }}>
+          <Typography variant="h5" component="div" sx={{ mb: 2, color: 'text.primary' }}>
+            开始新的对话
+          </Typography>
+          <Typography variant="body2" sx={{ textAlign: 'center', color: 'text.secondary' }}>
+            选择模型并输入您的问题开始聊天
+          </Typography>
+        </Box>
+      )}
+      
+      {messages.map((message) => (
+        <Paper
+          key={message.id}
+          elevation={0}
+          sx={{
+            p: 2,
+            backgroundColor: message.role === 'user' ? 'background.default' : 'background.paper',
+            borderRadius: 2,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor: message.role === 'user' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.23)',
+            color: 'text.primary',
+            maxWidth: '100%'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+            {message.role === 'assistant' ? (
+              <Avatar sx={{ 
+                mr: 1, 
+                bgcolor: 'transparent',
+                color: 'text.primary',
+                border: 1,
+                borderColor: 'divider'
+              }}>
+                <SmartToyIcon />
+              </Avatar>
+            ) : (
+              <Avatar sx={{ 
+                mr: 1,
+                bgcolor: 'transparent',
+                color: 'text.primary',
+                border: 1,
+                borderColor: 'divider'
+              }}>
+                <PersonIcon />
+              </Avatar>
+            )}
+            <Typography variant="subtitle2" component="div" sx={{ fontWeight: 'bold' }}>
+              {message.role === 'user' ? userName : (
+                message.modelInfo?.modelName ? 
+                `${message.modelInfo.modelName}` : 
+                modelName || 'AI'
+              )}
+            </Typography>
+          </Box>
+          {renderMessageContent(message)}
+        </Paper>
+      ))}
+    </Box>
+  );
+
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* 侧边栏抽屉 */}
@@ -306,48 +425,37 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                     },
                   }}
                 >
-                  {/* Group models by provider */}
-                  {Object.entries(
-                    models.reduce((acc, model) => {
-                      // Extract provider name from model name format "ModelName (ProviderName)"
-                      const match = model.name.match(/^(.*) \((.*)\)$/);
-                      const providerName = match ? match[2] : '其他';
-                      
-                      if (!acc[providerName]) {
-                        acc[providerName] = [];
-                      }
-                      acc[providerName].push({
-                        id: model.id,
-                        name: match ? match[1] : model.name
-                      });
-                      return acc;
-                    }, {} as Record<string, Array<{id: string, name: string}>>)
-                  ).map(([provider, providerModels]) => (
-                    <React.Fragment key={provider}>
-                      <ListItem sx={{ py: 0, px: 2 }}>
-                        <ListItemText 
-                          primary={provider} 
-                          primaryTypographyProps={{ 
-                            variant: 'caption',
-                            color: 'text.secondary',
-                            fontWeight: 'bold'
-                          }} 
-                        />
-                      </ListItem>
-                      <Divider />
-                      {providerModels.map(model => (
-                        <MenuItem 
-                          key={model.id} 
-                          onClick={() => handleModelSelect(model.id)}
-                          selected={currentModelId === model.id}
-                        >
-                          <ListItemText primary={model.name} />
-                        </MenuItem>
-                      ))}
-                      {/* Add divider between provider groups */}
-                      <Divider />
-                    </React.Fragment>
-                  ))}
+                  {groupedModels.map(({groupName, models: groupModels}) => {
+                    return (
+                      <div key={groupName}>
+                        <ListItem sx={{ py: 0, px: 2 }}>
+                          <ListItemText 
+                            primary={groupName} 
+                            primaryTypographyProps={{ 
+                              variant: 'caption',
+                              color: 'text.secondary',
+                              fontWeight: 'bold'
+                            }} 
+                          />
+                        </ListItem>
+                        <Divider />
+                        {groupModels.map(model => (
+                          <MenuItem 
+                            key={model.id} 
+                            onClick={() => handleModelSelect(model.id)}
+                            selected={currentModelId === model.id}
+                          >
+                            <ListItemText 
+                              primary={model.name} 
+                              secondary={model.provider ? `(${model.provider})` : undefined}
+                            />
+                          </MenuItem>
+                        ))}
+                        {/* Add divider between groups */}
+                        <Divider />
+                      </div>
+                    );
+                  })}
                 </Menu>
               </>
             )}
@@ -432,104 +540,51 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
             display: 'flex',
             flexDirection: 'column'
           }}>
-            {messages.length === 0 ? (
-              <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                height: '100%',
-                opacity: 0.7
-              }}>
-                <Typography variant="h4" gutterBottom>
-                  👋 欢迎使用 FimAI Chat
-                </Typography>
-                <Typography variant="body1" textAlign="center">
-                  开始一个新的对话，输入您的问题或指令。
-                </Typography>
-              </Box>
-            ) : (
-              messages.map((message) => (
-                <Box 
-                  key={message.id} 
-                  sx={{ 
-                    display: 'flex', 
-                    flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
-                    mb: 2,
-                    gap: 1
-                  }}
-                >
-                  {/* 头像区域 */}
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: message.role === 'user' 
-                        ? (mode === 'light' ? '#212121' : '#e0e0e0') 
-                        : (mode === 'light' ? '#9e9e9e' : '#424242'),
-                      color: message.role === 'user'
-                        ? (mode === 'light' ? '#fff' : '#000')
-                        : (mode === 'light' ? '#fff' : '#000'),
-                      width: 36,
-                      height: 36
-                    }}
-                  >
-                    {message.role === 'user' ? <PersonIcon /> : <SmartToyIcon />}
-                  </Avatar>
-                  
-                  <Box sx={{ maxWidth: '85%' }}>
-                    {/* 发送者名称 */}
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      sx={{ 
-                        mb: 0.5, 
-                        textAlign: message.role === 'user' ? 'right' : 'left' 
-                      }}
-                    >
-                      {message.role === 'user' ? userName : (message.modelInfo?.modelName || modelName || 'AI助手')}
-                    </Typography>
-                    
-                    {/* 消息气泡 */}
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        p: 2, 
-                        bgcolor: message.role === 'user' 
-                          ? (mode === 'light' ? '#e0e0e0' : '#333333') 
-                          : (mode === 'light' ? '#ffffff' : '#1e1e1e'),
-                        borderRadius: 2
-                      }}
-                    >
-                      {renderMessageContent(message)}
-                    </Paper>
-                  </Box>
-                </Box>
-              ))
-            )}
+            {messagesList}
           </Box>
-        </Box>
 
-        {/* 输入区域 */}
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 2,
-            borderTop: '1px solid',
-            borderColor: 'divider'
-          }}
-        >
+          {/* 输入框区域 */}
           <Box sx={{ 
-            maxWidth: { xs: '100%', sm: '80%', md: '800px' }, 
-            width: '100%', 
-            mx: 'auto' 
+            p: 2,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: 'background.paper'
           }}>
+            {/* 模型选择区 */}
+            <Box sx={{ 
+              mb: 1, 
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <Button 
+                onClick={handleModelMenuOpen}
+                variant="outlined"
+                size="small"
+                sx={{
+                  color: 'text.primary',
+                  borderColor: 'divider',
+                  textTransform: 'none',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                    borderColor: 'rgba(0, 0, 0, 0.5)'
+                  }
+                }}
+              >
+                {modelName || '选择模型'} {providerName && `(${providerName})`}
+              </Button>
+            </Box>
+
             <TextField
               fullWidth
               placeholder="输入消息..."
+              variant="outlined"
               value={input}
               onChange={onInputChange}
               onKeyPress={onKeyPress}
               disabled={isLoading}
               multiline
+              minRows={1}
               maxRows={4}
               InputProps={{
                 endAdornment: (
@@ -537,21 +592,104 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                     <IconButton 
                       onClick={onSend} 
                       disabled={isLoading || !input.trim()}
-                      color="primary"
+                      sx={{
+                        color: 'text.secondary',
+                        '&.Mui-disabled': {
+                          color: 'rgba(0, 0, 0, 0.26)'
+                        }
+                      }}
                     >
-                      <SendIcon />
+                      {isLoading ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                            ...
+                          </Typography>
+                        </Box>
+                      ) : <SendIcon />}
                     </IconButton>
                   </InputAdornment>
-                )
+                ),
+                sx: {
+                  backgroundColor: 'background.default',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    borderColor: 'text.primary'
+                  },
+                  '&.Mui-focused': {
+                    borderColor: 'text.primary',
+                    boxShadow: 'none'
+                  }
+                }
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
+                  borderColor: 'divider',
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'text.primary'
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'text.primary',
+                    borderWidth: 1
+                  }
                 }
               }}
             />
           </Box>
-        </Paper>
+
+          {/* 模型选择菜单 */}
+          <Menu
+            anchorEl={modelMenuAnchorEl}
+            open={Boolean(modelMenuAnchorEl)}
+            onClose={handleModelMenuClose}
+            sx={{
+              '& .MuiPaper-root': {
+                backgroundColor: 'background.paper',
+                borderRadius: 1,
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+                maxHeight: '70vh',
+                maxWidth: 320
+              }
+            }}
+          >
+            {groupedModels.map((group) => (
+              <React.Fragment key={group.groupName}>
+                <MenuItem 
+                  disabled
+                  sx={{ 
+                    opacity: 1,
+                    fontWeight: 'bold',
+                    color: 'text.primary',
+                    backgroundColor: 'background.default',
+                    borderBottom: 1,
+                    borderColor: 'divider'
+                  }}
+                >
+                  {group.groupName}
+                </MenuItem>
+                
+                {group.models.map((model) => (
+                  <MenuItem 
+                    key={model.id}
+                    onClick={() => handleModelSelect(model.id)}
+                    selected={currentModelId === model.id}
+                    sx={{
+                      pl: 3,
+                      minHeight: '40px',
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.08)'
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                      }
+                    }}
+                  >
+                    {model.name}
+                  </MenuItem>
+                ))}
+              </React.Fragment>
+            ))}
+          </Menu>
+        </Box>
       </Box>
     </Box>
   );
