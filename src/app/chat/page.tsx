@@ -9,7 +9,7 @@ import { useToast, ToastContainer } from '@/components/Toast';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { MessageActions } from '@/components/MessageActions';
 import { AIIcon } from '@/components/AIIcon';
-import { getModelGroups, getCategorySortOrder, getGroupIcon, getModelGroupsWithUserOrder } from '@/utils/aiModelUtils';
+import { getModelGroups, getCategorySortOrder, getGroupIcon, getModelGroupsWithUserOrder, getAIModelCategoryName } from '@/utils/aiModelUtils';
 import type { Message, AIProvider, AIModel, ChatHistory, TokenUsage } from '@/types';
 import React from 'react'; // Added for useRef
 import { MaterialChatLayout } from '@/components/MaterialChatLayout';
@@ -159,11 +159,15 @@ function ChatPageContent() {
 
     const loadGroupOrders = async () => {
       try {
+        // 确保用户已登录
+        if (!user || !user.id) return;
+        
         const response = await fetch(`/api/admin/model-groups?userId=${user.id}`);
         if (response.ok) {
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
             setUserGroupOrders(result.data);
+            console.log('Loaded user group orders:', result.data);
           }
         }
       } catch (error) {
@@ -233,12 +237,15 @@ function ChatPageContent() {
       loadProviders();
       loadGroupOrders(); // 同时加载分组排序
       loadUserSettings(); // 同时加载用户设置
+    } else if (user && userGroupOrders.length === 0) {
+      // 如果提供商已加载但分组排序还没加载，单独加载分组排序
+      loadGroupOrders();
     }
 
     return () => {
       isMounted = false;
     };
-  }, [user]); // 只依赖user，避免无限循环
+  }, [user, providers.length]); // 添加 providers.length 作为依赖项
 
   // 设置默认模型（单独的effect避免循环依赖）
   useEffect(() => {
@@ -258,8 +265,44 @@ function ChatPageContent() {
         }
       }
 
-      // 2. 如果用户没有设置默认模型或默认模型不可用，使用第一个可用模型
-      if (!defaultModelId && allModels.length > 0) {
+      // 2. 如果用户没有设置默认模型，尝试使用系统设置的默认模型
+      if (!defaultModelId && !localStorage.getItem('fimai-last-used-model')) {
+        // 尝试获取系统默认模型设置
+        fetch('/api/admin/system-settings?key=system_default_model_id')
+          .then(response => response.json())
+          .then(data => {
+            if (data.value) {
+              const systemDefaultModel = allModels.find(model => model.id === data.value);
+              if (systemDefaultModel) {
+                setSelectedModelId(data.value);
+                return;
+              }
+            }
+            
+            // 3. 如果系统也没有设置默认模型，使用第一个可用模型
+            if (allModels.length > 0) {
+              setSelectedModelId(allModels[0].id);
+            }
+          })
+          .catch(() => {
+            // 如果获取系统设置失败，回退到使用第一个可用模型
+            if (allModels.length > 0) {
+              setSelectedModelId(allModels[0].id);
+            }
+          });
+      } 
+      // 3. 尝试使用上次使用的模型（如果启用了此功能）
+      else if (!defaultModelId && localStorage.getItem('fimai-last-used-model')) {
+        const lastUsedModelId = localStorage.getItem('fimai-last-used-model');
+        const lastUsedModel = allModels.find(model => model.id === lastUsedModelId);
+        if (lastUsedModel) {
+          defaultModelId = lastUsedModelId;
+        } else if (allModels.length > 0) {
+          defaultModelId = allModels[0].id;
+        }
+      }
+      // 4. 如果以上都没有，使用第一个可用模型
+      else if (!defaultModelId && allModels.length > 0) {
         defaultModelId = allModels[0].id;
       }
 
@@ -950,6 +993,50 @@ function ChatPageContent() {
     toast.success('消息已复制到剪贴板');
   };
 
+  // 处理模型选择
+  const handleModelSelect = (modelId: string) => {
+    if (isLoading) return;
+
+    setSelectedModelId(modelId);
+    
+    // 保存用户默认模型设置
+    if (user && user.id) {
+      fetch(`/api/user/settings?userId=${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultModelId: modelId
+        }),
+      }).then(async (response) => {
+        if (response.ok) {
+          toast.success('已设置为默认模型');
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('设置默认模型失败:', errorData);
+          toast.error('设置默认模型失败');
+        }
+      }).catch(error => {
+        console.error('保存默认模型设置失败:', error);
+        toast.error('设置默认模型失败');
+      });
+    }
+    
+    // 检查是否启用记录最后使用模型功能
+    fetch('/api/admin/system-settings?key=enable_last_used_model')
+      .then(response => response.json())
+      .then(data => {
+        // 如果系统设置启用了记录最后使用模型，或者没有明确禁用（默认启用）
+        if (data.value === true || data.value === undefined || data.value === null) {
+          // 保存最后使用的模型ID到localStorage
+          localStorage.setItem('fimai-last-used-model', modelId);
+        }
+      })
+      .catch(() => {
+        // 如果获取设置失败，默认保存（保证基本功能可用）
+        localStorage.setItem('fimai-last-used-model', modelId);
+      });
+  };
+
   // 只替换return部分
   return (
     <MaterialChatLayout
@@ -997,35 +1084,17 @@ function ChatPageContent() {
             Array.isArray(p.models) ? p.models
               .filter(m => m.isEnabled || m.enabled)
               .map(m => ({ 
-                id: m.id, 
-                name: `${m.name} (${p.displayName || p.name})` 
+                id: m.id,
+                name: m.name,
+                group: m.group || getAIModelCategoryName(m.modelId),
+                provider: p.displayName || p.name
               }))
             : []
           )
-          .sort((a, b) => a.name.localeCompare(b.name))
         : []
       }
-      onModelSelect={(modelId) => {
-        setSelectedModelId(modelId);
-        
-        // 保存用户默认模型设置
-        if (user && user.id) {
-          fetch('/api/user/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: user.id,
-              defaultModelId: modelId
-            }),
-          }).then(async (response) => {
-            if (response.ok) {
-              toast.success('已设置为默认模型');
-            }
-          }).catch(error => {
-            console.error('保存默认模型设置失败:', error);
-          });
-        }
-      }}
+      modelGroups={userGroupOrders}
+      onModelSelect={handleModelSelect}
       currentModelId={selectedModelId}
     />
   );

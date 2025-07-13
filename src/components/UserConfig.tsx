@@ -30,7 +30,13 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
-  Stack
+  Stack,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControl,
+  FormHelperText,
+  AlertTitle
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -119,6 +125,9 @@ export default function UserConfig() {
   const [isLoading, setIsLoading] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [activeModels, setActiveModels] = useState<any[]>([]);
+  const [recentModels, setRecentModels] = useState<string[]>([]);
+  const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>('');
   const { mode } = useTheme();
 
   // 加载用户仪表板
@@ -134,6 +143,20 @@ export default function UserConfig() {
         setAccessCodes(data.accessCodes);
         setInviteCodes(data.inviteCodes);
         setAvailableModels(data.allowedModels);
+        
+        // 设置当前默认模型
+        if (data.userSettings?.defaultModelId) {
+          setSelectedDefaultModel(data.userSettings.defaultModelId);
+        }
+        
+        // 加载历史使用的模型列表
+        const lastUsedModelId = localStorage.getItem('fimai-last-used-model');
+        if (lastUsedModelId) {
+          setRecentModels(prev => {
+            const newModels = [lastUsedModelId];
+            return [...new Set([...newModels, ...prev])].slice(0, 5);
+          });
+        }
       } else {
         toast.error('加载用户数据失败');
       }
@@ -232,6 +255,37 @@ export default function UserConfig() {
     toast.success('已复制到剪贴板');
   };
 
+  // 设置默认模型
+  const setDefaultModel = async (modelId: string) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          defaultModelId: modelId
+        }),
+      });
+
+      if (response.ok) {
+        setSelectedDefaultModel(modelId);
+        toast.success('默认模型已设置');
+      } else {
+        toast.error('设置默认模型失败');
+      }
+    } catch (error) {
+      toast.error('设置默认模型失败');
+    }
+  };
+
+  const clearLastUsedModel = () => {
+    localStorage.removeItem('fimai-last-used-model');
+    setRecentModels([]);
+    toast.success('已清除最近使用的模型记录');
+  };
+
   useEffect(() => {
     loadDashboard();
   }, [user]);
@@ -261,6 +315,7 @@ export default function UserConfig() {
           <Tab icon={<DashboardIcon />} label="仪表板" />
           <Tab icon={<KeyIcon />} label="访问码管理" />
           <Tab icon={<SmartToyIcon />} label="模型权限" />
+          <Tab icon={<SmartToyIcon />} label="默认模型" />
         </Tabs>
       </Box>
 
@@ -588,6 +643,96 @@ export default function UserConfig() {
               您没有可用的模型权限，请联系管理员。
             </Alert>
           )}
+        </Box>
+      </TabPanel>
+
+      {/* 默认模型标签页 */}
+      <TabPanel value={tabValue} index={3}>
+        <Box sx={{ px: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            默认模型设置
+          </Typography>
+
+          <Paper elevation={1} sx={{ p: 4, mb: 4, borderRadius: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
+              选择默认模型
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              选择您想要在每次开始聊天时默认使用的模型
+            </Typography>
+
+            <FormControl fullWidth sx={{ mb: 4 }}>
+              <InputLabel>默认模型</InputLabel>
+              <Select
+                value={selectedDefaultModel}
+                onChange={(e) => setDefaultModel(e.target.value)}
+                label="默认模型"
+              >
+                <MenuItem value="">
+                  <em>无默认模型</em>
+                </MenuItem>
+                {availableModels.map((model) => (
+                  <MenuItem key={model.id} value={model.id}>
+                    {model.provider.name} - {model.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                {selectedDefaultModel ? '当前默认模型已设置' : '未设置默认模型，将使用系统默认模型'}
+              </FormHelperText>
+            </FormControl>
+
+            <Divider sx={{ my: 4 }} />
+
+            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
+              最近使用的模型
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              您最近使用过的模型将显示在这里，点击可设为默认模型
+            </Typography>
+
+            {recentModels.length > 0 ? (
+              <Box sx={{ mb: 2 }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {recentModels.map((modelId) => {
+                    const model = availableModels.find(m => m.id === modelId);
+                    return (
+                      <Chip
+                        key={modelId}
+                        label={model ? `${model.provider.name} - ${model.name}` : modelId}
+                        onClick={() => setDefaultModel(modelId)}
+                        color={selectedDefaultModel === modelId ? "primary" : "default"}
+                        sx={{ mb: 1, mr: 1 }}
+                      />
+                    );
+                  })}
+                </Stack>
+                <Button 
+                  size="small"
+                  onClick={clearLastUsedModel} 
+                  sx={{ mt: 2 }}
+                  startIcon={<DeleteIcon />}
+                >
+                  清除记录
+                </Button>
+              </Box>
+            ) : (
+              <Alert severity="info">
+                尚无记录。使用模型后会自动记录在这里。
+              </Alert>
+            )}
+          </Paper>
+
+          <Box sx={{ mt: 4 }}>
+            <Alert severity="info">
+              <AlertTitle>关于默认模型</AlertTitle>
+              <Typography variant="body2">
+                • 默认模型将在每次新聊天时自动选择<br />
+                • 您可以随时在聊天界面更改使用的模型<br />
+                • 系统可能会记住您最近使用的模型作为下次的默认选择
+              </Typography>
+            </Alert>
+          </Box>
         </Box>
       </TabPanel>
 

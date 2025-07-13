@@ -51,6 +51,18 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingValue[] = [
     value: null,
     type: 'string',
     description: '用于生成对话标题的模型ID'
+  },
+  {
+    key: 'system_default_model_id',
+    value: null,
+    type: 'string',
+    description: '系统默认模型ID（新用户首次访问使用）'
+  },
+  {
+    key: 'enable_last_used_model',
+    value: true,
+    type: 'boolean',
+    description: '是否自动将上次使用的模型设为默认模型'
   }
 ]
 

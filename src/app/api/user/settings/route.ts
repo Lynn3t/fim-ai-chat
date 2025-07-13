@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/api-utils'
 import { getUserSettings, upsertUserSettings, updateUserDefaultModel } from '@/lib/db/users'
+import { prisma } from '@/lib/prisma'
 
 // 获取用户设置
 export async function GET(request: NextRequest) {
@@ -101,6 +102,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 检查模型是否存在且用户有权限使用
+    const model = await prisma.model.findUnique({
+      where: { id: defaultModelId },
+    });
+
+    if (!model) {
+      return NextResponse.json(
+        { error: 'Model not found' },
+        { status: 404 }
+      )
+    }
+
+    // 更新用户默认模型设置
     const settings = await updateUserDefaultModel(userId, defaultModelId)
 
     return NextResponse.json({
