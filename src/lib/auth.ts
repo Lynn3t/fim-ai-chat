@@ -33,11 +33,16 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
   try {
     const { email, username, password, inviteCode, accessCode } = data
 
-    // 检查用户名是否已存在
+    // 检查用户名是否已存在（不区分大小写）
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { username },
+          { 
+            username: {
+              equals: username,
+              mode: 'insensitive' // 不区分大小写
+            }
+          },
           ...(email ? [{ email }] : []),
         ],
       },
@@ -178,8 +183,14 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
  */
 export async function loginUser(username: string, password: string): Promise<AuthResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { username },
+    // 使用 findFirst 替代 findUnique 并使用不区分大小写的查询
+    const user = await prisma.user.findFirst({
+      where: {
+        username: {
+          equals: username,
+          mode: 'insensitive' // 不区分大小写
+        }
+      },
       include: {
         settings: true,
         permissions: true,

@@ -19,9 +19,11 @@ import {
   Tab, 
   Paper,
   InputAdornment,
-  IconButton 
+  IconButton,
+  Fade,
+  Divider
 } from '@mui/material'
-import { Visibility, VisibilityOff } from '@mui/icons-material'
+import { Visibility, VisibilityOff, Login, Person, Key, VpnKey } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
 
 export default function LoginPage() {
@@ -88,38 +90,63 @@ export default function LoginPage() {
       
       <Container maxWidth="sm">
         {/* Logo */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-            🤖
-          </Typography>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 1 }}>
-            FimAI Chat
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            登录您的账户
-          </Typography>
-        </Box>
+        <Fade in={true} timeout={800}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
+              🤖
+            </Typography>
+            <Typography variant="h4" component="h1" sx={{ 
+              fontWeight: 'bold', 
+              color: 'primary.main', 
+              mb: 1,
+              letterSpacing: '0.5px' 
+            }}>
+              FimAI Chat
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              登录您的账户
+            </Typography>
+          </Box>
+        </Fade>
 
         <Card sx={{ 
-          boxShadow: 3,
-          bgcolor: 'background.paper'
+          boxShadow: mode === 'light' ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.4)',
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          overflow: 'hidden'
         }}>
-          <Paper sx={{ borderRadius: '8px 8px 0 0' }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              borderRadius: '8px 8px 0 0',
+              borderBottom: 1,
+              borderColor: 'divider' 
+            }}
+          >
             <Tabs
               value={loginType}
               onChange={handleLoginTypeChange}
               variant="fullWidth"
               textColor="primary"
               indicatorColor="primary"
-              sx={{ mb: 3 }}
             >
-              <Tab value="user" label="用户登录" />
-              <Tab value="guest" label="访问码登录" />
+              <Tab 
+                value="user" 
+                label="用户登录" 
+                icon={<Person />} 
+                iconPosition="start"
+              />
+              <Tab 
+                value="guest" 
+                label="访问码登录" 
+                icon={<VpnKey />} 
+                iconPosition="start" 
+              />
             </Tabs>
           </Paper>
           
-          <Box component="form" onSubmit={handleSubmit} sx={{ px: 3, pb: 3 }}>
-            {/* 用户名（根据登录类型显示不同的帮助文字） */}
+          <Box component="form" onSubmit={handleSubmit} sx={{ px: 3, py: 4 }}>
+            {/* 用户名 */}
             <Box sx={{ mb: 3 }}>
               <TextField
                 label="用户名"
@@ -130,6 +157,13 @@ export default function LoginPage() {
                 required={loginType === 'user'}
                 helperText={loginType === 'guest' ? "可选，留空将自动生成" : ""}
                 fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Box>
 
@@ -146,6 +180,11 @@ export default function LoginPage() {
                   required
                   fullWidth
                   InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Key color="action" />
+                      </InputAdornment>
+                    ),
                     endAdornment: (
                       <InputAdornment position="end">
                         <IconButton
@@ -173,16 +212,23 @@ export default function LoginPage() {
                   placeholder="请输入访问码 (fimai_xxxxxxxxxxxxxxxx)"
                   required
                   fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <VpnKey color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Box>
             )}
 
             {/* 错误信息 */}
-            {error && (
+            <Fade in={!!error}>
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="error">{error}</AlertMessage>
               </Box>
-            )}
+            </Fade>
 
             {/* 登录按钮 */}
             <Button
@@ -190,37 +236,86 @@ export default function LoginPage() {
               disabled={isLoading}
               fullWidth
               size="large"
-              sx={{ mb: 2 }}
+              variant="contained"
+              sx={{ 
+                mb: 2, 
+                py: 1.5,
+                borderRadius: 8,
+                textTransform: 'none',
+                fontSize: '1rem'
+              }}
+              startIcon={<Login />}
             >
               {isLoading ? '登录中...' : '登录'}
             </Button>
+
+            {loginType === 'user' && (
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="body2">
+                  <Link 
+                    href="/forgot-password" 
+                    style={{ 
+                      color: 'primary', 
+                      textDecoration: 'none',
+                      fontWeight: 500
+                    }}
+                  >
+                    忘记密码？
+                  </Link>
+                </Typography>
+              </Box>
+            )}
           </Box>
         </Card>
 
         {/* 其他操作 */}
         <Box sx={{ textAlign: 'center', mt: 3 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
             还没有账户？{' '}
-            <Link href="/register" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
+            <Link 
+              href="/register" 
+              style={{ 
+                color: 'primary',
+                fontWeight: 500,
+                textDecoration: 'none' 
+              }}
+            >
               立即注册
             </Link>
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            <Link href="/" style={{ color: mode === 'light' ? '#212121' : '#fff', fontWeight: 500 }}>
+            <Link 
+              href="/" 
+              style={{ 
+                color: 'primary',
+                textDecoration: 'none'
+              }}
+            >
               返回首页
             </Link>
           </Typography>
         </Box>
 
         {/* 说明 */}
-        <Paper sx={{ mt: 4, p: 2, bgcolor: 'background.paper', boxShadow: 1, borderRadius: 2 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+        <Paper 
+          elevation={1}
+          sx={{ 
+            mt: 4, 
+            p: 2, 
+            bgcolor: mode === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.05)', 
+            borderRadius: 2,
+            border: 1,
+            borderColor: 'divider'
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
             登录说明
           </Typography>
-          <Typography variant="body2" component="ul" sx={{ pl: 2 }}>
-            <li>• 用户登录：使用已注册的用户名登录</li>
-            <li>• 访问码登录：使用他人分享的访问码临时登录</li>
-            <li>• 访客用户的聊天记录仅保存在本地</li>
+          <Divider sx={{ mb: 2 }} />
+          <Typography variant="body2" component="ul" sx={{ pl: 2, m: 0 }}>
+            <li>用户登录：使用已注册的用户名登录 (不区分大小写)</li>
+            <li>访问码登录：使用他人分享的访问码临时登录</li>
+            <li>访客用户的聊天记录仅保存在本地</li>
           </Typography>
         </Paper>
       </Container>
