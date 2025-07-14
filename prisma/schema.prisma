@@ -150,6 +150,7 @@ model Model {
   conversations Conversation[]
   messages      Message[]
   tokenUsage    TokenUsage[]
+  pricing       ModelPricing?  // 新增：模型价格设置
 
   @@unique([providerId, modelId])
   @@map("models")
@@ -288,8 +289,19 @@ model UserPermission {
   id              String   @id @default(cuid())
   userId          String   @unique // 用户ID
   allowedModelIds String? // 允许使用的模型ID列表，用逗号分隔
+  
+  // Token使用限制
   tokenLimit      Int?     // token使用限制，null表示无限制
   tokenUsed       Int      @default(0) // 已使用的token数
+  
+  // 新增时间段限制
+  limitType       String?  @default("none")  // 限制类型: "none", "token", "cost"
+  limitPeriod     String?  @default("monthly") // 限制周期: "daily", "monthly", "quarterly", "yearly"
+  costLimit       Float?   // 费用限制 (USD)
+  
+  // 上次重置时间
+  lastResetAt     DateTime @default(now()) // 上次重置限制的时间
+  
   canShareAccess  Boolean  @default(true) // 是否可以分发访问码
   isActive        Boolean  @default(true) // 权限是否激活
 
@@ -317,4 +329,23 @@ model ModelGroupOrder {
   @@index([userId])
   @@index([order])
   @@map("model_group_orders")
+}
+
+// 模型价格配置
+model ModelPricing {
+  id                String  @id @default(cuid())
+  modelId           String  @unique
+  pricingType       String  @default("token")  // 计价类型："token"(按token) 或 "usage"(按次)
+  inputPrice        Float   // 输入价格，USD/1M token
+  cachedInputPrice  Float   // 缓存输入价格，USD/1M token
+  outputPrice       Float   // 输出价格，USD/1M token
+  usagePrice        Float?  // 若按次计价，每次价格 (USD)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // 关联关系
+  model             Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("model_pricing")
 }

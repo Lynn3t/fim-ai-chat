@@ -1,6 +1,7 @@
 /**
  * Token计算和统计工具
  */
+import { prisma } from '@/lib/prisma'
 
 /**
  * 估算文本的token数量
@@ -60,18 +61,62 @@ export function extractTokenUsage(usage: any): {
 }
 
 /**
- * 计算token成本（基于OpenAI定价）
+ * 计算token成本（使用数据库中的模型价格配置）
  * @param modelId 模型ID
  * @param promptTokens 输入token数
  * @param completionTokens 输出token数
  * @returns 成本（美元）
  */
-export function calculateTokenCost(
+export async function calculateTokenCost(
+  modelId: string, 
+  promptTokens: number, 
+  completionTokens: number
+): Promise<number> {
+  try {
+    // 获取模型价格配置
+    const model = await prisma.model.findUnique({
+      where: { id: modelId },
+      include: { pricing: true },
+    })
+
+    if (!model || !model.pricing) {
+      // 如果没有配置价格，使用默认价格
+      return calculateDefaultTokenCost(model?.modelId || modelId, promptTokens, completionTokens)
+    }
+
+    const { pricing } = model
+    
+    // 根据计价类型计算成本
+    if (pricing.pricingType === 'usage' && pricing.usagePrice) {
+      // 按次计费，每次API调用收取固定费用
+      return pricing.usagePrice
+    } else {
+      // 按token计费
+      // 输入token计算（默认常规输入）
+      const inputCost = promptTokens * (pricing.inputPrice / 1000000)
+      
+      // 输出token计算
+      const outputCost = completionTokens * (pricing.outputPrice / 1000000)
+      
+      return inputCost + outputCost
+    }
+  } catch (error) {
+    console.error('Error calculating token cost:', error)
+    // 出错时回退到默认计算方式
+    return calculateDefaultTokenCost(modelId, promptTokens, completionTokens)
+  }
+}
+
+/**
+ * 使用默认价格计算token成本
+ * 这是一个备用方法，当数据库中没有价格配置时使用
+ */
+function calculateDefaultTokenCost(
   modelId: string, 
   promptTokens: number, 
   completionTokens: number
 ): number {
-  // 简化的定价表（实际项目中应该从配置文件或数据库读取）
+  // 简化的默认定价表
   const pricing: Record<string, { input: number; output: number }> = {
     'gpt-4o-mini': { input: 0.00015 / 1000, output: 0.0006 / 1000 },
     'gpt-4o': { input: 0.005 / 1000, output: 0.015 / 1000 },

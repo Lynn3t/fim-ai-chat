@@ -48,7 +48,7 @@ export async function recordTokenUsage(data: CreateTokenUsageData): Promise<Toke
   }
 
   // 计算成本
-  const cost = calculateTokenCost(
+  const cost = await calculateTokenCost(
     data.modelId,
     promptTokens || 0,
     completionTokens || 0
@@ -70,6 +70,9 @@ export async function recordTokenUsage(data: CreateTokenUsageData): Promise<Toke
       cost,
     },
   })
+
+  // 更新用户权限表中的token使用量
+  await updateUserTokenUsage(data.userId, totalTokens || 0, cost || 0)
 
   // 如果是访客，需要将token使用量计入宿主用户
   const user = await prisma.user.findUnique({
@@ -95,9 +98,148 @@ export async function recordTokenUsage(data: CreateTokenUsageData): Promise<Toke
         cost,
       },
     })
+
+    // 更新宿主用户的token使用量
+    await updateUserTokenUsage(user.hostUserId, totalTokens || 0, cost || 0)
   }
 
   return tokenUsage
+}
+
+/**
+ * 更新用户token使用量并检查限制
+ * @param userId 用户ID
+ * @param tokenCount 使用的token数量
+ * @param cost 使用的成本
+ * @returns 是否达到限制
+ */
+export async function updateUserTokenUsage(
+  userId: string,
+  tokenCount: number,
+  cost: number
+): Promise<{ reachedLimit: boolean; limitType?: string; limitMessage?: string }> {
+  // 获取用户权限配置
+  const userPermission = await prisma.userPermission.findUnique({
+    where: { userId }
+  })
+
+  if (!userPermission) {
+    return { reachedLimit: false }
+  }
+
+  // 更新token使用量
+  await prisma.userPermission.update({
+    where: { userId },
+    data: { tokenUsed: { increment: tokenCount } }
+  })
+
+  // 检查是否需要重置限制
+  if (userPermission.limitType !== 'none' && userPermission.limitPeriod) {
+    const shouldReset = await checkAndResetLimits(userId)
+    if (shouldReset) {
+      // 如果已重置，重新获取权限信息
+      const updatedPermission = await prisma.userPermission.findUnique({
+        where: { userId }
+      })
+      if (updatedPermission) {
+        userPermission.tokenUsed = updatedPermission.tokenUsed
+        userPermission.lastResetAt = updatedPermission.lastResetAt
+      }
+    }
+  }
+
+  // 检查是否达到限制
+  if (userPermission.limitType === 'token' && userPermission.tokenLimit) {
+    if (userPermission.tokenUsed >= userPermission.tokenLimit) {
+      return { 
+        reachedLimit: true,
+        limitType: 'token',
+        limitMessage: `已达到Token使用限制 (${userPermission.tokenUsed}/${userPermission.tokenLimit})`
+      }
+    }
+  } else if (userPermission.limitType === 'cost' && userPermission.costLimit) {
+    // 获取当前周期内的总成本
+    const periodStart = userPermission.lastResetAt
+    
+    const costStats = await prisma.tokenUsage.aggregate({
+      where: {
+        userId,
+        createdAt: { gte: periodStart }
+      },
+      _sum: { cost: true }
+    })
+    
+    const totalCost = costStats._sum.cost || 0
+    
+    if (totalCost >= userPermission.costLimit) {
+      return {
+        reachedLimit: true,
+        limitType: 'cost',
+        limitMessage: `已达到成本限制 ($${totalCost.toFixed(2)}/$${userPermission.costLimit.toFixed(2)})`
+      }
+    }
+  }
+
+  return { reachedLimit: false }
+}
+
+/**
+ * 检查并根据配置的时间周期重置用户的使用限制
+ * @param userId 用户ID
+ * @returns 是否已重置
+ */
+export async function checkAndResetLimits(userId: string): Promise<boolean> {
+  const userPermission = await prisma.userPermission.findUnique({
+    where: { userId }
+  })
+
+  if (!userPermission || !userPermission.limitPeriod || userPermission.limitType === 'none') {
+    return false
+  }
+
+  const lastResetAt = userPermission.lastResetAt
+  const now = new Date()
+  let shouldReset = false
+
+  // 根据不同的周期判断是否需要重置
+  switch (userPermission.limitPeriod) {
+    case 'daily':
+      // 如果最后重置时间不是今天，则重置
+      shouldReset = lastResetAt.getDate() !== now.getDate() ||
+                    lastResetAt.getMonth() !== now.getMonth() ||
+                    lastResetAt.getFullYear() !== now.getFullYear()
+      break
+    case 'monthly':
+      // 如果最后重置时间不是本月，则重置
+      shouldReset = lastResetAt.getMonth() !== now.getMonth() ||
+                    lastResetAt.getFullYear() !== now.getFullYear()
+      break
+    case 'quarterly':
+      // 如果最后重置时间不是本季度，则重置
+      const lastQuarter = Math.floor(lastResetAt.getMonth() / 3)
+      const currentQuarter = Math.floor(now.getMonth() / 3)
+      shouldReset = lastQuarter !== currentQuarter ||
+                    lastResetAt.getFullYear() !== now.getFullYear()
+      break
+    case 'yearly':
+      // 如果最后重置时间不是本年，则重置
+      shouldReset = lastResetAt.getFullYear() !== now.getFullYear()
+      break
+  }
+
+  if (shouldReset) {
+    // 重置用户的使用量并更新最后重置时间
+    await prisma.userPermission.update({
+      where: { userId },
+      data: {
+        tokenUsed: 0,
+        lastResetAt: now
+      }
+    })
+    return true
+  }
+
+  return false
 }
 
 /**

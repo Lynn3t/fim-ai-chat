@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getUserAllowedModels } from '@/lib/auth'
+import type { UserRole } from '@prisma/client'
+import { updateUserTokenUsage, checkAndResetLimits } from '@/lib/db/token-usage'
 
 export interface ChatPermissionCheck {
   canChat: boolean
@@ -52,20 +54,44 @@ export async function checkChatPermissions(
       }
     }
 
-    // 检查token限制（仅对普通用户）
-    if (user.role === 'USER' && user.permissions?.tokenLimit) {
-      const tokenUsage = await prisma.tokenUsage.aggregate({
-        where: { userId },
-        _sum: { totalTokens: true },
-      })
+    // 检查用户权限配置
+    if (user.permissions) {
+      // 先检查是否需要重置限制
+      await checkAndResetLimits(userId)
 
-      const usedTokens = tokenUsage._sum.totalTokens || 0
-      if (usedTokens >= user.permissions.tokenLimit) {
-        return {
-          canChat: false,
-          canSaveToDatabase: false,
-          allowedModels,
-          error: 'Token使用量已达上限',
+      // 检查token限制
+      if (user.permissions.limitType === 'token' && user.permissions.tokenLimit) {
+        if (user.permissions.tokenUsed >= user.permissions.tokenLimit) {
+          return {
+            canChat: false,
+            canSaveToDatabase: false,
+            allowedModels,
+            error: `Token使用量已达上限（${user.permissions.tokenUsed}/${user.permissions.tokenLimit}）`,
+          }
+        }
+      }
+      
+      // 检查成本限制
+      if (user.permissions.limitType === 'cost' && user.permissions.costLimit) {
+        // 获取当前周期内的总成本
+        const periodStart = user.permissions.lastResetAt;
+        const costStats = await prisma.tokenUsage.aggregate({
+          where: {
+            userId,
+            createdAt: { gte: periodStart }
+          },
+          _sum: { cost: true }
+        });
+        
+        const totalCost = costStats._sum.cost || 0;
+        
+        if (totalCost >= user.permissions.costLimit) {
+          return {
+            canChat: false,
+            canSaveToDatabase: false,
+            allowedModels,
+            error: `成本使用已达上限（$${totalCost.toFixed(2)}/$${user.permissions.costLimit.toFixed(2)}）`,
+          }
         }
       }
     }

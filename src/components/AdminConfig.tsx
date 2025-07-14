@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Toast';
 import Link from 'next/link';
 import { SortableList } from '@/components/SortableList';
+import TokenStatsAdmin from '@/components/TokenStatsAdmin';
 import {
   Box,
   Typography,
@@ -1832,6 +1833,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     } else if (activeTab === 'models') {
       loadProvidersAndModels();
       loadGroupOrders(); // 加载分组排序配置
+    } else if (activeTab === 'tokens') {
+      // Token统计页面会自己加载数据
     }
   }, [activeTab, currentUser]);
 
@@ -2261,6 +2264,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
               <Tab label="邀请码管理" value="invites" />
               <Tab label="模型管理" value="models" />
               <Tab label="系统设置" value="system" />
+              <Tab label="Token统计" value="tokens" />
             </Tabs>
           </Paper>
         </Box>
@@ -3299,6 +3303,13 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
               </button>
             </div>
           </div>
+        )}
+
+        {/* Token 统计页面 */}
+        {activeTab === 'tokens' && (
+          <Box sx={{ p: 3 }}>
+            <TokenStatsAdmin />
+          </Box>
         )}
 
         {/* 添加提供商模态框 */}
