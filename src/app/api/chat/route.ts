@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkChatPermissions } from '@/lib/chat-permissions';
+import { estimateTokens, extractTokenUsage } from '@/lib/token-counter';
+import { recordTokenUsage } from '@/lib/db/token-usage';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -62,19 +64,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!model) {
-      return NextResponse.json({ error: 'Model not found' }, { status: 404 });
-    }
-
-    if (!model.isEnabled || !model.provider.isEnabled) {
-      return NextResponse.json({ error: 'Model or provider is disabled' }, { status: 400 });
-    }
-
     if (!model.provider.apiKey || !model.provider.baseUrl) {
       return NextResponse.json({
         error: 'Provider configuration incomplete'
       }, { status: 500 });
     }
+
+    // 在发送请求前计算输入的token数量（用于备份和比较）
+    const userMessage = messages[messages.length - 1];
+    const estimatedPromptTokens = estimateTokens(userMessage.content);
 
     // 构建请求URL
     const apiUrl = `${model.provider.baseUrl}/chat/completions`;
@@ -117,6 +115,9 @@ export async function POST(request: NextRequest) {
           return;
         }
 
+        let fullAssistantMessage = ''; // 用于记录完整的助手回复内容
+        let tokenUsage: any = null; // 用于记录token使用情况
+
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -137,6 +138,17 @@ export async function POST(request: NextRequest) {
                 try {
                   // 验证JSON格式并过滤敏感信息
                   const jsonData = JSON.parse(data);
+                  
+                  // 提取token使用信息（如果有）
+                  if (jsonData.usage) {
+                    tokenUsage = jsonData.usage;
+                  }
+                  
+                  // 收集助手回复内容（用于后续token估算）
+                  if (jsonData.choices && jsonData.choices[0].delta && jsonData.choices[0].delta.content) {
+                    fullAssistantMessage += jsonData.choices[0].delta.content;
+                  }
+                  
                   // 移除可能包含的敏感信息
                   delete jsonData.user;
                   delete jsonData.provider;
@@ -152,6 +164,38 @@ export async function POST(request: NextRequest) {
                   // 忽略无效的JSON数据
                 }
               }
+            }
+          }
+
+          // 在流结束后，如果API没有提供token统计，则进行估算
+          if (!tokenUsage && fullAssistantMessage) {
+            const estimatedCompletionTokens = estimateTokens(fullAssistantMessage);
+            tokenUsage = {
+              prompt_tokens: estimatedPromptTokens,
+              completion_tokens: estimatedCompletionTokens,
+              total_tokens: estimatedPromptTokens + estimatedCompletionTokens,
+              is_estimated: true // 标记为估算值
+            };
+            
+            // 发送估算的token信息
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage: tokenUsage })}\n\n`));
+          }
+
+          // 记录token使用情况
+          if (tokenUsage) {
+            try {
+              await recordTokenUsage({
+                userId,
+                providerId: model.provider.id,
+                modelId: model.id,
+                promptTokens: tokenUsage.prompt_tokens,
+                completionTokens: tokenUsage.completion_tokens,
+                totalTokens: tokenUsage.total_tokens,
+                inputText: userMessage.content,
+                outputText: fullAssistantMessage,
+              });
+            } catch (error) {
+              console.error('Error recording token usage:', error);
             }
           }
         } catch (error) {

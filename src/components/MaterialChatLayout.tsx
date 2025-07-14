@@ -55,6 +55,12 @@ interface ChatMessage {
     providerId: string;
     providerName: string;
   };
+  tokenUsage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    is_estimated?: boolean;
+  };
 }
 
 interface ChatHistory {
@@ -593,6 +599,25 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                       }}
                     >
                       {renderMessageContent(message)}
+
+                      {/* Token使用信息显示 */}
+                      {message.tokenUsage && (
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            display: 'block',
+                            color: 'text.secondary',
+                            mt: 1,
+                            textAlign: 'right',
+                            fontSize: '0.7rem'
+                          }}
+                        >
+                          {message.role === 'user' ? 
+                            `上行: ${message.tokenUsage.prompt_tokens || 0} tokens` :
+                            `下行: ${message.tokenUsage.completion_tokens || 0} tokens · 总计: ${message.tokenUsage.total_tokens || 0} tokens${message.tokenUsage.is_estimated ? ' (估算)' : ''}`
+                          }
+                        </Typography>
+                      )}
 
                       {/* 消息操作按钮 */}
                       <Stack 

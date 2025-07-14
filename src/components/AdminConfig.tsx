@@ -242,6 +242,32 @@ export default function AdminConfig() {
   // 系统设置相关状态
   const [systemSettings, setSystemSettings] = useState<any>({});
 
+  // 在组件初始化状态的部分，添加token统计相关状态
+  const [tokenUsageStats, setTokenUsageStats] = useState<{
+    totalTokens: number;
+    userLeaderboard: Array<{
+      userId: string;
+      username: string;
+      role: string;
+      totalTokens: number;
+      totalCost: number;
+      messageCount: number;
+    }>;
+    modelStats: Array<{
+      modelId: string;
+      modelName: string;
+      providerName: string;
+      totalTokens: number;
+      totalCost: number;
+      messageCount: number;
+      userCount: number;
+    }>;
+  }>({
+    totalTokens: 0,
+    userLeaderboard: [],
+    modelStats: []
+  });
+
   // 加载仪表板数据
   const loadDashboard = async () => {
     if (!currentUser) return;
@@ -1739,14 +1765,54 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     }
   };
 
+  // 添加加载token统计数据的函数
+  const loadTokenStats = async () => {
+    if (!currentUser) return;
+    setIsLoading(true);
+
+    try {
+      // 加载用户排行榜
+      const leaderboardResponse = await fetch(`/api/admin/stats?userId=${currentUser.id}&type=users`);
+      
+      // 加载模型统计
+      const modelStatsResponse = await fetch(`/api/admin/stats?userId=${currentUser.id}&type=models`);
+      
+      if (leaderboardResponse.ok && modelStatsResponse.ok) {
+        const userLeaderboard = await leaderboardResponse.json();
+        const modelStats = await modelStatsResponse.json();
+        
+        // 计算总token数量
+        const totalTokens = userLeaderboard.reduce(
+          (sum: number, user: any) => sum + (user.totalTokens || 0), 
+          0
+        );
+        
+        setTokenUsageStats({
+          totalTokens,
+          userLeaderboard,
+          modelStats
+        });
+      } else {
+        toast.error('加载Token统计数据失败');
+      }
+    } catch (error) {
+      console.error('Error loading token stats:', error);
+      toast.error('加载Token统计数据失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser) return;
 
     if (activeTab === 'dashboard') {
       loadDashboard();
       loadProvidersAndModels(); // 为了获取提供商和模型数量
+      loadTokenStats(); // 加载Token使用统计
     } else if (activeTab === 'users') {
       loadUsers();
+      loadTokenStats(); // 加载用户Token统计
     } else if (activeTab === 'invites') {
       loadInviteCodes();
     } else if (activeTab === 'system') {
@@ -2142,165 +2208,98 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
         {/* 仪表板 */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            {/* 统计卡片 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">👥</span>
-                      </div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                          总用户数
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                          {isLoading ? '...' : (stats?.totalUsers || 0)}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <div>
+            {/* 现有仪表板内容... */}
+            
+            {/* Token 使用统计 */}
+            <Paper elevation={1} sx={{ p: 3, mb: 4 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                Token 使用统计
+              </Typography>
 
-              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">✅</span>
-                      </div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                          活跃用户
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                          {isLoading ? '...' : (stats?.activeUsers || 0)}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1">
+                  系统总计: {tokenUsageStats.totalTokens.toLocaleString()} tokens
+                </Typography>
+              </Box>
 
-              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">🤖</span>
-                      </div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                          AI 模型数
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                          {models.length}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                按用户统计 (Top 10)
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>用户</TableCell>
+                      <TableCell>角色</TableCell>
+                      <TableCell align="right">Token 数量</TableCell>
+                      <TableCell align="right">消息数</TableCell>
+                      <TableCell align="right">成本 (USD)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tokenUsageStats.userLeaderboard.slice(0, 10).map((user) => (
+                      <TableRow key={user.userId}>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={user.role} 
+                            size="small"
+                            color={user.role === 'ADMIN' ? 'error' : user.role === 'USER' ? 'primary' : 'default'} 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell align="right">{user.totalTokens.toLocaleString()}</TableCell>
+                        <TableCell align="right">{user.messageCount}</TableCell>
+                        <TableCell align="right">${user.totalCost.toFixed(4)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {tokenUsageStats.userLeaderboard.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">暂无数据</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-              <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">🏢</span>
-                      </div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                          服务提供商
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                          {providers.length}
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 快速操作 */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                快速操作
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => setActiveTab('users')}
-                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">👥</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">管理用户</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">查看和管理系统用户</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('models')}
-                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">🤖</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">模型管理</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">配置 AI 模型和提供商</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('invites')}
-                  className="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">🎫</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">邀请码管理</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">创建和管理邀请码</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* 系统状态 */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                系统状态
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">数据库连接</span>
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    正常
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">API 服务</span>
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    运行中
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">启用的提供商</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {providers.filter(p => p.isEnabled).length} / {providers.length}
-                  </span>
-                </div>
-              </div>
-            </div>
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  按模型统计 (Top 10)
+                </Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>模型</TableCell>
+                        <TableCell>提供商</TableCell>
+                        <TableCell align="right">Token 数量</TableCell>
+                        <TableCell align="right">用户数</TableCell>
+                        <TableCell align="right">成本 (USD)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tokenUsageStats.modelStats.slice(0, 10).map((model) => (
+                        <TableRow key={model.modelId}>
+                          <TableCell>{model.modelName}</TableCell>
+                          <TableCell>{model.providerName}</TableCell>
+                          <TableCell align="right">{model.totalTokens.toLocaleString()}</TableCell>
+                          <TableCell align="right">{model.userCount}</TableCell>
+                          <TableCell align="right">${model.totalCost.toFixed(4)}</TableCell>
+                        </TableRow>
+                      ))}
+                      {tokenUsageStats.modelStats.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center">暂无数据</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </Paper>
+            
+            {/* 其他仪表板组件 */}
           </div>
         )}
 

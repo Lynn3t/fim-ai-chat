@@ -32,6 +32,7 @@ interface Message {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    is_estimated?: boolean;
   };
 }
 
@@ -874,18 +875,31 @@ function ChatPageContent() {
         }
       }
 
-      // 更新token统计
-      if (finalTokenUsage) {
-        setTokenStats(prev => ({
-          input: prev.input + (finalTokenUsage.prompt_tokens || 0),
-          output: prev.output + (finalTokenUsage.completion_tokens || 0),
-          total: prev.total + (finalTokenUsage.total_tokens || 0),
-        }));
+      // 在处理流式响应的部分，更新token数据的处理逻辑
 
+      // 保存token使用信息
+      if (parsed.usage) {
+        finalTokenUsage = parsed.usage;
+        
+        // 更新token统计
+        setTokenStats(prev => ({
+          input: prev.input + (parsed.usage.prompt_tokens || 0),
+          output: prev.output + (parsed.usage.completion_tokens || 0),
+          total: prev.total + (parsed.usage.total_tokens || 0),
+        }));
+        
         // 更新消息的token信息
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, tokenUsage: finalTokenUsage }
+            ? { ...msg, tokenUsage: parsed.usage }
+            : msg
+        ));
+        
+        // 同时更新用户消息的token信息（只更新prompt_tokens）
+        const userMessageId = messages[messages.length - 1].id;
+        setMessages(prev => prev.map(msg =>
+          msg.id === userMessageId
+            ? { ...msg, tokenUsage: { prompt_tokens: parsed.usage.prompt_tokens || 0 } }
             : msg
         ));
       }
