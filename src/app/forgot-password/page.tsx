@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -15,64 +14,95 @@ import {
 import { 
   Box, 
   Typography, 
-  Tabs, 
-  Tab, 
   Paper,
   InputAdornment,
   IconButton,
   Fade,
-  Divider
+  Divider,
+  FormControl,
+  FormControlLabel,
+  RadioGroup,
+  Radio
 } from '@mui/material'
-import { Visibility, VisibilityOff, Login, Person, Key, VpnKey } from '@mui/icons-material'
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Lock, 
+  Person, 
+  Email,
+  Key,
+  LockReset
+} from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
 
-export default function LoginPage() {
-  const [loginType, setLoginType] = useState<'user' | 'guest'>('user')
+export default function ForgotPasswordPage() {
   const [username, setUsername] = useState('')
+  const [verificationMethod, setVerificationMethod] = useState<'password' | 'email'>('email')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [accessCode, setAccessCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  const { login, loginWithAccessCode } = useAuth()
   const router = useRouter()
   const { mode } = useTheme()
+
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    setSuccess('')
+
+    if (!username) {
+      setError('请输入用户名')
+      setIsLoading(false)
+      return
+    }
+
+    if (verificationMethod === 'password' && !password) {
+      setError('请输入原密码')
+      setIsLoading(false)
+      return
+    }
+
+    if (verificationMethod === 'email' && !email) {
+      setError('请输入邮箱地址')
+      setIsLoading(false)
+      return
+    }
 
     try {
-      let result
-      if (loginType === 'user') {
-        result = await login(username, password)
-      } else {
-        // 访问码登录不需要用户名，自动生成
-        const guestUsername = username || `guest_${Date.now()}`
-        result = await loginWithAccessCode(guestUsername, accessCode)
-      }
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          verificationType: verificationMethod,
+          password: verificationMethod === 'password' ? password : undefined,
+          email: verificationMethod === 'email' ? email : undefined
+        }),
+      })
 
-      if (result.success) {
-        router.push('/chat')
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccess('验证成功，请设置新密码')
+        // 保存重置令牌并跳转到重置密码页面
+        localStorage.setItem('fimai_reset_token', data.resetToken)
+        router.push('/reset-password')
       } else {
-        setError(result.error || '登录失败')
+        setError(data.error || '验证失败')
       }
     } catch (error) {
       setError('网络错误，请稍后重试')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleTogglePassword = () => {
-    setShowPassword(!showPassword)
-  }
-
-  const handleLoginTypeChange = (_: React.SyntheticEvent, newValue: 'user' | 'guest') => {
-    setLoginType(newValue)
-    setError('')
   }
 
   return (
@@ -117,29 +147,14 @@ export default function LoginPage() {
             sx={{ 
               borderRadius: '8px 8px 0 0',
               borderBottom: 1,
-              borderColor: 'divider' 
+              borderColor: 'divider',
+              p: 2,
+              textAlign: 'center'
             }}
           >
-            <Tabs
-              value={loginType}
-              onChange={handleLoginTypeChange}
-              variant="fullWidth"
-              textColor="primary"
-              indicatorColor="primary"
-            >
-              <Tab 
-                value="user" 
-                label="用户登录" 
-                icon={<Person />} 
-                iconPosition="start"
-              />
-              <Tab 
-                value="guest" 
-                label="访问码登录" 
-                icon={<VpnKey />} 
-                iconPosition="start" 
-              />
-            </Tabs>
+            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+              重置密码
+            </Typography>
           </Paper>
           
           <Box component="form" onSubmit={handleSubmit} sx={{ px: 3, py: 4 }}>
@@ -150,9 +165,8 @@ export default function LoginPage() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={loginType === 'user' ? "请输入用户名" : "请输入用户名（可选）"}
-                required={loginType === 'user'}
-                helperText={loginType === 'guest' ? "可选，留空将自动生成" : ""}
+                placeholder="请输入用户名"
+                required
                 fullWidth
                 InputProps={{
                   startAdornment: (
@@ -164,16 +178,41 @@ export default function LoginPage() {
               />
             </Box>
 
-            {/* 密码（仅用户登录时显示） */}
-            {loginType === 'user' && (
+            {/* 验证方式选择 */}
+            <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                验证方式
+              </Typography>
+              <RadioGroup
+                row
+                value={verificationMethod}
+                onChange={(e) => setVerificationMethod(e.target.value as 'password' | 'email')}
+              >
+                <FormControlLabel 
+                  value="email" 
+                  control={<Radio />} 
+                  label="使用邮箱验证" 
+                  sx={{ flexGrow: 1 }}
+                />
+                <FormControlLabel 
+                  value="password" 
+                  control={<Radio />} 
+                  label="使用原密码验证" 
+                  sx={{ flexGrow: 1 }}
+                />
+              </RadioGroup>
+            </FormControl>
+
+            {/* 根据验证方式显示不同输入框 */}
+            {verificationMethod === 'password' ? (
               <Box sx={{ mb: 3 }}>
                 <TextField
-                  label="密码"
+                  label="原密码"
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="请输入密码"
+                  placeholder="请输入原密码"
                   required
                   fullWidth
                   InputProps={{
@@ -196,23 +235,21 @@ export default function LoginPage() {
                   }}
                 />
               </Box>
-            )}
-
-            {/* 访问码（仅访客登录时显示） */}
-            {loginType === 'guest' && (
+            ) : (
               <Box sx={{ mb: 3 }}>
                 <TextField
-                  label="访问码"
-                  id="accessCode"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="请输入访问码 (fimai_xxxxxxxxxxxxxxxx)"
+                  label="邮箱地址"
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="请输入注册时的邮箱地址"
                   required
                   fullWidth
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <VpnKey color="action" />
+                        <Email color="action" />
                       </InputAdornment>
                     ),
                   }}
@@ -227,7 +264,14 @@ export default function LoginPage() {
               </Box>
             </Fade>
 
-            {/* 登录按钮 */}
+            {/* 成功信息 */}
+            <Fade in={!!success}>
+              <Box sx={{ mb: 3 }}>
+                <AlertMessage severity="success">{success}</AlertMessage>
+              </Box>
+            </Fade>
+
+            {/* 提交按钮 */}
             <Button
               type="submit"
               disabled={isLoading}
@@ -241,14 +285,14 @@ export default function LoginPage() {
                 textTransform: 'none',
                 fontSize: '1rem'
               }}
-              startIcon={<Login />}
+              startIcon={<LockReset />}
             >
-              {isLoading ? '登录中...' : '登录'}
+              {isLoading ? '验证中...' : '验证身份'}
             </Button>
-            
-            {/* 忘记密码和用户名链接 */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Link href="/forgot-password">
+
+            {/* 返回登录 */}
+            <Box sx={{ textAlign: 'center' }}>
+              <Link href="/login">
                 <Typography 
                   variant="body2" 
                   component="span"
@@ -258,94 +302,29 @@ export default function LoginPage() {
                     '&:hover': { textDecoration: 'underline' }
                   }}
                 >
-                  忘记密码？
-                </Typography>
-              </Link>
-              <Link href="/recover-username">
-                <Typography 
-                  variant="body2" 
-                  component="span"
-                  sx={{ 
-                    color: 'primary.main',
-                    cursor: 'pointer',
-                    '&:hover': { textDecoration: 'underline' }
-                  }}
-                >
-                  忘记用户名？
+                  返回登录
                 </Typography>
               </Link>
             </Box>
-
-            {loginType === 'user' && (
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2">
-                  <Link 
-                    href="/forgot-password" 
-                    style={{ 
-                      color: 'primary', 
-                      textDecoration: 'none',
-                      fontWeight: 500
-                    }}
-                  >
-                    忘记密码？
-                  </Link>
-                </Typography>
-              </Box>
-            )}
           </Box>
         </Card>
 
-        {/* 其他操作 */}
-        <Box sx={{ textAlign: 'center', mt: 3 }}>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-            还没有账户？{' '}
-            <Link 
-              href="/register" 
-              style={{ 
-                color: 'primary',
-                fontWeight: 500,
-                textDecoration: 'none' 
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
+          <Link href="/recover-username">
+            <Typography 
+              variant="body2" 
+              component="span"
+              sx={{ 
+                color: 'text.secondary',
+                cursor: 'pointer',
+                '&:hover': { textDecoration: 'underline' }
               }}
             >
-              立即注册
-            </Link>
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            <Link 
-              href="/" 
-              style={{ 
-                color: 'primary',
-                textDecoration: 'none'
-              }}
-            >
-              返回首页
-            </Link>
-          </Typography>
+              忘记用户名？
+            </Typography>
+          </Link>
         </Box>
-
-        {/* 说明 */}
-        <Paper 
-          elevation={1}
-          sx={{ 
-            mt: 4, 
-            p: 2, 
-            bgcolor: mode === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.05)', 
-            borderRadius: 2,
-            border: 1,
-            borderColor: 'divider'
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
-            登录说明
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="body2" component="ul" sx={{ pl: 2, m: 0 }}>
-            <li>用户登录：使用已注册的用户名登录 (不区分大小写)</li>
-            <li>访问码登录：使用他人分享的访问码临时登录</li>
-            <li>访客用户的聊天记录仅保存在本地</li>
-          </Typography>
-        </Paper>
       </Container>
     </Box>
   )
-}
+} 

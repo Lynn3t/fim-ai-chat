@@ -25,7 +25,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Grid
 } from '@mui/material';
 import {
   OpenAI,
@@ -242,6 +243,15 @@ export default function AdminConfig() {
     newPassword: ''
   });
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  
+  // 创建用户相关状态
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [createUserData, setCreateUserData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    isGeneratingPassword: false
+  });
 
   // 系统设置相关状态
   const [systemSettings, setSystemSettings] = useState<any>({});
@@ -275,6 +285,9 @@ export default function AdminConfig() {
   // 删除用户相关状态
   const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false);
   const [deletingUser, setDeletingUser] = useState<{ id: string; username: string } | null>(null);
+  // 邀请码删除相关状态
+  const [showDeleteInviteDialog, setShowDeleteInviteDialog] = useState(false);
+  const [deletingInvite, setDeletingInvite] = useState<{ id: string; code: string } | null>(null);
 
   // 加载仪表板数据
   const loadDashboard = async () => {
@@ -1709,12 +1722,14 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     setInviteFormData({ count: 1, maxUses: 1 }); // 重置表单
   };
 
+  // 打开删除邀请码对话框
+  const openDeleteInviteDialog = (codeId: string, code: string) => {
+    setDeletingInvite({ id: codeId, code });
+    setShowDeleteInviteDialog(true);
+  };
+
   const deleteInviteCode = async (codeId: string, code: string) => {
     if (!currentUser) return;
-
-    if (!confirm(`确定要删除邀请码 "${code}" 吗？`)) {
-      return;
-    }
 
     try {
       const response = await fetch(`/api/admin/codes/${codeId}?adminUserId=${currentUser.id}`, {
@@ -1724,6 +1739,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       if (response.ok) {
         toast.success('邀请码删除成功');
         loadInviteCodes();
+        setShowDeleteInviteDialog(false);
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || '删除邀请码失败';
@@ -1862,11 +1878,364 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     );
   };
 
+  // 添加删除邀请码确认对话框
+  const DeleteInviteDialog = () => {
+    return (
+      <Dialog
+        open={showDeleteInviteDialog}
+        onClose={() => setShowDeleteInviteDialog(false)}
+        aria-labelledby="delete-invite-dialog-title"
+      >
+        <DialogTitle id="delete-invite-dialog-title">
+          确认删除邀请码
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            您确定要删除邀请码 <b>{deletingInvite?.code}</b> 吗？此操作不可撤销。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteInviteDialog(false)} color="primary">
+            取消
+          </Button>
+          <Button 
+            onClick={() => deletingInvite && deleteInviteCode(deletingInvite.id, deletingInvite.code)} 
+            color="error"
+            variant="contained"
+          >
+            删除
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
+
+  // 生成随机密码
+  const generatePassword = (length = 12) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
+    let password = '';
+    
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      password += chars[randomIndex];
+    }
+
+    return password;
+  };
+
+  // 创建用户
+  const createUser = async () => {
+    if (!currentUser || !createUserData.username) return;
+    
+    try {
+      // 如果没有密码，生成一个随机密码
+      const password = createUserData.password || generatePassword(12);
+      
+      const response = await fetch(`/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          username: createUserData.username,
+          email: createUserData.email || undefined, // 如果为空字符串，则传undefined
+          password: password,
+          role: 'USER'
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`用户创建成功，密码: ${password}`);
+        setShowCreateUserModal(false);
+        setCreateUserData({
+          username: '',
+          email: '',
+          password: '',
+          isGeneratingPassword: false
+        });
+        loadUsers();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '创建用户失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('创建用户失败');
+    }
+  };
+
+  // 重置用户密码
+  const resetUserPassword = async () => {
+    if (!currentUser || !resetPasswordData.userId || !resetPasswordData.newPassword) return;
+
+    setIsResettingPassword(true);
+    try {
+      const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          newPassword: resetPasswordData.newPassword
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`用户 "${resetPasswordData.username}" 的密码已重置`);
+        setShowResetPasswordModal(false);
+        setResetPasswordData({ userId: '', username: '', newPassword: '' });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '密码重置失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('密码重置失败');
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  // 打开重置密码对话框
+  const openResetPasswordModal = (userId: string, username: string) => {
+    setResetPasswordData({ userId, username, newPassword: '' });
+    setShowResetPasswordModal(true);
+  };
+
+  // 重置密码对话框
+  interface ResetPasswordModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    username: string;
+    newPassword: string;
+    setNewPassword: (password: string) => void;
+    isLoading: boolean;
+  }
+
+  function ResetPasswordModal({ 
+    isOpen, 
+    onClose, 
+    onSubmit, 
+    username, 
+    newPassword, 
+    setNewPassword,
+    isLoading 
+  }: ResetPasswordModalProps) {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSubmit();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+          </div>
+
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+
+          <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    重置用户密码
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      您正在为用户 <span className="font-bold">{username}</span> 重置密码。
+                    </p>
+                    <form onSubmit={handleSubmit}>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          新密码
+                        </label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="输入新密码"
+                          minLength={6}
+                          required
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          密码长度至少需要6个字符
+                        </p>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={isLoading || !newPassword || newPassword.length < 6}
+                className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                  (isLoading || !newPassword || newPassword.length < 6) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {isLoading ? '处理中...' : '重置密码'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isLoading}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 创建用户对话框
+  interface CreateUserModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    formData: {
+      username: string;
+      email: string;
+      password: string;
+      isGeneratingPassword: boolean;
+    };
+    setFormData: (data: any) => void;
+  }
+
+  function CreateUserModal({ 
+    isOpen, 
+    onClose, 
+    onSubmit, 
+    formData, 
+    setFormData 
+  }: CreateUserModalProps) {
+    
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSubmit();
+    };
+
+    const handleGeneratePassword = () => {
+      setFormData({...formData, password: generatePassword(12)});
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+          </div>
+
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+
+          <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    创建新用户
+                  </h3>
+                  <div className="mt-2">
+                    <form onSubmit={handleSubmit}>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          用户名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.username}
+                          onChange={(e) => setFormData({...formData, username: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="输入用户名"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          电子邮箱（可选）
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="输入邮箱（可选）"
+                        />
+                      </div>
+                      
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            密码
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleGeneratePassword}
+                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            生成随机密码
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={formData.password}
+                          onChange={(e) => setFormData({...formData, password: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="留空将自动生成12位强密码"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          如不填写，系统将自动生成12位强密码
+                        </p>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={!formData.username}
+                className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                  !formData.username ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                创建用户
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
       <Container>
         {/* 删除用户确认对话框 */}
         <DeleteUserDialog />
+        
+        {/* 删除邀请码确认对话框 */}
+        <DeleteInviteDialog />
         
         {/* 页面标题 */}
         <Box sx={{ mb: 4 }}>
@@ -2240,7 +2609,146 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         {/* 仪表板 */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* 现有仪表板内容... */}
+            {/* 系统状态概览 */}
+            <Paper elevation={1} sx={{ p: 3, mb: 4 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                系统状态概览
+              </Typography>
+
+              <Grid container spacing={3}>
+                {/* 用户统计卡片 */}
+                <Grid item xs={12} md={4}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: 'primary.50',
+                      borderRadius: 2,
+                      height: '100%'
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      用户统计
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        总用户数:
+                      </Typography>
+                      <Typography variant="h4" color="primary" sx={{ my: 0.5 }}>
+                        {stats?.totalUsers || 0}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          活跃用户:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.activeUsers || 0}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          管理员:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.detailed?.userCount?.admin || 0}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+
+                {/* 模型统计卡片 */}
+                <Grid item xs={12} md={4}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: 'info.50',
+                      borderRadius: 2,
+                      height: '100%'
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      模型统计
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        总模型数:
+                      </Typography>
+                      <Typography variant="h4" color="info.main" sx={{ my: 0.5 }}>
+                        {stats?.detailed?.modelUsage?.totalModels || 0}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          启用模型:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.detailed?.modelUsage?.activeModels || 0}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          提供商:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.detailed?.modelUsage?.totalProviders || 0}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+
+                {/* 系统代码统计卡片 */}
+                <Grid item xs={12} md={4}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: 'success.50',
+                      borderRadius: 2,
+                      height: '100%'
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      系统代码统计
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        邀请码总数:
+                      </Typography>
+                      <Typography variant="h4" color="success.main" sx={{ my: 0.5 }}>
+                        {stats?.detailed?.codeUsage?.totalInviteCodes || 0}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          使用邀请码:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.detailed?.codeUsage?.usedInviteCodes || 0}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          访问码:
+                        </Typography>
+                        <Typography variant="body1">
+                          {stats?.detailed?.codeUsage?.totalAccessCodes || 0}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Paper>
             
             {/* Token 使用统计 */}
             <Paper elevation={1} sx={{ p: 3, mb: 4 }}>
@@ -2335,15 +2843,25 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         )}
 
         {/* 用户管理 */}
-        {activeTab === 'users' && (
+                  {activeTab === 'users' && (
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h5" component="h2">
                 用户管理
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                共 {users.length} 个用户
-              </Typography>
+              <Box>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  sx={{ mr: 1 }}
+                  onClick={() => setShowCreateUserModal(true)}
+                >
+                  创建用户
+                </Button>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'right' }}>
+                  共 {users.length} 个用户
+                </Typography>
+              </Box>
             </Box>
 
             {/* 用户列表 */}
@@ -2595,7 +3113,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button
-                              onClick={() => deleteInviteCode(code.id, code.code)}
+                                                                                onClick={() => openDeleteInviteDialog(code.id, code.code)}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                             >
                               删除
@@ -2888,6 +3406,13 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
           onSubmit={updateEditedModel}
           model={editingModel}
           groupOptions={userGroupOrders.map(g => g.groupName)}
+        />
+        <CreateUserModal
+          isOpen={showCreateUserModal}
+          onClose={() => setShowCreateUserModal(false)}
+          onSubmit={createUser}
+          formData={createUserData}
+          setFormData={setCreateUserData}
         />
       </Container>
     </Box>

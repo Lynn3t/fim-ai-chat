@@ -31,6 +31,10 @@ model User {
   isActive  Boolean  @default(true)
   canShareAccessCode Boolean @default(true) // 是否可以分发访问码
 
+  // 密码重置相关
+  resetToken String? // 密码重置令牌
+  resetTokenExpiry DateTime? // 令牌过期时间
+
   // 邀请码相关（仅管理员和用户有）
   invitedBy String?  // 邀请者ID
   usedInviteCode String? // 使用的邀请码

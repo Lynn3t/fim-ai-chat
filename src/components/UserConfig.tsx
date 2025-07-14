@@ -348,20 +348,14 @@ export default function UserConfig() {
             </Typography>
             
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="body2" color="text.secondary">用户名：</Typography>
                 <Typography variant="body1">{user.username}</Typography>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="body2" color="text.secondary">角色：</Typography>
                 <Typography variant="body1">
                   {user.role === 'ADMIN' ? '管理员' : '普通用户'}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography variant="body2" color="text.secondary">注册时间：</Typography>
-                <Typography variant="body1">
-                  {new Date(user.createdAt).toLocaleDateString()}
                 </Typography>
               </Grid>
             </Grid>
@@ -497,17 +491,30 @@ export default function UserConfig() {
                             <Box sx={{ mt: 1 }}>
                               {code.allowedModelIds?.length > 0 ? (
                                 <Stack direction="row" spacing={1} flexWrap="wrap">
-                                  {code.allowedModelIds.map(modelId => {
-                                    const model = availableModels.find(m => m.id === modelId);
-                                    return (
-                                      <Chip 
-                                        key={modelId}
-                                        label={model?.name || modelId}
-                                        size="small"
-                                        sx={{ mb: 1 }}
-                                      />
-                                    );
-                                  })}
+                                  {Array.isArray(code.allowedModelIds) 
+                                    ? code.allowedModelIds.map(modelId => {
+                                        const model = availableModels.find(m => m.id === modelId);
+                                        return (
+                                          <Chip 
+                                            key={modelId}
+                                            label={model?.name || modelId}
+                                            size="small"
+                                            sx={{ mb: 1 }}
+                                          />
+                                        );
+                                      })
+                                    : code.allowedModelIds.split(',').filter(id => id.trim()).map(modelId => {
+                                        const model = availableModels.find(m => m.id === modelId);
+                                        return (
+                                          <Chip 
+                                            key={modelId}
+                                            label={model?.name || modelId}
+                                            size="small"
+                                            sx={{ mb: 1 }}
+                                          />
+                                        );
+                                      })
+                                  }
                                 </Stack>
                               ) : (
                                 <Typography variant="body2" color="text.secondary">

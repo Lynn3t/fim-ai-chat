@@ -175,9 +175,6 @@ export default function RegisterPage() {
             }}>
               FimAI Chat
             </Typography>
-            <Typography variant="subtitle1" color="text.secondary">
-              创建您的账户
-            </Typography>
           </Box>
         </Fade>
 
