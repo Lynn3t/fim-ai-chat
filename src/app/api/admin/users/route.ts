@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 哈希密码
-    const bcrypt = await import('bcrypt')
-    const hashedPassword = await bcrypt.default.hash(password, 12)
+    const bcrypt = await import('bcryptjs')
+    const hashedPassword = await bcrypt.hash(password, 12)
 
     // 创建用户
     const user = await prisma.user.create({

@@ -92,6 +92,7 @@ function ChatPageContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false); // 添加历史记录加载状态
   const [isWaitingFirstChar, setIsWaitingFirstChar] = useState(false); // 等待第一个字符
   const [hasChinese, setHasChinese] = useState(false); // 是否包含中文字符
   const [randomChars, setRandomChars] = useState(''); // 随机字符
@@ -367,8 +368,14 @@ function ChatPageContent() {
 
   // 创建新聊天
   const createNewChat = () => {
+    // 只有当有消息且内容有意义时才保存当前聊天
     if (messages.length > 0) {
-      saveCurrentChat();
+      const hasUserMessage = messages.some(m => m.role === 'user' && m.content.trim() !== '');
+      const hasAssistantMessage = messages.some(m => m.role === 'assistant' && m.content.trim() !== '');
+      
+      if (hasUserMessage && hasAssistantMessage) {
+        saveCurrentChat();
+      }
     }
     setMessages([]);
     setCurrentChatId('');
@@ -376,7 +383,16 @@ function ChatPageContent() {
 
   // 保存当前聊天
   const saveCurrentChat = async () => {
+    // 检查是否有消息，或者消息是否都是空的
     if (messages.length === 0) return;
+    
+    // 检查是否有用户消息，如果没有用户消息则不保存
+    const hasUserMessage = messages.some(m => m.role === 'user' && m.content.trim() !== '');
+    if (!hasUserMessage) return;
+    
+    // 检查是否有AI回复，如果没有AI回复或者AI回复都是空的，则不保存
+    const hasAssistantMessage = messages.some(m => m.role === 'assistant' && m.content.trim() !== '');
+    if (!hasAssistantMessage) return;
 
     const chatId = currentChatId || Date.now().toString();
     const now = new Date();
@@ -416,6 +432,9 @@ function ChatPageContent() {
     }
     
     try {
+      // 添加延迟，避免并发请求导致的错误
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // 获取系统设置的标题生成模型ID
       let titleModelId = selectedModelId;
       try {
@@ -434,7 +453,7 @@ function ChatPageContent() {
       
       // 构建标题生成请求
       const titlePrompt = `请根据以下用户消息生成一个简短的聊天标题（不超过8个字）：\n\n${firstMessage}\n\n只需回复标题文本，不要有任何其他内容。`;
-      
+     
       const titleResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -468,46 +487,61 @@ function ChatPageContent() {
     const history = chatHistories.find(h => h.id === historyId);
     if (!history) return;
 
-    // 保存当前状态
-    const previousMessages = [...messages];
-    const previousChatId = currentChatId;
+    // 设置加载状态
+    setIsLoadingHistory(true);
 
-    // 1. 立即更新UI (保留滚动位置)
-    setMessages(history.messages.map(msg => ({
-      ...msg,
-      timestamp: msg.timestamp || new Date(msg.createdAt || Date.now())
-    })));
-    setCurrentChatId(historyId);
-    setShowHistoryDropdown(false);
+    try {
+      // 保存当前状态
+      const previousMessages = [...messages];
+      const previousChatId = currentChatId;
 
-    // 2. 如果是数据库用户，验证消息完整性
-    if (user && chatConfig?.canSaveToDatabase) {
-      // 延迟验证 (1秒后)
-      setTimeout(async () => {
-        try {
-          const response = await fetch(`/api/conversations/${historyId}/messages`);
-          if (response.ok) {
-            const serverMessages = await response.json();
-            
-            // Convert string timestamps to Date objects
-            const processedMessages = serverMessages.map((msg: any) => ({
-              ...msg,
-              timestamp: msg.createdAt ? new Date(msg.createdAt) : undefined
-            }));
+      // 1. 立即更新UI (保留滚动位置)
+      setMessages(history.messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp || new Date(msg.createdAt || Date.now())
+      })));
+      setCurrentChatId(historyId);
+      setShowHistoryDropdown(false);
 
-            // 3. 验证消息是否完整
-            if (serverMessages.length !== history.messages.length) {
-              // 使用服务器数据更新
-              setMessages(processedMessages);
-              toast.warning('聊天记录已从服务器同步');
+      // 2. 如果是数据库用户，验证消息完整性
+      if (user && chatConfig?.canSaveToDatabase) {
+        // 延迟验证 (1秒后)
+        setTimeout(async () => {
+          try {
+            const response = await fetch(`/api/conversations/${historyId}/messages`);
+            if (response.ok) {
+              const serverMessages = await response.json();
+              
+              // Convert string timestamps to Date objects
+              const processedMessages = serverMessages.map((msg: any) => ({
+                ...msg,
+                timestamp: msg.createdAt ? new Date(msg.createdAt) : undefined
+              }));
+
+              // 3. 验证消息是否完整
+              if (serverMessages.length !== history.messages.length) {
+                // 使用服务器数据更新
+                setMessages(processedMessages);
+                toast.warning('聊天记录已从服务器同步');
+              }
             }
+          } catch (error) {
+            // 验证失败，但不回滚，只提示
+            console.error('Failed to verify chat history:', error);
+            toast.warning('无法验证聊天记录完整性');
+          } finally {
+            // 无论如何，结束加载状态
+            setIsLoadingHistory(false);
           }
-        } catch (error) {
-          // 验证失败，但不回滚，只提示
-          console.error('Failed to verify chat history:', error);
-          toast.warning('无法验证聊天记录完整性');
-        }
-      }, 1000);
+        }, 1000);
+      } else {
+        // 如果不需要验证，直接结束加载状态
+        setTimeout(() => setIsLoadingHistory(false), 300);
+      }
+    } catch (error) {
+      console.error('加载聊天历史失败:', error);
+      toast.error('加载聊天历史失败');
+      setIsLoadingHistory(false);
     }
   };
 
@@ -795,7 +829,27 @@ function ChatPageContent() {
               
               // 处理可能的非JSON格式数据
               if (data.startsWith('{') || data.startsWith('[')) {
-                const parsed = JSON.parse(data);
+                let parsed;
+                try {
+                  parsed = JSON.parse(data);
+                } catch (jsonError) {
+                  // 如果JSON解析失败，尝试修复常见问题
+                  console.warn('JSON解析失败，尝试修复:', jsonError);
+                  
+                  // 尝试提取有效的JSON部分
+                  const jsonMatch = data.match(/\{.*\}/);
+                  if (jsonMatch) {
+                    try {
+                      parsed = JSON.parse(jsonMatch[0]);
+                    } catch (matchError) {
+                      console.error('提取JSON匹配失败:', matchError);
+                      continue;
+                    }
+                  } else {
+                    console.error('无法提取有效JSON');
+                    continue;
+                  }
+                }
                 const content = parsed.choices?.[0]?.delta?.content || '';
 
                 // 保存token使用信息
@@ -833,6 +887,39 @@ function ChatPageContent() {
               }
             } catch (e) {
               console.error('解析流式响应失败:', e, '原始数据:', data);
+              
+              // 如果SSE格式数据中包含双重"data:"前缀，尝试处理它
+              if (data.includes('data: {')) {
+                try {
+                  const innerDataMatches = data.match(/data: (\{.*\})/);
+                  if (innerDataMatches && innerDataMatches[1]) {
+                    const innerData = innerDataMatches[1];
+                    const parsed = JSON.parse(innerData);
+                    
+                    const content = parsed.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                      // 更新消息内容
+                      setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: msg.content + content }
+                          : msg
+                      ));
+                      
+                      // 同时更新引用中的内容
+                      if (latestAIReply.current && latestAIReply.current.id === assistantMessageId) {
+                        latestAIReply.current.content = latestAIReply.current.content + content;
+                      }
+                      
+                      // 如果是第一个字符，更新等待状态
+                      if (isWaitingFirstChar) {
+                        setIsWaitingFirstChar(false);
+                      }
+                    }
+                  }
+                } catch (innerError) {
+                  console.warn('处理内嵌data前缀失败:', innerError);
+                }
+              }
               
               // 尝试修复常见的JSON解析问题
               try {
@@ -1069,27 +1156,46 @@ function ChatPageContent() {
     const message = messages[messageIndex];
     if (message.role !== 'user') return;
 
-    // 删除该消息后面的AI回复
-    const newMessages = [...messages];
-    if (messageIndex < messages.length - 1) {
-      const nextMessage = messages[messageIndex + 1];
-      if (nextMessage.role === 'assistant') {
-        // 删除AI回复
-        newMessages.splice(messageIndex + 1, 1);
-        setMessages(newMessages);
+    // 保存原始用户消息内容
+    const originalContent = message.content;
+
+    // 删除用户消息和后续的AI回复
+    const newMessages = messages.slice(0, messageIndex);
+    setMessages(newMessages);
+
+    // 从数据库中删除消息
+    if (currentChatId && chatConfig?.canSaveToDatabase) {
+      // 删除用户消息
+      fetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
+        method: 'DELETE'
+      }).catch(error => console.error('删除用户消息失败:', error));
         
-        // 从数据库中删除消息
-        if (currentChatId && chatConfig?.canSaveToDatabase) {
+      // 删除后面的AI回复
+      if (messageIndex < messages.length - 1) {
+        const nextMessage = messages[messageIndex + 1];
+        if (nextMessage.role === 'assistant') {
           fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
             method: 'DELETE'
-          }).catch(error => console.error('删除消息失败:', error));
+          }).catch(error => console.error('删除AI回复失败:', error));
         }
       }
     }
 
-    // 重新发送用户消息
-    setInput(message.content);
-    setTimeout(() => handleSend(), 100);
+    // 创建新的用户消息并发送
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      conversationId: currentChatId || undefined,
+      role: 'user',
+      content: originalContent,
+      timestamp: new Date(),
+      modelInfo: message.modelInfo
+    };
+    
+    // 更新消息列表
+    setMessages([...newMessages, userMessage]);
+    
+    // 发送消息到AI API
+    sendMessageToAI(originalContent);
   };
 
   // 处理模型选择
@@ -1167,6 +1273,7 @@ function ChatPageContent() {
       messages={messages}
       input={input}
       isLoading={isLoading}
+      isLoadingHistory={isLoadingHistory}
       onInputChange={(e) => setInput(e.target.value)}
       onSend={handleSend}
       onNewChat={createNewChat}

@@ -42,7 +42,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-hot-toast'
-import { AuthContext } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ModelPricing {
   id: string
@@ -103,7 +103,7 @@ interface UserUsageStats {
 }
 
 export default function TokenStatsAdmin() {
-  const { currentUser } = useContext(AuthContext)
+  const { currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('pricing')
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [modelPricingList, setModelPricingList] = useState<ModelPricing[]>([])
@@ -119,7 +119,7 @@ export default function TokenStatsAdmin() {
   const [editPricingDialog, setEditPricingDialog] = useState<boolean>(false)
   const [editLimitDialog, setEditLimitDialog] = useState<boolean>(false)
   const [currentModel, setCurrentModel] = useState<ModelPricing | null>(null)
-  const [currentUser, setCurrentUser] = useState<UserLimit | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserLimit | null>(null)
   
   // 编辑表单数据
   const [pricingForm, setPricingForm] = useState({
@@ -157,7 +157,7 @@ export default function TokenStatsAdmin() {
   }, [startDate, endDate, activeTab])
 
   const loadData = async () => {
-    if (!currentUser) return
+    if (!currentUser || !currentUser.id) return
     setIsLoading(true)
     
     try {
@@ -177,43 +177,79 @@ export default function TokenStatsAdmin() {
   }
   
   const loadPricingData = async () => {
-    const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=pricing`)
-    if (response.ok) {
-      const data = await response.json()
-      setModelPricingList(data)
-    } else {
+    if (!currentUser || !currentUser.id) return
+    
+    try {
+      console.log('Loading pricing data...')
+      const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=pricing`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Pricing data loaded:', data)
+        setModelPricingList(data)
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to load pricing data:', response.status, errorText)
+        toast.error('加载模型价格数据失败')
+      }
+    } catch (error) {
+      console.error('Error loading pricing data:', error)
       toast.error('加载模型价格数据失败')
     }
   }
   
   const loadLimitsData = async () => {
-    const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=user-limits`)
-    if (response.ok) {
-      const data = await response.json()
-      setUserLimitsList(data)
-    } else {
+    if (!currentUser || !currentUser.id) return
+    
+    try {
+      console.log('Loading user limits data...')
+      const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=user-limits`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('User limits data loaded:', data)
+        setUserLimitsList(data)
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to load user limits data:', response.status, errorText)
+        toast.error('加载用户限制数据失败')
+      }
+    } catch (error) {
+      console.error('Error loading user limits data:', error)
       toast.error('加载用户限制数据失败')
     }
   }
   
   const loadStatsData = async () => {
-    const dateParams = new URLSearchParams()
-    if (startDate) dateParams.append('startDate', startDate.toISOString())
-    if (endDate) dateParams.append('endDate', endDate.toISOString())
+    if (!currentUser || !currentUser.id) return
     
-    const action = activeTab === 'models' ? 'models' : 'users'
-    const response = await fetch(
-      `/api/admin/token-stats?adminUserId=${currentUser.id}&action=${action}&${dateParams.toString()}`
-    )
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (action === 'models') {
-        setModelStats(data)
+    try {
+      console.log('Loading stats data for tab:', activeTab)
+      const dateParams = new URLSearchParams()
+      if (startDate) dateParams.append('startDate', startDate.toISOString())
+      if (endDate) dateParams.append('endDate', endDate.toISOString())
+      
+      const action = activeTab === 'models' ? 'models' : 'users'
+      const url = `/api/admin/token-stats?adminUserId=${currentUser.id}&action=${action}&${dateParams.toString()}`
+      console.log('Fetching from URL:', url)
+      
+      const response = await fetch(url)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`${action} stats data loaded:`, data)
+        if (action === 'models') {
+          setModelStats(data)
+        } else {
+          setUserStats(data)
+        }
       } else {
-        setUserStats(data)
+        const errorText = await response.text()
+        console.error('Failed to load stats data:', response.status, errorText)
+        toast.error('加载统计数据失败')
       }
-    } else {
+    } catch (error) {
+      console.error('Error loading stats data:', error)
       toast.error('加载统计数据失败')
     }
   }
@@ -235,7 +271,7 @@ export default function TokenStatsAdmin() {
   }
   
   const handleSavePricing = async () => {
-    if (!currentUser || !currentModel) return
+    if (!currentUser || !currentUser.id || !currentModel) return
     
     setIsLoading(true)
     try {
@@ -268,7 +304,7 @@ export default function TokenStatsAdmin() {
   
   const handleEditLimit = (user: UserLimit | null, userId?: string) => {
     if (user) {
-      setCurrentUser(user)
+      setSelectedUser(user)
       setLimitForm({
         limitType: user.limitType || 'none',
         limitPeriod: user.limitPeriod || 'monthly',
@@ -277,7 +313,7 @@ export default function TokenStatsAdmin() {
         resetUsage: false,
       })
     } else if (userId) {
-      setCurrentUser({ userId } as UserLimit)
+      setSelectedUser({ userId } as UserLimit)
       setLimitForm({
         limitType: 'none',
         limitPeriod: 'monthly',
@@ -290,11 +326,11 @@ export default function TokenStatsAdmin() {
   }
   
   const handleSaveLimit = async () => {
-    if (!currentUser || !currentUser) return
+    if (!currentUser || !currentUser.id || !selectedUser) return;
     
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/${currentUser.userId}/limits`, {
+      const response = await fetch(`/api/admin/users/${selectedUser.userId}/limits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +339,7 @@ export default function TokenStatsAdmin() {
           adminUserId: currentUser.id,
           ...limitForm,
         }),
-      })
+      });
       
       if (response.ok) {
         toast.success('用户限制已保存')

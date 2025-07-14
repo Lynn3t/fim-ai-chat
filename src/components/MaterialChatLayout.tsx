@@ -75,6 +75,7 @@ interface MaterialChatLayoutProps {
   messages: ChatMessage[];
   input: string;
   isLoading: boolean;
+  isLoadingHistory?: boolean; // 添加历史记录加载状态
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSend: () => void;
   onNewChat: () => void;
@@ -114,6 +115,7 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
   messages,
   input,
   isLoading,
+  isLoadingHistory = false,
   onInputChange,
   onSend,
   onNewChat,
@@ -562,7 +564,47 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
             display: 'flex',
             flexDirection: 'column'
           }}>
-            {messages.length === 0 ? (
+            {/* 显示历史记录加载中状态 */}
+            {isLoadingHistory && (
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                width: '100%',
+                py: 4
+              }}>
+                <Box sx={{ position: 'relative', width: 60, height: 60 }}>
+                  <Box 
+                    sx={{ 
+                      position: 'absolute', 
+                      top: 0, 
+                      left: 0, 
+                      width: '100%', 
+                      height: '100%', 
+                      borderRadius: '50%', 
+                      border: '6px solid',
+                      borderColor: theme => theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+                      borderTopColor: theme => theme.palette.primary.main,
+                      animation: 'spin 1s linear infinite',
+                      '@keyframes spin': {
+                        '0%': {
+                          transform: 'rotate(0deg)',
+                        },
+                        '100%': {
+                          transform: 'rotate(360deg)',
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" sx={{ mt: 2 }}>
+                  正在加载对话...
+                </Typography>
+              </Box>
+            )}
+            
+            {!isLoadingHistory && messages.length === 0 ? (
               <Box sx={{ 
                 display: 'flex', 
                 flexDirection: 'column', 
@@ -578,7 +620,7 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                   开始一个新的对话，输入您的问题或指令。
                 </Typography>
               </Box>
-            ) : (
+            ) : !isLoadingHistory && (
               messages.map((message) => {
                 return (
                   <Box 
