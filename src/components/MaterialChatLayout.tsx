@@ -43,6 +43,7 @@ import { ThemeToggle } from './MaterialUI';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sortGroupsByUserOrder, getModelGroups } from '@/utils/aiModelUtils';
 import { AIIcon } from './AIIcon';
+import { MessageActions } from './MessageActions';
 
 interface ChatMessage {
   id: string;
@@ -474,7 +475,7 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                               width: 24,
                               height: 24
                             }}>
-                              <AIIcon modelId={model.id} size={16} />
+                              <AIIcon modelId={groupName} size={16} />
                             </Box>
                             <Typography variant="body2" noWrap>
                               {model.name}
@@ -565,147 +566,92 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                 </Typography>
               </Box>
             ) : (
-              messages.map((message) => (
-                <Box 
-                  key={message.id} 
-                  sx={{ 
-                    display: 'flex', 
-                    flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
-                    mb: 2,
-                    gap: 1
-                  }}
-                >
-                  {/* 头像区域 */}
-                  <Avatar 
+              messages.map((message) => {
+                return (
+                  <Box 
+                    key={message.id} 
                     sx={{ 
-                      bgcolor: message.role === 'user' 
-                        ? (mode === 'light' ? '#212121' : '#e0e0e0') 
-                        : (mode === 'light' ? '#9e9e9e' : '#424242'),
-                      color: message.role === 'user'
-                        ? (mode === 'light' ? '#fff' : '#000')
-                        : (mode === 'light' ? '#fff' : '#000'),
-                      width: 36,
-                      height: 36,
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center'
+                      display: 'flex', 
+                      flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
+                      mb: 2,
+                      gap: 1
                     }}
                   >
-                    {message.role === 'user' ? 
-                      <PersonIcon /> : 
-                      (message.modelInfo?.modelId ? 
-                        <AIIcon modelId={message.modelInfo.modelId} size={24} /> : 
-                        <SmartToyIcon />)
-                    }
-                  </Avatar>
-                  
-                  <Box sx={{ maxWidth: '85%' }}>
-                    {/* 发送者名称 */}
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
+                    {/* 头像区域 */}
+                    <Avatar 
                       sx={{ 
-                        mb: 0.5, 
-                        textAlign: message.role === 'user' ? 'right' : 'left' 
-                      }}
-                    >
-                      {message.role === 'user' ? userName : (message.modelInfo?.modelName || modelName || 'AI助手')}
-                    </Typography>
-                    
-                    {/* 消息气泡 */}
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        p: 2, 
                         bgcolor: message.role === 'user' 
-                          ? (mode === 'light' ? '#e0e0e0' : '#333333') 
-                          : (mode === 'light' ? '#ffffff' : '#1e1e1e'),
-                        borderRadius: 2
+                          ? (mode === 'light' ? '#212121' : '#e0e0e0') 
+                          : (mode === 'light' ? '#9e9e9e' : '#424242'),
+                        color: message.role === 'user'
+                          ? (mode === 'light' ? '#fff' : '#000')
+                          : (mode === 'light' ? '#fff' : '#000'),
+                        width: 36,
+                        height: 36,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
                       }}
                     >
-                      {renderMessageContent(message)}
-
-                      {/* Token使用信息显示 */}
-                      {message.tokenUsage && (
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            display: 'block',
-                            color: 'text.secondary',
-                            mt: 1,
-                            textAlign: 'right',
-                            fontSize: '0.7rem'
-                          }}
-                        >
-                          {message.role === 'user' ? 
-                            `上行: ${message.tokenUsage.prompt_tokens || 0} tokens` :
-                            `下行: ${message.tokenUsage.completion_tokens || 0} tokens · 总计: ${message.tokenUsage.total_tokens || 0} tokens${message.tokenUsage.is_estimated ? ' (估算)' : ''}`
-                          }
-                        </Typography>
-                      )}
-
-                      {/* 消息操作按钮 */}
-                      <Stack 
-                        direction="row" 
-                        spacing={1} 
+                      {message.role === 'user' ? 
+                        <PersonIcon /> : 
+                        (message.modelInfo?.modelId ? 
+                          <AIIcon modelId={message.modelInfo.providerId || message.modelInfo.modelId} size={24} /> : 
+                          <SmartToyIcon />)
+                      }
+                    </Avatar>
+                    
+                    <Box sx={{ maxWidth: '85%', width: '100%' }}>
+                      {/* 发送者名称 */}
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
                         sx={{ 
-                          mt: 1, 
-                          justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                          opacity: 0.5,
-                          '&:hover': {
-                            opacity: 1
-                          }
+                          mb: 0.5, 
+                          textAlign: message.role === 'user' ? 'right' : 'left' 
                         }}
                       >
-                        {message.role === 'assistant' && (
-                          <>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => onCopyMessage?.(message.id, message.content)}
-                              title="复制"
-                            >
-                              <CopyIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => onDeleteMessage?.(message.id)}
-                              title="删除"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
-                        
-                        {message.role === 'user' && (
-                          <>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => onEditMessage?.(message.id, message.content)}
-                              title="编辑"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => onRetryMessage?.(message.id)}
-                              title="重试"
-                            >
-                              <RefreshIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => onDeleteMessage?.(message.id)}
-                              title="删除"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
-                      </Stack>
-                    </Paper>
+                        {message.role === 'user' ? userName : (message.modelInfo?.modelName || modelName || 'AI助手')}
+                      </Typography>
+                      
+                      {/* 消息气泡 */}
+                      <Paper 
+                        elevation={0}
+                        sx={{ 
+                          p: 2, 
+                          bgcolor: message.role === 'user' 
+                            ? (mode === 'light' ? '#e0e0e0' : '#333333') 
+                            : (mode === 'light' ? '#ffffff' : '#1e1e1e'),
+                          borderRadius: 2,
+                          position: 'relative'
+                        }}
+                      >
+                        {/* 消息内容或编辑框 */}
+                        {renderMessageContent(message)}
+
+                        {/* 使用MessageActions组件来处理消息操作和token显示 */}
+                        <Box 
+                          sx={{ 
+                            mt: 1,
+                            textAlign: message.role === 'user' ? 'right' : 'left',
+                          }}
+                        >
+                          <MessageActions
+                            content={message.content}
+                            messageRole={message.role}
+                            onCopy={() => onCopyMessage?.(message.id, message.content)}
+                            onDelete={() => onDeleteMessage?.(message.id)}
+                            onEdit={(newContent) => onEditMessage?.(message.id, newContent)}
+                            onResend={() => onRetryMessage?.(message.id)}
+                            tokenUsage={message.tokenUsage}
+                            isInMessageBubble={true}
+                          />
+                        </Box>
+                      </Paper>
+                    </Box>
                   </Box>
-                </Box>
-              ))
+                );
+              })
             )}
           </Box>
         </Box>

@@ -16,6 +16,7 @@ interface MessageActionsProps {
     total_tokens?: number;
     is_estimated?: boolean;
   };
+  isInMessageBubble?: boolean; // 是否在消息气泡内
 }
 
 export function MessageActions({
@@ -25,7 +26,8 @@ export function MessageActions({
   onDelete,
   onEdit,
   onResend,
-  tokenUsage
+  tokenUsage,
+  isInMessageBubble = false
 }: MessageActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
@@ -33,6 +35,7 @@ export function MessageActions({
   const [isMobile, setIsMobile] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const messageActionsRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 检测是否为移动设备
   useEffect(() => {
@@ -47,6 +50,14 @@ export function MessageActions({
       window.removeEventListener('resize', checkIfMobile);
     };
   }, []);
+
+  // 编辑模式下自适应文本框高度
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [isEditing, editContent]);
 
   // 处理移动端点击行为
   useEffect(() => {
@@ -90,7 +101,8 @@ export function MessageActions({
     }
   };
 
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(content);
       toast.success('已复制到剪贴板');
@@ -100,9 +112,13 @@ export function MessageActions({
     }
   };
 
-  const handleEdit = () => {
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsEditing(true);
     setEditContent(content);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
   };
 
   const handleSaveEdit = () => {
@@ -117,32 +133,80 @@ export function MessageActions({
     setEditContent(content);
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onDelete?.();
   };
 
-  if (isEditing) {
+  const handleResend = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onResend?.();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      handleCancelEdit();
+    } else if (e.key === 'Enter' && e.ctrlKey) {
+      handleSaveEdit();
+    }
+  };
+
+  // 如果在编辑模式且在消息气泡内，返回编辑框代替消息内容
+  if (isEditing && isInMessageBubble) {
     return (
-      <div className="mt-2 space-y-2">
+      <div className="w-full">
         <textarea
+          ref={textareaRef}
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-          rows={Math.max(3, editContent.split('\n').length)}
+          style={{ minHeight: '100px' }}
           autoFocus
         />
-        <div className="flex space-x-2">
-          <button
-            onClick={handleSaveEdit}
-            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-          >
-            保存并重发
-          </button>
+        <div className="flex justify-end space-x-2 mt-2">
           <button
             onClick={handleCancelEdit}
             className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
           >
-            取消
+            取消 (Esc)
+          </button>
+          <button
+            onClick={handleSaveEdit}
+            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          >
+            保存并重发 (Ctrl+Enter)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果不在消息气泡内，且处于编辑模式
+  if (isEditing && !isInMessageBubble) {
+    return (
+      <div className="mt-2 space-y-2">
+        <textarea
+          ref={textareaRef}
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          style={{ minHeight: '100px' }}
+          autoFocus
+        />
+        <div className="flex space-x-2">
+          <button
+            onClick={handleCancelEdit}
+            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+          >
+            取消 (Esc)
+          </button>
+          <button
+            onClick={handleSaveEdit}
+            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          >
+            保存并重发 (Ctrl+Enter)
           </button>
         </div>
       </div>
@@ -159,83 +223,82 @@ export function MessageActions({
     >
       <div 
         className={`
-          inline-flex items-center space-x-1 
+          inline-flex items-center space-x-2 
           transition-opacity duration-200
           ${isVisible ? 'opacity-100' : 'opacity-0'}
         `}
       >
-        <button
-          onClick={handleCopy}
-          className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          title="复制"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        </button>
-
-        {messageRole === 'user' && (
+        {/* 工具按钮区 */}
+        <div className="flex items-center space-x-1">
           <button
-            onClick={handleEdit}
+            onClick={handleCopy}
             className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title="编辑"
+            title="复制"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </button>
-        )}
 
-        {messageRole === 'user' && onResend && (
-          <button
-            onClick={onResend}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title="重新发送"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        )}
-
-        <button
-          onClick={handleDelete}
-          className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-          title="删除"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </div>
-      
-      {/* Token 使用量显示 */}
-      {tokenUsage && messageRole === 'assistant' && (
-        <div 
-          className={`
-            mt-2 text-xs text-gray-500 dark:text-gray-400
-            transition-opacity duration-200
-            ${isVisible ? 'opacity-100' : 'opacity-0'}
-          `}
-        >
-          <span title="输入/提示 tokens">
-            输入: {tokenUsage.prompt_tokens || 0}
-          </span>
-          <span className="mx-2">|</span>
-          <span title="输出/完成 tokens">
-            输出: {tokenUsage.completion_tokens || 0}
-          </span>
-          <span className="mx-2">|</span>
-          <span title="总计 tokens">
-            总计: {tokenUsage.total_tokens || 0}
-          </span>
-          {tokenUsage.is_estimated && (
-            <span className="ml-1 text-yellow-500" title="此为估算值">
-              (估算)
-            </span>
+          {messageRole === 'user' && (
+            <button
+              onClick={handleEdit}
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              title="编辑"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
           )}
+
+          {messageRole === 'user' && onResend && (
+            <button
+              onClick={handleResend}
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              title="重新发送"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
+
+          <button
+            onClick={handleDelete}
+            className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+            title="删除"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
-      )}
+      
+        {/* Token 使用量显示 - 和按钮放在同一行 */}
+        {tokenUsage && messageRole === 'assistant' && (
+          <div 
+            className="ml-2 text-xs text-gray-500 dark:text-gray-400 flex items-center"
+          >
+            <span title="输入/提示 tokens">
+              输入: {tokenUsage.prompt_tokens || 0}
+            </span>
+            <span className="mx-1">|</span>
+            <span title="输出/完成 tokens">
+              输出: {tokenUsage.completion_tokens || 0}
+            </span>
+            <span className="mx-1">|</span>
+            <span title="总计 tokens">
+              总计: {tokenUsage.total_tokens || 0}
+            </span>
+            {tokenUsage.is_estimated && (
+              <span className="ml-1 text-yellow-500" title="此为估算值">
+                (估算)
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

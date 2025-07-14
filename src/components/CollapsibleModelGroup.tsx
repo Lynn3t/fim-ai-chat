@@ -42,7 +42,7 @@ export function CollapsibleModelGroup({
           <div className="flex items-center space-x-3">
             {/* 分组图标 - 更加突出的logo */}
             <div className="flex-shrink-0 bg-gray-100 dark:bg-gray-600 rounded-full p-1.5 flex items-center justify-center">
-              <AIIcon modelId={models[0]?.modelId || groupName} size={24} />
+              <AIIcon modelId={groupName} size={24} />
             </div>
             
             {/* 分组名称和数量 */}

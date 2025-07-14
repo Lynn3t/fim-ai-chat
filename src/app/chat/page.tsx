@@ -852,6 +852,13 @@ function ChatPageContent() {
               // 保存token使用信息
               if (parsed.usage) {
                 finalTokenUsage = parsed.usage;
+                
+                // 更新token统计
+                setTokenStats(prev => ({
+                  input: prev.input + (parsed.usage.prompt_tokens || 0),
+                  output: prev.output + (parsed.usage.completion_tokens || 0),
+                  total: prev.total + (parsed.usage.total_tokens || 0),
+                }));
               }
 
               if (content) {
@@ -879,50 +886,25 @@ function ChatPageContent() {
         }
       }
 
-      // 在处理流式响应的部分，更新token数据的处理逻辑
-
-      // 保存token使用信息
-      if (parsed.usage) {
-        finalTokenUsage = parsed.usage;
-        
-        // 更新token统计
-        setTokenStats(prev => ({
-          input: prev.input + (parsed.usage.prompt_tokens || 0),
-          output: prev.output + (parsed.usage.completion_tokens || 0),
-          total: prev.total + (parsed.usage.total_tokens || 0),
-        }));
-        
+      // 流式响应结束后，处理最终的token使用情况
+      if (finalTokenUsage) {
         // 更新消息的token信息
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, tokenUsage: parsed.usage }
+            ? { ...msg, tokenUsage: finalTokenUsage }
             : msg
         ));
         
-        // 同时更新用户消息的token信息（只更新prompt_tokens）
-        const userMessageId = messages[messages.length - 1].id;
-        setMessages(prev => prev.map(msg =>
-          msg.id === userMessageId
-            ? { ...msg, tokenUsage: { prompt_tokens: parsed.usage.prompt_tokens || 0 } }
-            : msg
-        ));
-      }
-
-      // 保存AI响应到数据库
-      if (chatConfig?.canSaveToDatabase && conversationId) {
-        try {
-          // 使用存储在引用中的最新AI回复内容
-          const finalContent = latestAIReply.current?.content || '';
-          
-          console.log('Saving AI response to database:', {
-            messageId: assistantMessageId,
-            content: finalContent.slice(0, 50) + (finalContent.length > 50 ? '...' : ''),
-            length: finalContent.length
-          });
-
-          await saveMessageToDatabase(finalContent, 'assistant', finalTokenUsage);
-        } catch (error) {
-          console.error('保存AI响应失败:', error);
+        // 保存AI消息到数据库
+        if (chatConfig?.canSaveToDatabase && conversationId) {
+          try {
+            // 获取最终的AI回复内容
+            const aiMessageContent = latestAIReply.current?.content || '';
+            
+            await saveMessageToDatabase(aiMessageContent, 'assistant', finalTokenUsage);
+          } catch (error) {
+            console.error('保存AI回复失败:', error);
+          }
         }
       }
     } catch (error) {
@@ -1197,11 +1179,6 @@ function ChatPageContent() {
             }
             isLoading={isLoading}
           />
-          {message.tokenUsage && (
-            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-              Tokens: {message.tokenUsage.total_tokens || 0}
-            </Typography>
-          )}
         </Box>
       )}
       userName={user?.username || "用户"}
