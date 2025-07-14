@@ -2,6 +2,21 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from './Toast';
+import { 
+  TextField, 
+  Box, 
+  Button, 
+  IconButton,
+  Paper
+} from '@mui/material';
+import {
+  ContentCopy as CopyIcon,
+  Edit as EditIcon,
+  Refresh as RefreshIcon,
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 
 interface MessageActionsProps {
   content: string;
@@ -17,6 +32,7 @@ interface MessageActionsProps {
     is_estimated?: boolean;
   };
   isInMessageBubble?: boolean; // 是否在消息气泡内
+  parentRef?: React.RefObject<HTMLElement>; // 父元素引用，用于扩大悬停区域
 }
 
 export function MessageActions({
@@ -27,7 +43,8 @@ export function MessageActions({
   onEdit,
   onResend,
   tokenUsage,
-  isInMessageBubble = false
+  isInMessageBubble = false,
+  parentRef
 }: MessageActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
@@ -81,6 +98,60 @@ export function MessageActions({
     };
   }, [isMobile, isVisible]);
 
+  // 为父元素添加鼠标事件监听
+  useEffect(() => {
+    if (!parentRef?.current || isMobile) return;
+    
+    const parent = parentRef.current;
+    
+    // 创建一个扩展的检测区域
+    const extendedArea = document.createElement('div');
+    extendedArea.style.position = 'absolute';
+    extendedArea.style.top = '-10px';  // 向上扩展
+    extendedArea.style.left = '-10px'; // 向左扩展
+    extendedArea.style.right = '-10px'; // 向右扩展
+    extendedArea.style.bottom = '-30px'; // 向下扩展更多，覆盖按钮区域
+    extendedArea.style.zIndex = '-1';   // 放在内容下面
+    
+    // 将扩展区域添加到父元素
+    if (parent.style.position !== 'absolute' && parent.style.position !== 'relative') {
+      parent.style.position = 'relative';
+    }
+    parent.appendChild(extendedArea);
+    
+    const handleParentMouseEnter = () => {
+      setIsVisible(true);
+    };
+    
+    const handleParentMouseLeave = (e: MouseEvent) => {
+      // 检查鼠标是否移动到按钮区域
+      const buttonArea = messageActionsRef.current;
+      if (buttonArea && (buttonArea === e.relatedTarget || buttonArea.contains(e.relatedTarget as Node))) {
+        return; // 如果移动到按钮区域，不隐藏
+      }
+      
+      // 给一个小延迟，以防止鼠标在气泡和按钮之间移动时闪烁
+      setTimeout(() => {
+        // 再次检查当前鼠标是否在按钮区域上
+        if (buttonArea && buttonArea.matches(':hover')) {
+          return;
+        }
+        setIsVisible(false);
+      }, 50);
+    };
+    
+    parent.addEventListener('mouseenter', handleParentMouseEnter);
+    parent.addEventListener('mouseleave', handleParentMouseLeave);
+    
+    return () => {
+      parent.removeEventListener('mouseenter', handleParentMouseEnter);
+      parent.removeEventListener('mouseleave', handleParentMouseLeave);
+      if (extendedArea.parentNode === parent) {
+        parent.removeChild(extendedArea);
+      }
+    };
+  }, [parentRef, isMobile, messageActionsRef]);
+
   // 处理消息操作的显示/隐藏
   const handleMessageClick = () => {
     if (isMobile) {
@@ -88,15 +159,15 @@ export function MessageActions({
     }
   };
 
-  // 鼠标悬停处理
+  // 鼠标悬停处理 - 仅当没有父元素引用时使用
   const handleMouseEnter = () => {
-    if (!isMobile) {
+    if (!isMobile && !parentRef) {
       setIsVisible(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (!isMobile) {
+    if (!isMobile && !parentRef) {
       setIsVisible(false);
     }
   };
@@ -143,7 +214,7 @@ export function MessageActions({
     onResend?.();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLDivElement>) => {
     if (e.key === 'Escape') {
       handleCancelEdit();
     } else if (e.key === 'Enter' && e.ctrlKey) {
@@ -154,151 +225,162 @@ export function MessageActions({
   // 如果在编辑模式且在消息气泡内，返回编辑框代替消息内容
   if (isEditing && isInMessageBubble) {
     return (
-      <div className="w-full">
-        <textarea
-          ref={textareaRef}
+      <Box sx={{ width: '100%' }}>
+        <TextField
+          multiline
+          fullWidth
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-          style={{ minHeight: '100px' }}
+          variant="outlined"
+          size="small"
+          inputRef={textareaRef}
           autoFocus
+          minRows={3}
+          sx={{ mb: 1 }}
         />
-        <div className="flex justify-end space-x-2 mt-2">
-          <button
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button
             onClick={handleCancelEdit}
-            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+            variant="outlined"
+            color="inherit"
+            size="small"
+            startIcon={<CloseIcon />}
           >
             取消 (Esc)
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSaveEdit}
-            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<SaveIcon />}
           >
             保存并重发 (Ctrl+Enter)
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Box>
+      </Box>
     );
   }
 
   // 如果不在消息气泡内，且处于编辑模式
   if (isEditing && !isInMessageBubble) {
     return (
-      <div className="mt-2 space-y-2">
-        <textarea
-          ref={textareaRef}
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-          style={{ minHeight: '100px' }}
-          autoFocus
-        />
-        <div className="flex space-x-2">
-          <button
-            onClick={handleCancelEdit}
-            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-          >
-            取消 (Esc)
-          </button>
-          <button
-            onClick={handleSaveEdit}
-            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-          >
-            保存并重发 (Ctrl+Enter)
-          </button>
-        </div>
-      </div>
+      <Box sx={{ mt: 1 }}>
+        <Paper elevation={0} variant="outlined" sx={{ p: 1.5 }}>
+          <TextField
+            multiline
+            fullWidth
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            variant="outlined"
+            size="small"
+            inputRef={textareaRef}
+            autoFocus
+            minRows={3}
+            sx={{ mb: 1 }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button
+              onClick={handleCancelEdit}
+              variant="outlined"
+              color="inherit"
+              size="small"
+              startIcon={<CloseIcon />}
+            >
+              取消 (Esc)
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<SaveIcon />}
+            >
+              保存并重发 (Ctrl+Enter)
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
     );
   }
 
   return (
-    <div 
+    <Box 
       ref={messageActionsRef}
-      className="relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      sx={{ position: 'relative' }}
+      onMouseEnter={() => {
+        setIsVisible(true); // Always show buttons when hovering directly over them
+        handleMouseEnter();
+      }}
+      onMouseLeave={(e) => {
+        // Only hide if we're not moving to the parent element
+        if (parentRef?.current && !parentRef.current.contains(e.relatedTarget as Node)) {
+          setIsVisible(false);
+        }
+        handleMouseLeave();
+      }}
       onClick={handleMessageClick}
     >
-      <div 
-        className={`
-          inline-flex items-center space-x-2 
-          transition-opacity duration-200
-          ${isVisible ? 'opacity-100' : 'opacity-0'}
-        `}
+      <Box 
+        sx={{ 
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.5,
+          opacity: isVisible ? 1 : 0,
+          transition: 'opacity 200ms',
+          pointerEvents: isVisible ? 'auto' : 'none', // Prevent interaction when invisible
+          padding: '3px',
+          borderRadius: '4px',
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+          }
+        }}
       >
-        {/* 工具按钮区 */}
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={handleCopy}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title="复制"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
+        <IconButton
+          onClick={handleCopy}
+          size="small"
+          title="复制"
+          sx={{ color: 'text.secondary' }}
+        >
+          <CopyIcon fontSize="small" />
+        </IconButton>
 
-          {messageRole === 'user' && (
-            <button
-              onClick={handleEdit}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="编辑"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-          )}
-
-          {messageRole === 'user' && onResend && (
-            <button
-              onClick={handleResend}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="重新发送"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          )}
-
-          <button
-            onClick={handleDelete}
-            className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-            title="删除"
+        {messageRole === 'user' && (
+          <IconButton
+            onClick={handleEdit}
+            size="small"
+            title="编辑"
+            sx={{ color: 'text.secondary' }}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      
-        {/* Token 使用量显示 - 和按钮放在同一行 */}
-        {tokenUsage && messageRole === 'assistant' && (
-          <div 
-            className="ml-2 text-xs text-gray-500 dark:text-gray-400 flex items-center"
-          >
-            <span title="输入/提示 tokens">
-              输入: {tokenUsage.prompt_tokens || 0}
-            </span>
-            <span className="mx-1">|</span>
-            <span title="输出/完成 tokens">
-              输出: {tokenUsage.completion_tokens || 0}
-            </span>
-            <span className="mx-1">|</span>
-            <span title="总计 tokens">
-              总计: {tokenUsage.total_tokens || 0}
-            </span>
-            {tokenUsage.is_estimated && (
-              <span className="ml-1 text-yellow-500" title="此为估算值">
-                (估算)
-              </span>
-            )}
-          </div>
+            <EditIcon fontSize="small" />
+          </IconButton>
         )}
-      </div>
-    </div>
+
+        {messageRole === 'user' && onResend && (
+          <IconButton
+            onClick={handleResend}
+            size="small"
+            title="重新发送"
+            sx={{ color: 'text.secondary' }}
+          >
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        )}
+
+        <IconButton
+          onClick={handleDelete}
+          size="small"
+          title="删除"
+          sx={{ 
+            color: 'text.secondary',
+            '&:hover': { color: 'error.main' }
+          }}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
   );
 }

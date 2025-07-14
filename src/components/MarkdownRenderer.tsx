@@ -129,7 +129,7 @@ export function MarkdownRenderer({
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           p(props: any) {
-            return <p className="mb-3 leading-relaxed">{props.children}</p>;
+            return <p className="my-0 leading-relaxed">{props.children}</p>;
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           a(props: any) {

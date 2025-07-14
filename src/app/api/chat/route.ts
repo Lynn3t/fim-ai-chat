@@ -159,9 +159,33 @@ export async function POST(request: NextRequest) {
                       { name: jsonData.model.name, id: jsonData.model.id };
                   }
                   
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(jsonData)}\n\n`));
-                } catch {
-                  // 忽略无效的JSON数据
+                  // 确保输出的是有效的JSON
+                  const cleanJson = JSON.stringify(jsonData);
+                  controller.enqueue(encoder.encode(`data: ${cleanJson}\n\n`));
+                } catch (error) {
+                  // 记录无效的JSON数据
+                  console.error('无效的JSON数据:', data, error);
+                  
+                  // 尝试修复常见问题
+                  try {
+                    // 如果数据包含多个JSON对象，尝试分割并处理
+                    if (data.includes('}{')) {
+                      const parts = data.split(/(?<=\})(?=\{)/);
+                      for (const part of parts) {
+                        try {
+                          const partData = JSON.parse(part);
+                          if (partData.choices && partData.choices[0].delta && partData.choices[0].delta.content) {
+                            fullAssistantMessage += partData.choices[0].delta.content;
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(partData)}\n\n`));
+                          }
+                        } catch {
+                          // 忽略无法解析的部分
+                        }
+                      }
+                    }
+                  } catch {
+                    // 如果修复尝试失败，忽略这个数据块
+                  }
                 }
               }
             }

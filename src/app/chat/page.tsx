@@ -409,89 +409,58 @@ function ChatPageContent() {
 
   // 生成聊天标题
   const generateChatTitle = async (firstMessage: string): Promise<string> => {
-    // 获取系统配置的标题生成模型
-    let titleModelId = null;
+    // 如果已经有标题且不是默认标题，则不再生成
+    if (currentChatId && chatHistories.find(h => h.id === currentChatId)?.title && 
+        chatHistories.find(h => h.id === currentChatId)?.title !== '新对话') {
+      return chatHistories.find(h => h.id === currentChatId)?.title || '新对话';
+    }
+    
     try {
-      const settingsResponse = await fetch(`/api/admin/system-settings?adminUserId=${user.id}&key=title_generation_model_id`);
-      if (settingsResponse.ok) {
-        const settingsData = await settingsResponse.json();
-        titleModelId = settingsData.value;
-      }
-    } catch (error) {
-      console.error('Error loading title generation model setting:', error);
-    }
-
-    // 如果没有配置标题生成模型，使用当前选择的模型
-    let modelToUse = null;
-    if (titleModelId) {
-      // 查找配置的标题生成模型
-      const allModels = providers.flatMap(provider =>
-        provider.models?.filter(model => model.isEnabled) || []
-      );
-      modelToUse = allModels.find(model => model.id === titleModelId);
-    }
-
-    // 如果没有找到配置的模型，使用当前选择的模型
-    if (!modelToUse) {
-      const currentModel = getCurrentModel();
-      if (!currentModel) {
-        return firstMessage.slice(0, 20) + (firstMessage.length > 20 ? '...' : '');
-      }
-      modelToUse = currentModel.model;
-    }
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'user',
-              content: `使用4到8个字直接返回这句话的简要主题，在 8 个字以内，不要解释、不要标点、不要语气词、不要多余文本，不要加粗，如果没有主题，请直接返回"闲聊"：\n\n${firstMessage}`
-            }
-          ],
-          userId: user.id,
-          modelId: modelToUse.id
-        }),
-      });
-
-      if (response.ok) {
-        const reader = response.body?.getReader();
-        if (reader) {
-          let title = '';
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content || '';
-                  title += content;
-                } catch {
-                  // 忽略解析错误
-                }
-              }
-            }
-          }
-          return title.trim().slice(0, 8) || '闲聊';
+      // 获取系统设置的标题生成模型ID
+      let titleModelId = selectedModelId;
+      try {
+        const titleModelResponse = await fetch('/api/admin/system-settings?key=title_generation_model_id');
+        if (titleModelResponse.ok) {
+          const titleModelData = await titleModelResponse.json();
+          titleModelId = titleModelData.value || selectedModelId;
         }
+      } catch (error) {
+        console.log('获取标题生成模型失败，使用当前选择的模型');
       }
-    } catch {
-      // 如果生成失败，使用默认标题
+      
+      if (!titleModelId) {
+        return '新对话';
+      }
+      
+      // 构建标题生成请求
+      const titlePrompt = `请根据以下用户消息生成一个简短的聊天标题（不超过8个字）：\n\n${firstMessage}\n\n只需回复标题文本，不要有任何其他内容。`;
+      
+      const titleResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: titlePrompt }],
+          modelId: titleModelId,
+          userId: user?.id || 'guest',
+          temperature: 0.3,
+          stream: false
+        })
+      });
+      
+      if (!titleResponse.ok) {
+        console.error('标题生成失败:', await titleResponse.text());
+        return '新对话';
+      }
+      
+      const titleData = await titleResponse.json();
+      const generatedTitle = titleData.content?.trim() || '新对话';
+      
+      // 限制标题长度
+      return generatedTitle.slice(0, 8);
+    } catch (error) {
+      console.error('生成标题失败:', error);
+      return '新对话';
     }
-
-    return firstMessage.slice(0, 8) + (firstMessage.length > 8 ? '' : '') || '闲聊';
   };
 
   // 加载历史聊天 - 乐观更新 + 延迟验证
@@ -695,10 +664,10 @@ function ChatPageContent() {
     }
   };
 
-  // 发送消息
-  const handleSend = async () => {
-    if (!input.trim() || isLoading || !user) return;
-
+  // 发送消息到AI API的核心逻辑
+  const sendMessageToAI = async (messageContent: string) => {
+    if (!user) return;
+    
     const currentModel = getCurrentModel();
     if (!currentModel) {
       toast.error('请选择一个AI模型');
@@ -719,29 +688,7 @@ function ChatPageContent() {
       return;
     }
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      conversationId: currentChatId || undefined,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-      modelInfo: {
-        modelId: currentModel.model.modelId || currentModel.model.id,
-        modelName: currentModel.model.name,
-        providerId: currentModel.provider.id,
-        providerName: currentModel.provider.displayName || currentModel.provider.name
-      }
-    };
-
-    // 检测是否包含中文
-    const containsChinese = /[\u4e00-\u9fff]/.test(input);
-    setHasChinese(containsChinese);
-    
-    // 先添加用户消息
-    setMessages(prev => [...prev, userMessage]);
-    
-    // 然后添加AI回复消息（乐观估计）
-    // 为每条消息使用唯一ID以避免合并
+    // 添加AI回复消息（乐观估计）
     const assistantMessage: Message = {
       id: `assistant-${Date.now()}`, // 确保ID唯一性
       conversationId: currentChatId || undefined,
@@ -764,7 +711,6 @@ function ChatPageContent() {
     setTimeout(() => {
       setMessages(prev => [...prev, assistantMessage]);
     }, 50);
-    setInput('');
     setIsLoading(true);
     setIsWaitingFirstChar(true);
 
@@ -772,7 +718,7 @@ function ChatPageContent() {
     let conversationId = currentChatId;
     if (!conversationId && chatConfig?.canSaveToDatabase) {
       try {
-        const title = await generateChatTitle(userMessage.content);
+        const title = await generateChatTitle(messageContent);
         const convResponse = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -797,7 +743,7 @@ function ChatPageContent() {
     // 保存用户消息到数据库
     if (chatConfig?.canSaveToDatabase && conversationId) {
       try {
-        await saveMessageToDatabase(userMessage.content, 'user');
+        await saveMessageToDatabase(messageContent, 'user');
       } catch (error) {
         console.error('保存用户消息失败:', error);
       }
@@ -810,7 +756,7 @@ function ChatPageContent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(msg => ({
+          messages: [...messages].map(msg => ({
             role: msg.role,
             content: msg.content
           })),
@@ -826,10 +772,6 @@ function ChatPageContent() {
       const reader = response.body?.getReader();
       if (!reader) throw new Error('无法读取响应');
 
-      // 创建消息ID变量以供后续使用
-      // 我们使用之前创建的assistantMessage
-      // const assistantMessageId = assistantMessage.id; // This line is no longer needed
-
       let finalTokenUsage: any = null;
 
       // 处理流式响应
@@ -841,99 +783,163 @@ function ChatPageContent() {
         const lines = chunk.split('\n');
 
         for (const line of lines) {
+          if (line.trim() === '') continue; // 跳过空行
+          
           if (line.startsWith('data: ')) {
-            const data = line.slice(6);
+            const data = line.slice(6).trim();
             if (data === '[DONE]') continue;
 
             try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || '';
+              // 检查是否是有效的JSON数据
+              if (!data || data === '') continue;
+              
+              // 处理可能的非JSON格式数据
+              if (data.startsWith('{') || data.startsWith('[')) {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices?.[0]?.delta?.content || '';
 
-              // 保存token使用信息
-              if (parsed.usage) {
-                finalTokenUsage = parsed.usage;
-                
-                // 更新token统计
-                setTokenStats(prev => ({
-                  input: prev.input + (parsed.usage.prompt_tokens || 0),
-                  output: prev.output + (parsed.usage.completion_tokens || 0),
-                  total: prev.total + (parsed.usage.total_tokens || 0),
-                }));
-              }
+                // 保存token使用信息
+                if (parsed.usage) {
+                  finalTokenUsage = parsed.usage;
+                  
+                  // 更新token统计
+                  setTokenStats(prev => ({
+                    input: prev.input + (parsed.usage.prompt_tokens || 0),
+                    output: prev.output + (parsed.usage.completion_tokens || 0),
+                    total: prev.total + (parsed.usage.total_tokens || 0),
+                  }));
+                }
 
-              if (content) {
-                // 如果是第一个字符，更新等待状态
-                if (isWaitingFirstChar) {
-                  setIsWaitingFirstChar(false);
+                if (content) {
+                  // 如果是第一个字符，更新等待状态
+                  if (isWaitingFirstChar) {
+                    setIsWaitingFirstChar(false);
+                  }
+                  
+                  // 更新消息内容
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: msg.content + content }
+                      : msg
+                  ));
+                  
+                  // 同时更新引用中的内容
+                  if (latestAIReply.current && latestAIReply.current.id === assistantMessageId) {
+                    latestAIReply.current.content = latestAIReply.current.content + content;
+                  }
                 }
-                
-                // 更新消息内容
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: msg.content + content }
-                    : msg
-                ));
-                
-                // 同时更新引用中的内容
-                if (latestAIReply.current && latestAIReply.current.id === assistantMessageId) {
-                  latestAIReply.current.content = latestAIReply.current.content + content;
-                }
+              } else {
+                console.warn('接收到非JSON格式数据:', data);
               }
-            } catch {
-              // 忽略解析错误
+            } catch (e) {
+              console.error('解析流式响应失败:', e, '原始数据:', data);
+              
+              // 尝试修复常见的JSON解析问题
+              try {
+                // 处理可能的数据前缀问题（如 "data: {"ch..."）
+                if (data.includes('{"ch') || data.includes('{"id":')) {
+                  const jsonStartIndex = data.indexOf('{');
+                  if (jsonStartIndex !== -1) {
+                    const jsonPart = data.substring(jsonStartIndex);
+                    const parsed = JSON.parse(jsonPart);
+                    
+                    const content = parsed.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                      // 更新消息内容
+                      setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: msg.content + content }
+                          : msg
+                      ));
+                      
+                      // 同时更新引用中的内容
+                      if (latestAIReply.current && latestAIReply.current.id === assistantMessageId) {
+                        latestAIReply.current.content = latestAIReply.current.content + content;
+                      }
+                      
+                      // 如果是第一个字符，更新等待状态
+                      if (isWaitingFirstChar) {
+                        setIsWaitingFirstChar(false);
+                      }
+                    }
+                  }
+                }
+              } catch (innerError) {
+                // 内部修复尝试也失败，忽略这个数据块
+                console.warn('尝试修复JSON失败:', innerError);
+              }
             }
+          } else {
+            // 处理不以 'data: ' 开头的行
+            console.warn('接收到非标准SSE格式数据:', line);
           }
         }
       }
 
-      // 流式响应结束后，处理最终的token使用情况
-      if (finalTokenUsage) {
-        // 更新消息的token信息
-        setMessages(prev => prev.map(msg =>
-          msg.id === assistantMessageId
-            ? { ...msg, tokenUsage: finalTokenUsage }
-            : msg
-        ));
-        
-        // 保存AI消息到数据库
-        if (chatConfig?.canSaveToDatabase && conversationId) {
-          try {
-            // 获取最终的AI回复内容
-            const aiMessageContent = latestAIReply.current?.content || '';
-            
-            await saveMessageToDatabase(aiMessageContent, 'assistant', finalTokenUsage);
-          } catch (error) {
-            console.error('保存AI回复失败:', error);
-          }
+      // 完成后更新状态
+      setIsLoading(false);
+      
+      // 保存AI回复到数据库
+      if (chatConfig?.canSaveToDatabase && conversationId) {
+        const aiContent = latestAIReply.current?.content || '';
+        try {
+          await saveMessageToDatabase(aiContent, 'assistant', finalTokenUsage);
+        } catch (error) {
+          console.error('保存AI回复失败:', error);
         }
       }
+
+      // 更新聊天历史
+      saveCurrentChat();
     } catch (error) {
       console.error('发送消息失败:', error);
-      // 错误情况下，使用新的错误消息替换之前的AI消息
-      setMessages(prev => {
-        // 移除最后一条消息，如果它是AI回复
-        const withoutLastMessage = prev.filter((msg, idx) => 
-          !(idx === prev.length - 1 && msg.role === 'assistant')
-        );
-        
-        // 添加新的错误消息
-        const errorMessage: Message = {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: '抱歉，发生了错误。请检查您的配置或稍后重试。',
-          timestamp: new Date()
-        };
-        
-        return [...withoutLastMessage, errorMessage];
-      });
-      toast.error('发送消息失败，请检查配置');
-    } finally {
+      
+      // 错误处理 - 更新最后一条消息为错误消息
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId
+          ? { ...msg, id: `error-${Date.now()}`, content: `发送失败: ${error instanceof Error ? error.message : '未知错误'}` }
+          : msg
+      ));
+      
       setIsLoading(false);
-      setIsWaitingFirstChar(false);
-      setRandomChars(''); // 清除随机字符
-      // 发送完成后保存聊天
-      setTimeout(() => saveCurrentChat(), 1000);
+      toast.error('发送消息失败');
     }
+  };
+
+  // 发送消息
+  const handleSend = async () => {
+    if (!input.trim() || isLoading || !user) return;
+
+    const currentModel = getCurrentModel();
+    if (!currentModel) {
+      toast.error('请选择一个AI模型');
+      return;
+    }
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      conversationId: currentChatId || undefined,
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date(),
+      modelInfo: {
+        modelId: currentModel.model.modelId || currentModel.model.id,
+        modelName: currentModel.model.name,
+        providerId: currentModel.provider.id,
+        providerName: currentModel.provider.displayName || currentModel.provider.name
+      }
+    };
+
+    // 检测是否包含中文
+    const containsChinese = /[\u4e00-\u9fff]/.test(input);
+    setHasChinese(containsChinese);
+    
+    // 先添加用户消息
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    
+    // 发送消息到AI API
+    await sendMessageToAI(userMessage.content);
   };
 
   // 清空对话
@@ -1018,8 +1024,7 @@ function ChatPageContent() {
 
     // 删除该消息及其后面的所有消息
     const newMessages = messages.slice(0, messageIndex);
-    setMessages(newMessages);
-
+    
     // 如果删除的是用户消息，也从数据库中删除相应的消息
     if (currentChatId && chatConfig?.canSaveToDatabase) {
       const message = messages[messageIndex];
@@ -1039,9 +1044,21 @@ function ChatPageContent() {
       }
     }
 
-    // 重新发送编辑后的消息
-    setInput(content);
-    setTimeout(() => handleSend(), 100);
+    // 添加编辑后的用户消息
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      conversationId: currentChatId || undefined,
+      role: 'user',
+      content: content,
+      timestamp: new Date(),
+      modelInfo: messages[messageIndex].modelInfo
+    };
+    
+    // 更新消息列表
+    setMessages([...newMessages, userMessage]);
+    
+    // 发送消息到AI API
+    sendMessageToAI(content);
   };
 
   // 重试消息
@@ -1165,7 +1182,7 @@ function ChatPageContent() {
       drawerOpen={drawerOpen}
       onDrawerToggle={handleDrawerToggle}
       renderMessageContent={(message) => (
-        <Box>
+        <Box sx={{ my: 0 }}>
           <MarkdownRenderer
             content={message.content}
             isStreaming={

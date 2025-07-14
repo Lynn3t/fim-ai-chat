@@ -146,6 +146,19 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
   const [editableTitle, setEditableTitle] = React.useState(chatTitle);
   const { mode } = useTheme();
   
+  // 创建消息气泡的引用数组 - 移到组件顶层，避免hooks顺序问题
+  const messageBubbleRefs = React.useRef<{ [key: string]: React.RefObject<HTMLDivElement> }>({});
+  
+  // 确保每个消息都有一个引用
+  React.useEffect(() => {
+    // 为每个消息创建或获取引用
+    messages.forEach(message => {
+      if (!messageBubbleRefs.current[message.id]) {
+        messageBubbleRefs.current[message.id] = React.createRef<HTMLDivElement>();
+      }
+    });
+  }, [messages]);
+  
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
@@ -616,38 +629,44 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                       
                       {/* 消息气泡 */}
                       <Paper 
+                        ref={messageBubbleRefs.current[message.id]}
                         elevation={0}
                         sx={{ 
-                          p: 2, 
+                          py: 1.5,  // 统一上下内边距
+                          px: 2,    // 保持左右内边距
                           bgcolor: message.role === 'user' 
                             ? (mode === 'light' ? '#e0e0e0' : '#333333') 
                             : (mode === 'light' ? '#ffffff' : '#1e1e1e'),
                           borderRadius: 2,
-                          position: 'relative'
+                          position: 'relative',
+                          cursor: 'default' // 确保鼠标样式正常
                         }}
                       >
                         {/* 消息内容或编辑框 */}
                         {renderMessageContent(message)}
-
-                        {/* 使用MessageActions组件来处理消息操作和token显示 */}
-                        <Box 
-                          sx={{ 
-                            mt: 1,
-                            textAlign: message.role === 'user' ? 'right' : 'left',
-                          }}
-                        >
-                          <MessageActions
-                            content={message.content}
-                            messageRole={message.role}
-                            onCopy={() => onCopyMessage?.(message.id, message.content)}
-                            onDelete={() => onDeleteMessage?.(message.id)}
-                            onEdit={(newContent) => onEditMessage?.(message.id, newContent)}
-                            onResend={() => onRetryMessage?.(message.id)}
-                            tokenUsage={message.tokenUsage}
-                            isInMessageBubble={true}
-                          />
-                        </Box>
                       </Paper>
+
+                      {/* 消息操作按钮 - 移至气泡外部 */}
+                      <Box 
+                        sx={{ 
+                          mt: 0.5,  // 减小上边距，使按钮更靠近气泡
+                          display: 'flex',
+                          justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                          padding: '5px 0', // 添加上下内边距，扩大可点击区域
+                        }}
+                      >
+                        <MessageActions
+                          content={message.content}
+                          messageRole={message.role}
+                          onCopy={() => onCopyMessage?.(message.id, message.content)}
+                          onDelete={() => onDeleteMessage?.(message.id)}
+                          onEdit={(newContent) => onEditMessage?.(message.id, newContent)}
+                          onResend={() => onRetryMessage?.(message.id)}
+                          tokenUsage={message.tokenUsage}
+                          isInMessageBubble={false}
+                          parentRef={messageBubbleRefs.current[message.id]}
+                        />
+                      </Box>
                     </Box>
                   </Box>
                 );

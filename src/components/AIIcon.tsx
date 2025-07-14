@@ -23,7 +23,8 @@ import {
   SiliconCloud,
   Perplexity,
   Stability,
-  Flux
+  Flux,
+  Meta
 } from '@lobehub/icons';
 
 interface AIIconProps {
@@ -47,7 +48,7 @@ const ICON_COMPONENTS: Record<string, React.ComponentType<any>> = {
   ByteDance: ByteDance,
   Cohere: Cohere,
   Zhipu: Zhipu,
-  Meta: OpenAI, // 使用OpenAI作为Meta的图标
+  Meta: Meta, // 使用正确的Meta图标
   Mistral: Mistral,
   Yi: Yi,
   SenseTime: SenseNova,
@@ -60,10 +61,31 @@ const ICON_COMPONENTS: Record<string, React.ComponentType<any>> = {
   Perplexity: Perplexity,
   StabilityAI: Stability,
   Flux: Flux,
+  // 添加其他可能的映射，确保所有分类都有对应的图标
+  ChatGPT: OpenAI,
+  Gemini: Google,
+  Grok: XAI,
+  GLM: Zhipu,
+  Llama: Meta,
+  Qwen: Alibaba,
+  WenXin: Baidu,
+  DouBao: ByteDance,
+  HunYuan: Tencent,
+  Gemma: Google,
+  HaiLuo: OpenAI,
+  VolcEngine: ByteDance,
+  VertexAI: Google,
+  Spark: Spark,
+  'DALL-E': OpenAI,
+  Baichuan: OpenAI,
+  Other: OpenAI
 };
 
 export function AIIcon({ modelId, size = 20, className = '' }: AIIconProps) {
+  // 获取图标名称
   const iconName = getAIModelIcon(modelId);
+  
+  // 查找对应的图标组件，如果没有找到则使用OpenAI作为默认
   const IconComponent = ICON_COMPONENTS[iconName] || OpenAI;
 
   return (
