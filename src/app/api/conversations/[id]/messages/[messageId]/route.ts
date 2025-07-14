@@ -3,10 +3,10 @@ import { deleteMessage, getMessageById, updateMessage } from '@/lib/db/conversat
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; messageId: string } }
+  { params }: { params: Promise<{ id: string; messageId: string }> }
 ) {
   try {
-    const { id, messageId } = params
+    const { id, messageId } = await params
     
     if (!id || !messageId) {
       return NextResponse.json(
@@ -45,10 +45,10 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; messageId: string } }
+  { params }: { params: Promise<{ id: string; messageId: string }> }
 ) {
   try {
-    const { id, messageId } = params
+    const { id, messageId } = await params
     
     if (!id || !messageId) {
       return NextResponse.json(

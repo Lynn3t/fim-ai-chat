@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from './Toast';
 
 interface MessageActionsProps {
@@ -10,6 +10,12 @@ interface MessageActionsProps {
   onDelete?: () => void;
   onEdit?: (newContent: string) => void;
   onResend?: () => void;
+  tokenUsage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    is_estimated?: boolean;
+  };
 }
 
 export function MessageActions({
@@ -18,11 +24,71 @@ export function MessageActions({
   onCopy,
   onDelete,
   onEdit,
-  onResend
+  onResend,
+  tokenUsage
 }: MessageActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const toast = useToast();
+  const [isMobile, setIsMobile] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const messageActionsRef = useRef<HTMLDivElement>(null);
+
+  // 检测是否为移动设备
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
+
+  // 处理移动端点击行为
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        messageActionsRef.current && 
+        !messageActionsRef.current.contains(event.target as Node) && 
+        isMobile && 
+        isVisible
+      ) {
+        setIsVisible(false);
+      }
+    };
+    
+    if (isMobile) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [isMobile, isVisible]);
+
+  // 处理消息操作的显示/隐藏
+  const handleMessageClick = () => {
+    if (isMobile) {
+      setIsVisible(prev => !prev);
+    }
+  };
+
+  // 鼠标悬停处理
+  const handleMouseEnter = () => {
+    if (!isMobile) {
+      setIsVisible(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!isMobile) {
+      setIsVisible(false);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -84,50 +150,92 @@ export function MessageActions({
   }
 
   return (
-    <div className="inline-flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button
-        onClick={handleCopy}
-        className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-        title="复制"
+    <div 
+      ref={messageActionsRef}
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleMessageClick}
+    >
+      <div 
+        className={`
+          inline-flex items-center space-x-1 
+          transition-opacity duration-200
+          ${isVisible ? 'opacity-100' : 'opacity-0'}
+        `}
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      </button>
-
-      {messageRole === 'user' && (
         <button
-          onClick={handleEdit}
+          onClick={handleCopy}
           className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          title="编辑"
+          title="复制"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         </button>
-      )}
 
-      {messageRole === 'user' && onResend && (
+        {messageRole === 'user' && (
+          <button
+            onClick={handleEdit}
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            title="编辑"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+        )}
+
+        {messageRole === 'user' && onResend && (
+          <button
+            onClick={onResend}
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            title="重新发送"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
+
         <button
-          onClick={onResend}
-          className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          title="重新发送"
+          onClick={handleDelete}
+          className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+          title="删除"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </button>
+      </div>
+      
+      {/* Token 使用量显示 */}
+      {tokenUsage && messageRole === 'assistant' && (
+        <div 
+          className={`
+            mt-2 text-xs text-gray-500 dark:text-gray-400
+            transition-opacity duration-200
+            ${isVisible ? 'opacity-100' : 'opacity-0'}
+          `}
+        >
+          <span title="输入/提示 tokens">
+            输入: {tokenUsage.prompt_tokens || 0}
+          </span>
+          <span className="mx-2">|</span>
+          <span title="输出/完成 tokens">
+            输出: {tokenUsage.completion_tokens || 0}
+          </span>
+          <span className="mx-2">|</span>
+          <span title="总计 tokens">
+            总计: {tokenUsage.total_tokens || 0}
+          </span>
+          {tokenUsage.is_estimated && (
+            <span className="ml-1 text-yellow-500" title="此为估算值">
+              (估算)
+            </span>
+          )}
+        </div>
       )}
-
-      <button
-        onClick={handleDelete}
-        className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-        title="删除"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
     </div>
   );
 }

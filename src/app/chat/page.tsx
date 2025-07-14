@@ -155,6 +155,39 @@ function ChatPageContent() {
     };
   }, [isLoading, hasChinese]);
 
+  // 定义函数早期以便引用
+  // 加载聊天历史
+  const loadChatHistories = async () => {
+    if (!user || !chatConfig?.canSaveToDatabase) return;
+
+    try {
+      const response = await fetch(`/api/conversations?userId=${user.id}`);
+      if (response.ok) {
+        const conversations = await response.json();
+        const histories: ChatHistory[] = conversations.map((conv: any) => ({
+          id: conv.id,
+          title: conv.title,
+          messages: [], // 消息会在选择对话时加载
+          createdAt: new Date(conv.createdAt),
+          updatedAt: new Date(conv.updatedAt),
+          provider: conv.provider,
+          model: conv.model,
+        }));
+        setChatHistories(histories);
+      }
+    } catch (error) {
+      console.error('加载聊天历史失败:', error);
+    }
+  };
+
+  // 保存聊天历史（对于访客用户，使用localStorage）
+  const saveChatHistories = (histories: ChatHistory[]) => {
+    if (user?.role === 'GUEST') {
+      localStorage.setItem('fimai-chat-histories', JSON.stringify(histories));
+    }
+    setChatHistories(histories);
+  };
+
   // 加载提供商和模型
   useEffect(() => {
     let isMounted = true;
@@ -249,6 +282,13 @@ function ChatPageContent() {
     };
   }, [user, providers.length]); // 添加 providers.length 作为依赖项
 
+  // 加载聊天历史的effect
+  useEffect(() => {
+    if (user && chatConfig?.canSaveToDatabase) {
+      loadChatHistories();
+    }
+  }, [user, chatConfig]);
+
   // 设置默认模型（单独的effect避免循环依赖）
   useEffect(() => {
     if (Array.isArray(providers) && providers.length > 0 && !selectedModelId) {
@@ -314,34 +354,6 @@ function ChatPageContent() {
     }
   }, [providers, selectedModelId, userSettings]);
 
-  // 加载历史聊天记录
-  useEffect(() => {
-    const loadChatHistories = async () => {
-      if (!user || !chatConfig?.canSaveToDatabase) return;
-
-      try {
-        const response = await fetch(`/api/conversations?userId=${user.id}`);
-        if (response.ok) {
-          const conversations = await response.json();
-          const histories: ChatHistory[] = conversations.map((conv: any) => ({
-            id: conv.id,
-            title: conv.title,
-            messages: [], // 消息会在选择对话时加载
-            createdAt: new Date(conv.createdAt),
-            updatedAt: new Date(conv.updatedAt),
-            provider: conv.provider,
-            model: conv.model,
-          }));
-          setChatHistories(histories);
-        }
-      } catch (error) {
-        console.error('加载聊天历史失败:', error);
-      }
-    };
-
-    loadChatHistories();
-  }, [user, chatConfig]);
-
   // 当侧边栏打开时，加载聊天历史记录
   const handleDrawerToggle = () => {
     const newState = !drawerOpen;
@@ -351,14 +363,6 @@ function ChatPageContent() {
     if (newState && user && chatConfig?.canSaveToDatabase) {
       loadChatHistories();
     }
-  };
-
-  // 保存聊天历史（对于访客用户，使用localStorage）
-  const saveChatHistories = (histories: ChatHistory[]) => {
-    if (user?.role === 'GUEST') {
-      localStorage.setItem('fimai-chat-histories', JSON.stringify(histories));
-    }
-    setChatHistories(histories);
   };
 
   // 创建新聊天

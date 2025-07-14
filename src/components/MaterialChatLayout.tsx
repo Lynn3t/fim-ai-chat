@@ -413,7 +413,7 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                   <Typography variant="body2" sx={{ mr: 1 }}>
                     {modelName || '选择模型'}
                   </Typography>
-                  <SmartToyIcon fontSize="small" />
+                  {currentModelId && <AIIcon modelId={currentModelId} size={16} />}
                 </Box>
                 <Menu
                   id="model-menu"
@@ -432,14 +432,26 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                     return (
                       <div key={groupName}>
                         <ListItem sx={{ py: 0, px: 2 }}>
-                          <ListItemText 
-                            primary={groupName} 
-                            primaryTypographyProps={{ 
-                              variant: 'caption',
-                              color: 'text.secondary',
-                              fontWeight: 'bold'
-                            }} 
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                            <Box sx={{ 
+                              mr: 1, 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              backgroundColor: 'background.paper',
+                              borderRadius: '50%',
+                              p: 0.5
+                            }}>
+                              <AIIcon modelId={groupName} size={16} />
+                            </Box>
+                            <ListItemText 
+                              primary={groupName} 
+                              primaryTypographyProps={{ 
+                                variant: 'caption',
+                                color: 'text.secondary',
+                                fontWeight: 'bold'
+                              }} 
+                            />
+                          </Box>
                         </ListItem>
                         <Divider />
                         {groupModels.map(model => (
@@ -447,15 +459,28 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
                             key={model.id} 
                             onClick={() => handleModelSelect(model.id)}
                             selected={currentModelId === model.id}
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              gap: 1
+                            }}
                           >
-                            <ListItemText 
-                              primary={model.name} 
-                              secondary={model.provider ? `(${model.provider})` : undefined}
-                            />
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '50%',
+                              backgroundColor: mode === 'light' ? 'grey.100' : 'grey.800',
+                              width: 24,
+                              height: 24
+                            }}>
+                              <AIIcon modelId={model.id} size={16} />
+                            </Box>
+                            <Typography variant="body2" noWrap>
+                              {model.name}
+                            </Typography>
                           </MenuItem>
                         ))}
-                        {/* Add divider between groups */}
-                        <Divider />
                       </div>
                     );
                   })}
