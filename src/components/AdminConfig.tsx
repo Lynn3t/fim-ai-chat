@@ -21,7 +21,11 @@ import {
   TableHead,
   TableRow,
   Chip,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   OpenAI,
@@ -267,6 +271,10 @@ export default function AdminConfig() {
     userLeaderboard: [],
     modelStats: []
   });
+
+  // 删除用户相关状态
+  const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<{ id: string; username: string } | null>(null);
 
   // 加载仪表板数据
   const loadDashboard = async () => {
@@ -1607,61 +1615,53 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     }
   };
 
+  // 打开删除用户确认对话框
+  const openDeleteUserDialog = (userId: string, username: string) => {
+    setDeletingUser({ id: userId, username });
+    setShowDeleteUserDialog(true);
+  };
+
+  // 关闭删除用户确认对话框
+  const closeDeleteUserDialog = () => {
+    setShowDeleteUserDialog(false);
+    setDeletingUser(null);
+  };
+
+  // 删除用户函数
   const deleteUser = async (userId: string, username: string) => {
     if (!currentUser) return;
-
-    if (!confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销。`)) {
-      return;
-    }
 
     // 保存原始用户数据
     const originalUser = users.find(u => u.id === userId);
     if (!originalUser) return;
 
-    // 1. 立即从UI移除 (淡出效果)
+    // 1. 立即从UI移除
     setUsers(prev => prev.filter(u => u.id !== userId));
     toast.success('用户删除成功');
+    closeDeleteUserDialog();
 
     // 2. 发送API请求
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-        }),
+      const response = await fetch(`/api/admin/users/${userId}?adminUserId=${currentUser.id}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
-        throw new Error('API request failed');
+        // 如果API请求失败，恢复用户
+        setUsers(prev => [...prev, originalUser].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ));
+        
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '删除用户失败';
+        toast.error(errorMessage);
       }
-
-      // 3. 延迟验证 (2秒后)
-      setTimeout(async () => {
-        try {
-          const verifyResponse = await fetch(`/api/admin/users/${userId}`);
-
-          // 4. 如果用户仍然存在，说明删除失败
-          if (verifyResponse.ok) {
-            // 恢复用户 (淡入效果)
-            setUsers(prev => [...prev, originalUser].sort((a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            ));
-            toast.error('用户删除失败，已恢复');
-          }
-        } catch {
-          // 404错误是正常的，说明删除成功
-          // 其他错误则提示验证失败但不恢复用户
-          console.log('用户删除验证完成');
-        }
-      }, 2000);
-
     } catch (error) {
       // API调用失败，立即恢复
       setUsers(prev => [...prev, originalUser].sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ));
-      toast.error('删除操作失败，已恢复用户');
+      toast.error('删除操作失败');
     }
   };
 
@@ -1717,12 +1717,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     }
 
     try {
-      const response = await fetch(`/api/admin/codes/${codeId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: currentUser.id,
-        }),
+      const response = await fetch(`/api/admin/codes/${codeId}?adminUserId=${currentUser.id}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -1834,9 +1830,44 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     );
   }
 
+  // 添加删除用户确认对话框
+  const DeleteUserDialog = () => {
+    return (
+      <Dialog
+        open={showDeleteUserDialog}
+        onClose={closeDeleteUserDialog}
+        aria-labelledby="delete-user-dialog-title"
+      >
+        <DialogTitle id="delete-user-dialog-title">
+          确认删除用户
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            您确定要删除用户 <b>{deletingUser?.username}</b> 吗？此操作不可撤销，将删除该用户的所有数据。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteUserDialog} color="primary">
+            取消
+          </Button>
+          <Button 
+            onClick={() => deletingUser && deleteUser(deletingUser.id, deletingUser.username)} 
+            color="error"
+            variant="contained"
+          >
+            删除
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: 4 }}>
       <Container>
+        {/* 删除用户确认对话框 */}
+        <DeleteUserDialog />
+        
         {/* 页面标题 */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
@@ -2406,9 +2437,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                   <Button
                                     variant="text"
                                     size="small"
-                                    color="inherit"
-                                    sx={{ color: '#000000' }}
-                                    onClick={() => deleteUser(user.id, user.username)}
+                                    color="error"
+                                    onClick={() => openDeleteUserDialog(user.id, user.username)}
                                   >
                                     删除
                                   </Button>
@@ -3671,35 +3701,36 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
   );
 }
 
-// 重置用户密码
-const resetUserPassword = async () => {
-  if (!currentUser || !resetPasswordData.userId || !resetPasswordData.newPassword) return;
+  // 重置用户密码
+  const resetUserPassword = async () => {
+    if (!currentUser || !resetPasswordData.userId || !resetPasswordData.newPassword) return;
 
-  setIsResettingPassword(true);
-  try {
-    const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adminUserId: currentUser.id,
-        newPassword: resetPasswordData.newPassword
-      }),
-    });
+    setIsResettingPassword(true);
+    try {
+      const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          newPassword: resetPasswordData.newPassword
+        }),
+      });
 
-    if (response.ok) {
-      toast.success(`用户 "${resetPasswordData.username}" 的密码已重置`);
-      setShowResetPasswordModal(false);
-      setResetPasswordData({ userId: '', username: '', newPassword: '' });
-    } else {
-      const errorData = await response.json();
-      toast.error(errorData.error || '密码重置失败');
+      if (response.ok) {
+        toast.success(`用户 "${resetPasswordData.username}" 的密码已重置`);
+        setShowResetPasswordModal(false);
+        setResetPasswordData({ userId: '', username: '', newPassword: '' });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || '密码重置失败';
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error('密码重置失败');
+    } finally {
+      setIsResettingPassword(false);
     }
-  } catch (error) {
-    toast.error('密码重置失败');
-  } finally {
-    setIsResettingPassword(false);
-  }
-};
+  };
 
 // 打开重置密码对话框
 const openResetPasswordModal = (userId: string, username: string) => {

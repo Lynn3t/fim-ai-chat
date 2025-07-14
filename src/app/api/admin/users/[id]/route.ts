@@ -105,12 +105,12 @@ export async function PATCH(
 // 删除单个用户
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const { searchParams } = new URL(request.url)
     const adminUserId = searchParams.get('adminUserId')
-    const { id: userId } = await params
+    const { id: userId } = params
 
     if (!adminUserId) {
       return NextResponse.json(
