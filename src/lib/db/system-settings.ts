@@ -47,6 +47,18 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingValue[] = [
     description: '默认用户Token限制'
   },
   {
+    key: 'default_limit_type',
+    value: 'token',
+    type: 'string',
+    description: '默认限制类型：none, token, cost'
+  },
+  {
+    key: 'enable_token_tracking',
+    value: true,
+    type: 'boolean',
+    description: '是否启用Token使用统计'
+  },
+  {
     key: 'title_generation_model_id',
     value: null,
     type: 'string',

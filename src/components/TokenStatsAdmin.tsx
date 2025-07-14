@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import { getAutoPricing } from '@/utils/aiModelUtils'
 
 interface ModelPricing {
   id: string
@@ -102,6 +103,13 @@ interface UserUsageStats {
   messageCount: number
 }
 
+// Add system settings interface
+interface SystemTokenSettings {
+  defaultTokenLimit: number;
+  defaultLimitType: 'token' | 'cost' | 'none';
+  enableTokenTracking: boolean;
+}
+
 export default function TokenStatsAdmin() {
   const { user: currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('pricing')
@@ -142,11 +150,19 @@ export default function TokenStatsAdmin() {
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
+  // Add system settings state
+  const [systemTokenSettings, setSystemTokenSettings] = useState<SystemTokenSettings>({
+    defaultTokenLimit: 100000,
+    defaultLimitType: 'token',
+    enableTokenTracking: true
+  })
+  
   // 加载数据
   useEffect(() => {
     console.log('TokenStatsAdmin: useEffect triggered. currentUser:', currentUser)
     if (currentUser) {
       loadData()
+      loadSystemSettings()
     } else {
       console.log('TokenStatsAdmin: Waiting for currentUser...')
     }
@@ -262,6 +278,62 @@ export default function TokenStatsAdmin() {
     }
   }
 
+  // Load system settings
+  const loadSystemSettings = async () => {
+    if (!currentUser || !currentUser.id) return
+    
+    try {
+      const response = await fetch(`/api/admin/system-settings?adminUserId=${currentUser.id}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSystemTokenSettings({
+          defaultTokenLimit: data.raw.default_user_token_limit || 100000,
+          defaultLimitType: data.raw.default_limit_type || 'token',
+          enableTokenTracking: data.raw.enable_token_tracking !== false
+        })
+      } else {
+        console.error('Failed to load system settings')
+      }
+    } catch (error) {
+      console.error('Error loading system settings:', error)
+    }
+  }
+  
+  // Save system settings
+  const saveSystemSettings = async () => {
+    if (!currentUser || !currentUser.id) return
+    
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/admin/system-settings`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminUserId: currentUser.id,
+          settings: {
+            default_user_token_limit: systemTokenSettings.defaultTokenLimit,
+            default_limit_type: systemTokenSettings.defaultLimitType,
+            enable_token_tracking: systemTokenSettings.enableTokenTracking
+          }
+        }),
+      })
+      
+      if (response.ok) {
+        toast.success('系统 Token 设置已保存')
+      } else {
+        toast.error('保存系统设置失败')
+      }
+    } catch (error) {
+      console.error('Error saving system settings:', error)
+      toast.error('保存系统设置失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
     setActiveTab(newValue)
   }
@@ -373,6 +445,120 @@ export default function TokenStatsAdmin() {
     setPage(0)
   }
   
+  // Add auto pricing handler
+  const handleAutoPricing = () => {
+    if (!currentModel) return
+    const pricing = getAutoPricing(currentModel.modelId)
+    if (pricing) {
+      setPricingForm(prev => ({
+        ...prev,
+        inputPrice: pricing.inputPrice,
+        outputPrice: pricing.outputPrice,
+      }))
+      toast.success('自动定价已应用')
+    } else {
+      toast.error('未找到匹配价格，请手动输入')
+    }
+  }
+  
+  // Add batch auto pricing handler
+  const handleBatchAutoPricing = async () => {
+    if (!currentUser || !currentUser.id) return
+    setIsLoading(true)
+    const unmatched: string[] = []
+    try {
+      await Promise.all(
+        modelPricingList
+          .filter(item => item.pricingType === 'token')
+          .map(item => {
+            const pricing = getAutoPricing(item.model.modelId)
+            if (!pricing) {
+              unmatched.push(item.model.modelId)
+              return Promise.resolve(null)
+            }
+            return fetch(`/api/admin/models/${item.id}/pricing`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                adminUserId: currentUser.id,
+                pricingType: 'token',
+                inputPrice: pricing.inputPrice,
+                outputPrice: pricing.outputPrice,
+                usagePrice: null,
+              }),
+            })
+          })
+      )
+      if (unmatched.length > 0) {
+        toast.error(`未匹配模型: ${unmatched.join(', ')}`)
+      }
+      toast.success('批量自动定价完成')
+      loadPricingData()
+    } catch (error) {
+      console.error('Batch auto pricing error:', error)
+      toast.error('批量自动定价失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  // Add system token settings UI section
+  const renderSystemSettings = () => (
+    <Paper sx={{ p: 3, mb: 3 }}>
+      <Typography variant="h6" sx={{ mb: 2 }}>系统 Token 设置</Typography>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>默认限制类型</InputLabel>
+            <Select
+              value={systemTokenSettings.defaultLimitType}
+              label="默认限制类型"
+              onChange={(e) => setSystemTokenSettings(prev => ({ ...prev, defaultLimitType: e.target.value as 'token' | 'cost' | 'none' }))}
+            >
+              <MenuItem value="none">无限制</MenuItem>
+              <MenuItem value="token">按Token限制</MenuItem>
+              <MenuItem value="cost">按成本限制</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="默认限制值"
+            type="number"
+            value={systemTokenSettings.defaultTokenLimit}
+            onChange={(e) => setSystemTokenSettings(prev => ({ ...prev, defaultTokenLimit: parseInt(e.target.value) }))}
+            helperText="0 表示无限制"
+          />
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <FormControlLabel
+            control={
+              <Radio
+                checked={systemTokenSettings.enableTokenTracking}
+                onChange={(e) => setSystemTokenSettings(prev => ({ ...prev, enableTokenTracking: e.target.checked }))}
+              />
+            }
+            label="启用 Token 使用统计"
+          />
+        </Grid>
+        
+        <Grid item xs={12} sx={{ textAlign: 'right' }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={saveSystemSettings}
+            disabled={isLoading}
+          >
+            {isLoading ? <CircularProgress size={24} /> : '保存设置'}
+          </Button>
+        </Grid>
+      </Grid>
+    </Paper>
+  )
+  
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ width: '100%' }}>
@@ -395,6 +581,9 @@ export default function TokenStatsAdmin() {
           </Tabs>
         </Paper>
         
+        {/* Add system settings at the top */}
+        {renderSystemSettings()}
+        
         <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {(activeTab === 'models' || activeTab === 'users') && (
@@ -414,14 +603,25 @@ export default function TokenStatsAdmin() {
               </>
             )}
           </Box>
-          <Button 
-            variant="outlined" 
-            startIcon={<RefreshIcon />} 
-            onClick={loadData}
-            disabled={isLoading}
-          >
-            {isLoading ? '加载中...' : '刷新数据'}
-          </Button>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button 
+              variant="outlined" 
+              startIcon={<RefreshIcon />} 
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              {isLoading ? '加载中...' : '刷新数据'}
+            </Button>
+            {activeTab === 'pricing' && (
+              <Button
+                variant="outlined"
+                onClick={handleBatchAutoPricing}
+                disabled={isLoading}
+              >
+                批量自动定价
+              </Button>
+            )}
+          </Box>
         </Paper>
         
         {loadError && (
@@ -693,6 +893,14 @@ export default function TokenStatsAdmin() {
                 </RadioGroup>
               </FormControl>
               
+              {pricingForm.pricingType === 'token' && (
+                <Box sx={{ mb: 2 }}>
+                  <Button variant="outlined" onClick={handleAutoPricing}>
+                    自动定价
+                  </Button>
+                </Box>
+              )}
+              
               {pricingForm.pricingType === 'token' ? (
                 <>
                   <TextField
@@ -796,7 +1004,8 @@ export default function TokenStatsAdmin() {
                   label="Token限制"
                   type="number"
                   value={limitForm.tokenLimit}
-                  onChange={(e) => setLimitForm({...limitForm, tokenLimit: parseInt(e.target.value)})}
+                  onChange={(e) => setLimitForm({...limitForm, tokenLimit: parseInt(e.target.value), costLimit: 0})}
+                  helperText="输入0表示无限制"
                   sx={{ mb: 2 }}
                 />
               )}
@@ -808,7 +1017,8 @@ export default function TokenStatsAdmin() {
                   label="成本限制 (USD)"
                   type="number"
                   value={limitForm.costLimit}
-                  onChange={(e) => setLimitForm({...limitForm, costLimit: parseFloat(e.target.value)})}
+                  onChange={(e) => setLimitForm({...limitForm, costLimit: parseFloat(e.target.value), tokenLimit: 0})}
+                  helperText="输入0表示无限制"
                   InputProps={{
                     startAdornment: <InputAdornment position="start">$</InputAdornment>,
                   }}

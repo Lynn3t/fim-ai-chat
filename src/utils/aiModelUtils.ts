@@ -275,3 +275,63 @@ export function getModelGroups<T extends { modelId: string; group?: string; orde
 
   return groups;
 }
+
+// Auto pricing mapping based on model ID and global LLM API pricing.
+export interface ModelTokenPricing {
+  inputPrice: number;
+  outputPrice: number;
+}
+
+export const MODEL_TOKEN_PRICING: Record<string, ModelTokenPricing> = {
+  'gpt-4.1': { inputPrice: 2.0, outputPrice: 8.0 },
+  'gpt-4.1-mini': { inputPrice: 0.4, outputPrice: 1.6 },
+  'gpt-4.1-nano': { inputPrice: 0.1, outputPrice: 0.4 },
+  'gpt-4o': { inputPrice: 5.0, outputPrice: 20.0 },
+  'gpt-4o-mini': { inputPrice: 0.6, outputPrice: 2.4 },
+  'gpt-4-turbo': { inputPrice: 10.0, outputPrice: 30.0 },
+  'gpt-4': { inputPrice: 30.0, outputPrice: 60.0 },
+  'gpt-3.5-turbo': { inputPrice: 0.5, outputPrice: 1.5 },
+  'gemini-2.5-pro': { inputPrice: 4.0, outputPrice: 20.0 },
+  'gemini-1.5-pro': { inputPrice: 2.5, outputPrice: 15.0 },
+  'gemini-1.5-flash': { inputPrice: 0.15, outputPrice: 0.6 },
+  'gemini-2.0-flash': { inputPrice: 0.3, outputPrice: 2.5 },
+  'gemini-2.0-flash-lite': { inputPrice: 0.1, outputPrice: 0.4 },
+  'claude-4-opus': { inputPrice: 15.0, outputPrice: 75.0 },
+  'claude-4-sonnet': { inputPrice: 3.0, outputPrice: 15.0 },
+  'claude-3.5-sonnet': { inputPrice: 3.0, outputPrice: 15.0 },
+  'claude-3.5-haiku': { inputPrice: 0.8, outputPrice: 4.0 },
+  'claude-3-opus': { inputPrice: 15.0, outputPrice: 75.0 },
+  'claude-3-sonnet': { inputPrice: 3.0, outputPrice: 15.0 },
+  'claude-3-haiku': { inputPrice: 0.25, outputPrice: 1.25 },
+  'grok-4': { inputPrice: 3.0, outputPrice: 15.0 },
+  'grok-3-mini': { inputPrice: 0.3, outputPrice: 0.5 },
+  'glm-4-flash': { inputPrice: 0.0, outputPrice: 0.0 },
+  'glm-z1-flashx': { inputPrice: 0.01, outputPrice: 0.01 },
+  'glm-4-air': { inputPrice: 0.07, outputPrice: 0.07 },
+  'glm-4-plus': { inputPrice: 0.69, outputPrice: 0.69 },
+  'glm-4-airx': { inputPrice: 1.38, outputPrice: 1.38 },
+  'glm-4-0520': { inputPrice: 13.79, outputPrice: 13.79 },
+  'doubao-1.5-pro-32k': { inputPrice: 0.11, outputPrice: 0.28 },
+  'doubao-1.5-pro-256k': { inputPrice: 0.69, outputPrice: 1.24 },
+  'kimi-k2-0711-preview': { inputPrice: 0.55, outputPrice: 2.21 },
+  'kimi-latest-128k': { inputPrice: 1.38, outputPrice: 4.14 },
+  'kimi-thinking-preview': { inputPrice: 27.59, outputPrice: 27.59 },
+  'deepseek-r1': { inputPrice: 0.55, outputPrice: 2.19 },
+  'deepseek-v3': { inputPrice: 0.14, outputPrice: 0.28 },
+  'deepseek-chat': { inputPrice: 0.27, outputPrice: 1.10 },
+  'deepseek-reasoner': { inputPrice: 0.55, outputPrice: 2.19 },
+};
+
+export function getAutoPricing(modelId: string): ModelTokenPricing | null {
+  const normalizedId = modelId.toLowerCase();
+  if (normalizedId.includes('free')) {
+    return { inputPrice: 0, outputPrice: 0 };
+  }
+  const keys = Object.keys(MODEL_TOKEN_PRICING).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (normalizedId.includes(key)) {
+      return MODEL_TOKEN_PRICING[key];
+    }
+  }
+  return null;
+}

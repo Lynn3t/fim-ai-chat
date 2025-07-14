@@ -3212,40 +3212,9 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                 Token 设置
               </h3>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    默认 Token 限额（每用户）
-                  </label>
-                  <input
-                    type="number"
-                    value={systemSettings.defaultTokenLimit || 100000}
-                    onChange={(e) => setSystemSettings(prev => ({ ...prev, defaultTokenLimit: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Token 价格（每 1000 tokens，人民币分）
-                  </label>
-                  <input
-                    type="number"
-                    value={systemSettings.tokenPrice || 1}
-                    onChange={(e) => setSystemSettings(prev => ({ ...prev, tokenPrice: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-
                 <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="enableTokenTracking"
-                    checked={systemSettings.enableTokenTracking ?? true}
-                    onChange={(e) => setSystemSettings(prev => ({ ...prev, enableTokenTracking: e.target.checked }))}
-                    className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="enableTokenTracking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                    启用 Token 使用统计
+                  <label className="block text-sm text-gray-700 dark:text-gray-300">
+                    Token 相关设置已移至 "Token 统计与价格设置" 页面
                   </label>
                 </div>
               </div>

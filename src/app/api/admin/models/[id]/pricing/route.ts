@@ -26,7 +26,7 @@ export async function GET(
       )
     }
 
-    const modelId = params.id
+    const { id: modelId } = await params
     
     // 直接从Model表中获取价格设置
     const model = await prisma.model.findUnique({
@@ -96,7 +96,7 @@ export async function POST(
       )
     }
 
-    const modelId = params.id
+    const { id: modelId } = await params
 
     // 检查模型是否存在
     const model = await prisma.model.findUnique({
