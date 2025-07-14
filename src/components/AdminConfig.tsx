@@ -2679,7 +2679,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                         总模型数:
                       </Typography>
                       <Typography variant="h4" color="info.main" sx={{ my: 0.5 }}>
-                        {stats?.detailed?.modelUsage?.totalModels || 0}
+                        {stats?.detailed?.modelUsage?.totalModels || models.length || 0}
                       </Typography>
                     </Box>
                     <Divider sx={{ my: 1.5 }} />
@@ -2689,7 +2689,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           启用模型:
                         </Typography>
                         <Typography variant="body1">
-                          {stats?.detailed?.modelUsage?.activeModels || 0}
+                          {stats?.detailed?.modelUsage?.activeModels || models.filter(m => m.isEnabled).length || 0}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
@@ -2697,7 +2697,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           提供商:
                         </Typography>
                         <Typography variant="body1">
-                          {stats?.detailed?.modelUsage?.totalProviders || 0}
+                          {stats?.detailed?.modelUsage?.totalProviders || providers.length || 0}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2723,7 +2723,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                         邀请码总数:
                       </Typography>
                       <Typography variant="h4" color="success.main" sx={{ my: 0.5 }}>
-                        {stats?.detailed?.codeUsage?.totalInviteCodes || 0}
+                        {stats?.totalInviteCodes || 0}
                       </Typography>
                     </Box>
                     <Divider sx={{ my: 1.5 }} />
@@ -2733,7 +2733,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           使用邀请码:
                         </Typography>
                         <Typography variant="body1">
-                          {stats?.detailed?.codeUsage?.usedInviteCodes || 0}
+                          {stats?.usedInviteCodes || 0}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
@@ -2741,7 +2741,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           访问码:
                         </Typography>
                         <Typography variant="body1">
-                          {stats?.detailed?.codeUsage?.totalAccessCodes || 0}
+                          {stats?.totalAccessCodes || 0}
                         </Typography>
                       </Grid>
                     </Grid>

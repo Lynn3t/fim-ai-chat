@@ -52,6 +52,118 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { adminUserId, username, email, password, role = 'USER' } = data
+
+    if (!adminUserId || !username) {
+      return NextResponse.json(
+        { error: 'adminUserId and username are required' },
+        { status: 400 }
+      )
+    }
+
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
+
+    // 检查用户名是否已存在
+    const { prisma } = await import('@/lib/prisma')
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { 
+            username: {
+              equals: username,
+              mode: 'insensitive' // 不区分大小写
+            }
+          },
+          ...(email ? [{ email }] : []),
+        ],
+      },
+    })
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: '用户名或邮箱已存在' },
+        { status: 400 }
+      )
+    }
+
+    // 哈希密码
+    const bcrypt = await import('bcrypt')
+    const hashedPassword = await bcrypt.default.hash(password, 12)
+
+    // 创建用户
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+        role,
+        isActive: true,
+      },
+    })
+
+    // 创建用户设置
+    await prisma.userSettings.create({
+      data: {
+        userId: user.id,
+        theme: 'light',
+        language: 'zh-CN',
+        enableMarkdown: true,
+        enableLatex: true,
+        enableCodeHighlight: true,
+        messagePageSize: 50,
+      },
+    })
+
+    // 为非管理员用户创建权限配置
+    if (role !== 'ADMIN') {
+      await prisma.userPermission.create({
+        data: {
+          userId: user.id,
+          allowedModelIds: null, // 默认可以使用所有模型
+          tokenLimit: null, // 默认无限制
+          canShareAccess: true,
+          isActive: true,
+        },
+      })
+    }
+
+    return NextResponse.json(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+      },
+      { status: 201 }
+    )
+
+  } catch (error) {
+    console.error('Error creating user:', error)
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const data = await request.json()

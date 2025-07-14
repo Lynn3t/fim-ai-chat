@@ -129,6 +129,9 @@ export default function UserConfig() {
   const [recentModels, setRecentModels] = useState<string[]>([]);
   const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>('');
   const { mode } = useTheme();
+  // 邀请码删除相关状态
+  const [showDeleteInviteDialog, setShowDeleteInviteDialog] = useState(false);
+  const [deletingInvite, setDeletingInvite] = useState<{ id: string; code: string } | null>(null);
 
   // 加载用户仪表板
   const loadDashboard = async () => {
@@ -220,6 +223,39 @@ export default function UserConfig() {
       }
     } catch (error) {
       toast.error('创建邀请码失败');
+    }
+  };
+
+  // 打开删除邀请码对话框
+  const openDeleteInviteDialog = (codeId: string, code: string) => {
+    setDeletingInvite({ id: codeId, code });
+    setShowDeleteInviteDialog(true);
+  };
+
+  // 删除邀请码
+  const deleteInviteCode = async (codeId: string) => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch('/api/user/codes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          codeId,
+          type: 'invite',
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('邀请码已删除');
+        loadDashboard();
+        setShowDeleteInviteDialog(false);
+      } else {
+        toast.error('删除邀请码失败');
+      }
+    } catch (error) {
+      toast.error('删除邀请码失败');
     }
   };
 
@@ -485,9 +521,6 @@ export default function UserConfig() {
                             <Typography variant="body2" color="text.secondary">
                               使用次数: {code.currentUses} / {code.maxUses || '无限'}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              创建时间: {new Date(code.createdAt).toLocaleString()}
-                            </Typography>
                             <Box sx={{ mt: 1 }}>
                               {code.allowedModelIds?.length > 0 ? (
                                 <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -503,7 +536,7 @@ export default function UserConfig() {
                                           />
                                         );
                                       })
-                                    : code.allowedModelIds.split(',').filter(id => id.trim()).map(modelId => {
+                                    : code.allowedModelIds.split(',').map(modelId => {
                                         const model = availableModels.find(m => m.id === modelId);
                                         return (
                                           <Chip 
@@ -598,6 +631,15 @@ export default function UserConfig() {
                           </Typography>
                         }
                       />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          edge="end" 
+                          onClick={() => openDeleteInviteDialog(code.id, code.code)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
                     </ListItem>
                     <Divider />
                   </React.Fragment>
@@ -742,6 +784,34 @@ export default function UserConfig() {
           </Box>
         </Box>
       </TabPanel>
+
+      {/* 邀请码删除确认对话框 */}
+      <Dialog
+        open={showDeleteInviteDialog}
+        onClose={() => setShowDeleteInviteDialog(false)}
+        aria-labelledby="delete-invite-dialog-title"
+      >
+        <DialogTitle id="delete-invite-dialog-title">
+          确认删除邀请码
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            您确定要删除邀请码 <b>{deletingInvite?.code}</b> 吗？此操作不可撤销。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteInviteDialog(false)} color="primary">
+            取消
+          </Button>
+          <Button 
+            onClick={() => deletingInvite && deleteInviteCode(deletingInvite.id)} 
+            color="error"
+            variant="contained"
+          >
+            删除
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 创建访问码对话框 */}
       <Dialog 
