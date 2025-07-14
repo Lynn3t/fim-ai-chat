@@ -142,6 +142,12 @@ model Model {
   frequencyPenalty Float? // 频率惩罚
   presencePenalty  Float? // 存在惩罚
 
+  // 价格设置（直接嵌入到Model中）
+  pricingType     String  @default("token") // 计价类型："token"(按token) 或 "usage"(按次)
+  inputPrice      Float   @default(2.0)     // 输入价格，USD/1M token
+  outputPrice     Float   @default(8.0)     // 输出价格，USD/1M token
+  usagePrice      Float?                    // 若按次计价，每次价格 (USD)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -150,7 +156,6 @@ model Model {
   conversations Conversation[]
   messages      Message[]
   tokenUsage    TokenUsage[]
-  pricing       ModelPricing?  // 新增：模型价格设置
 
   @@unique([providerId, modelId])
   @@map("models")
@@ -284,32 +289,25 @@ model TokenUsage {
   @@map("token_usage")
 }
 
-// 用户权限配置（管理员分发给用户的权限）
+// 用户权限模型
 model UserPermission {
-  id              String   @id @default(cuid())
-  userId          String   @unique // 用户ID
-  allowedModelIds String? // 允许使用的模型ID列表，用逗号分隔
-  
-  // Token使用限制
-  tokenLimit      Int?     // token使用限制，null表示无限制
-  tokenUsed       Int      @default(0) // 已使用的token数
-  
-  // 新增时间段限制
-  limitType       String?  @default("none")  // 限制类型: "none", "token", "cost"
-  limitPeriod     String?  @default("monthly") // 限制周期: "daily", "monthly", "quarterly", "yearly"
-  costLimit       Float?   // 费用限制 (USD)
-  
-  // 上次重置时间
-  lastResetAt     DateTime @default(now()) // 上次重置限制的时间
-  
-  canShareAccess  Boolean  @default(true) // 是否可以分发访问码
-  isActive        Boolean  @default(true) // 权限是否激活
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  permissions    Json      @default("[]") // 存储权限列表，如 ["admin_panel", "manage_users"]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Token 使用限制
+  limitType      String    @default("none") // 限制类型: "none", "token", "cost"
+  limitPeriod    String    @default("monthly") // 限制周期: "daily", "monthly", "quarterly", "yearly"
+  tokenLimit     Int?      // Token 数量限制
+  costLimit      Float?    // 成本限制 (USD)
+  tokenUsed      Int       @default(0) // 已使用的 Token 数量
+  lastResetAt    DateTime  @default(now()) // 上次重置时间
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // 关联关系
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_permissions")
 }
@@ -329,23 +327,4 @@ model ModelGroupOrder {
   @@index([userId])
   @@index([order])
   @@map("model_group_orders")
-}
-
-// 模型价格配置
-model ModelPricing {
-  id                String  @id @default(cuid())
-  modelId           String  @unique
-  pricingType       String  @default("token")  // 计价类型："token"(按token) 或 "usage"(按次)
-  inputPrice        Float   // 输入价格，USD/1M token
-  cachedInputPrice  Float   // 缓存输入价格，USD/1M token
-  outputPrice       Float   // 输出价格，USD/1M token
-  usagePrice        Float?  // 若按次计价，每次价格 (USD)
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // 关联关系
-  model             Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
-
-  @@map("model_pricing")
 }

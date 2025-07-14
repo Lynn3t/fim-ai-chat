@@ -45,7 +45,7 @@ export async function updateUserModelGroupOrders(
     }));
 
     memoryStorage.set(userId, userOrders);
-    console.log('Updated group orders in memory for user:', userId, userOrders);
+    // 删除不必要的日志输出
     return true;
   } catch (error) {
     console.error('Error updating user model group orders:', error)

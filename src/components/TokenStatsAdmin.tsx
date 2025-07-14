@@ -31,6 +31,7 @@ import {
   CircularProgress,
   Chip,
   TablePagination,
+  Alert,
 } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
@@ -49,7 +50,6 @@ interface ModelPricing {
   modelId: string
   pricingType: 'token' | 'usage'
   inputPrice: number
-  cachedInputPrice: number
   outputPrice: number
   usagePrice: number | null
   model: {
@@ -103,9 +103,10 @@ interface UserUsageStats {
 }
 
 export default function TokenStatsAdmin() {
-  const { currentUser } = useAuth()
+  const { user: currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('pricing')
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(true) // 设为true，表示初始加载状态
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [modelPricingList, setModelPricingList] = useState<ModelPricing[]>([])
   const [userLimitsList, setUserLimitsList] = useState<UserLimit[]>([])
   const [modelStats, setModelStats] = useState<ModelUsageStats[]>([])
@@ -125,7 +126,6 @@ export default function TokenStatsAdmin() {
   const [pricingForm, setPricingForm] = useState({
     pricingType: 'token',
     inputPrice: 2.0,
-    cachedInputPrice: 0.5,
     outputPrice: 8.0,
     usagePrice: 0.0,
   })
@@ -144,8 +144,11 @@ export default function TokenStatsAdmin() {
 
   // 加载数据
   useEffect(() => {
+    console.log('TokenStatsAdmin: useEffect triggered. currentUser:', currentUser)
     if (currentUser) {
       loadData()
+    } else {
+      console.log('TokenStatsAdmin: Waiting for currentUser...')
     }
   }, [currentUser, activeTab])
   
@@ -159,6 +162,7 @@ export default function TokenStatsAdmin() {
   const loadData = async () => {
     if (!currentUser || !currentUser.id) return
     setIsLoading(true)
+    setLoadError(null)
     
     try {
       if (activeTab === 'pricing') {
@@ -171,6 +175,7 @@ export default function TokenStatsAdmin() {
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('加载数据失败')
+      setLoadError('加载数据失败，请刷新重试')
     } finally {
       setIsLoading(false)
     }
@@ -180,21 +185,24 @@ export default function TokenStatsAdmin() {
     if (!currentUser || !currentUser.id) return
     
     try {
-      console.log('Loading pricing data...')
+      console.log('TokenStatsAdmin: Loading pricing data...')
       const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=pricing`)
       
       if (response.ok) {
         const data = await response.json()
-        console.log('Pricing data loaded:', data)
+        console.log('TokenStatsAdmin: Pricing data loaded:', data)
         setModelPricingList(data)
+        setLoadError(null)
       } else {
         const errorText = await response.text()
-        console.error('Failed to load pricing data:', response.status, errorText)
+        console.error('TokenStatsAdmin: Failed to load pricing data:', response.status, errorText)
         toast.error('加载模型价格数据失败')
+        setLoadError(`加载模型价格数据失败 (${response.status}): ${errorText}`)
       }
     } catch (error) {
       console.error('Error loading pricing data:', error)
       toast.error('加载模型价格数据失败')
+      setLoadError('加载模型价格数据失败: ' + (error instanceof Error ? error.message : String(error)))
     }
   }
   
@@ -202,16 +210,16 @@ export default function TokenStatsAdmin() {
     if (!currentUser || !currentUser.id) return
     
     try {
-      console.log('Loading user limits data...')
+      console.log('TokenStatsAdmin: Loading user limits data...')
       const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=user-limits`)
       
       if (response.ok) {
         const data = await response.json()
-        console.log('User limits data loaded:', data)
+        console.log('TokenStatsAdmin: User limits data loaded:', data)
         setUserLimitsList(data)
       } else {
         const errorText = await response.text()
-        console.error('Failed to load user limits data:', response.status, errorText)
+        console.error('TokenStatsAdmin: Failed to load user limits data:', response.status, errorText)
         toast.error('加载用户限制数据失败')
       }
     } catch (error) {
@@ -224,14 +232,14 @@ export default function TokenStatsAdmin() {
     if (!currentUser || !currentUser.id) return
     
     try {
-      console.log('Loading stats data for tab:', activeTab)
+      console.log('TokenStatsAdmin: Loading stats data for tab:', activeTab)
       const dateParams = new URLSearchParams()
       if (startDate) dateParams.append('startDate', startDate.toISOString())
       if (endDate) dateParams.append('endDate', endDate.toISOString())
       
       const action = activeTab === 'models' ? 'models' : 'users'
       const url = `/api/admin/token-stats?adminUserId=${currentUser.id}&action=${action}&${dateParams.toString()}`
-      console.log('Fetching from URL:', url)
+      console.log('TokenStatsAdmin: Fetching from URL:', url)
       
       const response = await fetch(url)
       
@@ -245,11 +253,11 @@ export default function TokenStatsAdmin() {
         }
       } else {
         const errorText = await response.text()
-        console.error('Failed to load stats data:', response.status, errorText)
+        console.error('TokenStatsAdmin: Failed to load stats data:', response.status, errorText)
         toast.error('加载统计数据失败')
       }
     } catch (error) {
-      console.error('Error loading stats data:', error)
+      console.error('TokenStatsAdmin: Error loading stats data:', error)
       toast.error('加载统计数据失败')
     }
   }
@@ -263,7 +271,6 @@ export default function TokenStatsAdmin() {
     setPricingForm({
       pricingType: model.pricingType,
       inputPrice: model.inputPrice,
-      cachedInputPrice: model.cachedInputPrice,
       outputPrice: model.outputPrice,
       usagePrice: model.usagePrice || 0,
     })
@@ -388,29 +395,39 @@ export default function TokenStatsAdmin() {
           </Tabs>
         </Paper>
         
-        {(activeTab === 'models' || activeTab === 'users') && (
-          <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <DatePicker
-              label="开始日期"
-              value={startDate}
-              onChange={(date) => setStartDate(date)}
-              slotProps={{ textField: { size: 'small' } }}
-            />
-            <DatePicker
-              label="结束日期"
-              value={endDate}
-              onChange={(date) => setEndDate(date)}
-              slotProps={{ textField: { size: 'small' } }}
-            />
-            <Button 
-              variant="outlined" 
-              startIcon={<RefreshIcon />} 
-              onClick={() => loadStatsData()}
-              disabled={isLoading}
-            >
-              刷新数据
-            </Button>
-          </Paper>
+        <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {(activeTab === 'models' || activeTab === 'users') && (
+              <>
+                <DatePicker
+                  label="开始日期"
+                  value={startDate}
+                  onChange={(date) => setStartDate(date)}
+                  slotProps={{ textField: { size: 'small' } }}
+                />
+                <DatePicker
+                  label="结束日期"
+                  value={endDate}
+                  onChange={(date) => setEndDate(date)}
+                  slotProps={{ textField: { size: 'small' } }}
+                />
+              </>
+            )}
+          </Box>
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshIcon />} 
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            {isLoading ? '加载中...' : '刷新数据'}
+          </Button>
+        </Paper>
+        
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {loadError}
+          </Alert>
         )}
         
         {isLoading ? (
@@ -421,210 +438,232 @@ export default function TokenStatsAdmin() {
           <>
             {/* 模型价格设置 */}
             {activeTab === 'pricing' && (
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>提供商</TableCell>
-                      <TableCell>模型</TableCell>
-                      <TableCell>计价类型</TableCell>
-                      <TableCell>输入价格</TableCell>
-                      <TableCell>缓存输入价格</TableCell>
-                      <TableCell>输出价格</TableCell>
-                      <TableCell>操作</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {modelPricingList.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.model.provider.displayName}</TableCell>
-                        <TableCell>{item.model.name}</TableCell>
-                        <TableCell>
-                          {item.pricingType === 'token' ? '按Token计费' : '按次计费'}
-                        </TableCell>
-                        <TableCell>
-                          {item.pricingType === 'token' 
-                            ? `$${item.inputPrice.toFixed(2)}/1M` 
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {item.pricingType === 'token' 
-                            ? `$${item.cachedInputPrice.toFixed(2)}/1M` 
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {item.pricingType === 'token' 
-                            ? `$${item.outputPrice.toFixed(2)}/1M` 
-                            : `$${item.usagePrice?.toFixed(4)}/次`}
-                        </TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleEditPricing(item)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <>
+                {modelPricingList.length === 0 ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    没有找到模型价格数据。
+                  </Alert>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>提供商</TableCell>
+                          <TableCell>模型</TableCell>
+                          <TableCell>计价类型</TableCell>
+                          <TableCell>输入价格</TableCell>
+                          <TableCell>输出价格</TableCell>
+                          <TableCell>操作</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {modelPricingList.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.model.provider.displayName}</TableCell>
+                            <TableCell>{item.model.name}</TableCell>
+                            <TableCell>
+                              {item.pricingType === 'token' ? '按Token计费' : '按次计费'}
+                            </TableCell>
+                            <TableCell>
+                              {item.pricingType === 'token' 
+                                ? `$${item.inputPrice.toFixed(2)}/1M` 
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.pricingType === 'token' 
+                                ? `$${item.outputPrice.toFixed(2)}/1M` 
+                                : `$${item.usagePrice?.toFixed(4)}/次`}
+                            </TableCell>
+                            <TableCell>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleEditPricing(item)}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </>
             )}
             
             {/* 用户使用限制 */}
             {activeTab === 'limits' && (
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>用户名</TableCell>
-                      <TableCell>角色</TableCell>
-                      <TableCell>限制类型</TableCell>
-                      <TableCell>限制周期</TableCell>
-                      <TableCell>Token限制</TableCell>
-                      <TableCell>成本限制</TableCell>
-                      <TableCell>已使用</TableCell>
-                      <TableCell>上次重置</TableCell>
-                      <TableCell>操作</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {userLimitsList.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.user.username}</TableCell>
-                        <TableCell>{item.user.role}</TableCell>
-                        <TableCell>
-                          {item.limitType === 'token' ? 'Token限制' : 
-                           item.limitType === 'cost' ? '成本限制' : '无限制'}
-                        </TableCell>
-                        <TableCell>
-                          {item.limitPeriod === 'daily' ? '每日' :
-                           item.limitPeriod === 'monthly' ? '每月' :
-                           item.limitPeriod === 'quarterly' ? '每季度' : '每年'}
-                        </TableCell>
-                        <TableCell>
-                          {item.limitType === 'token' ? 
-                            item.tokenLimit?.toLocaleString() : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {item.limitType === 'cost' ? 
-                            `$${item.costLimit?.toFixed(2)}` : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {item.limitType === 'token' ? 
-                            `${item.tokenUsed.toLocaleString()} tokens` : 
-                            '-'}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(item.lastResetAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleEditLimit(item)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <>
+                {userLimitsList.length === 0 ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    没有找到用户限制数据。
+                  </Alert>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>用户名</TableCell>
+                          <TableCell>角色</TableCell>
+                          <TableCell>限制类型</TableCell>
+                          <TableCell>限制周期</TableCell>
+                          <TableCell>Token限制</TableCell>
+                          <TableCell>成本限制</TableCell>
+                          <TableCell>已使用</TableCell>
+                          <TableCell>上次重置</TableCell>
+                          <TableCell>操作</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {userLimitsList.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.user.username}</TableCell>
+                            <TableCell>{item.user.role}</TableCell>
+                            <TableCell>
+                              {item.limitType === 'token' ? 'Token限制' : 
+                               item.limitType === 'cost' ? '成本限制' : '无限制'}
+                            </TableCell>
+                            <TableCell>
+                              {item.limitPeriod === 'daily' ? '每日' :
+                               item.limitPeriod === 'monthly' ? '每月' :
+                               item.limitPeriod === 'quarterly' ? '每季度' : '每年'}
+                            </TableCell>
+                            <TableCell>
+                              {item.limitType === 'token' ? 
+                                item.tokenLimit?.toLocaleString() : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.limitType === 'cost' ? 
+                                `$${item.costLimit?.toFixed(2)}` : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.limitType === 'token' ? 
+                                `${item.tokenUsed.toLocaleString()} tokens` : 
+                                '-'}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(item.lastResetAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleEditLimit(item)}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </>
             )}
             
             {/* 模型使用统计 */}
             {activeTab === 'models' && (
               <>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>提供商</TableCell>
-                        <TableCell>模型</TableCell>
-                        <TableCell align="right">使用量 (tokens)</TableCell>
-                        <TableCell align="right">成本 (USD)</TableCell>
-                        <TableCell align="right">消息数</TableCell>
-                        <TableCell align="right">用户数</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {modelStats
-                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                        .map((item) => (
-                          <TableRow key={item.modelId}>
-                            <TableCell>{item.providerName}</TableCell>
-                            <TableCell>{item.modelName}</TableCell>
-                            <TableCell align="right">{item.totalTokens.toLocaleString()}</TableCell>
-                            <TableCell align="right">${item.totalCost.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.messageCount.toLocaleString()}</TableCell>
-                            <TableCell align="right">{item.userCount}</TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25, 50]}
-                    component="div"
-                    count={modelStats.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                  />
-                </TableContainer>
+                {modelStats.length === 0 ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    在选定时间范围内没有模型使用数据。
+                  </Alert>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>提供商</TableCell>
+                          <TableCell>模型</TableCell>
+                          <TableCell align="right">使用量 (tokens)</TableCell>
+                          <TableCell align="right">成本 (USD)</TableCell>
+                          <TableCell align="right">消息数</TableCell>
+                          <TableCell align="right">用户数</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {modelStats
+                          .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                          .map((item) => (
+                            <TableRow key={item.modelId}>
+                              <TableCell>{item.providerName}</TableCell>
+                              <TableCell>{item.modelName}</TableCell>
+                              <TableCell align="right">{item.totalTokens.toLocaleString()}</TableCell>
+                              <TableCell align="right">${item.totalCost.toFixed(4)}</TableCell>
+                              <TableCell align="right">{item.messageCount.toLocaleString()}</TableCell>
+                              <TableCell align="right">{item.userCount}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                    <TablePagination
+                      rowsPerPageOptions={[5, 10, 25, 50]}
+                      component="div"
+                      count={modelStats.length}
+                      rowsPerPage={rowsPerPage}
+                      page={page}
+                      onPageChange={handleChangePage}
+                      onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
+                  </TableContainer>
+                )}
               </>
             )}
             
             {/* 用户使用统计 */}
             {activeTab === 'users' && (
               <>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>用户名</TableCell>
-                        <TableCell>角色</TableCell>
-                        <TableCell align="right">使用量 (tokens)</TableCell>
-                        <TableCell align="right">成本 (USD)</TableCell>
-                        <TableCell align="right">消息数</TableCell>
-                        <TableCell>操作</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {userStats
-                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                        .map((item) => (
-                          <TableRow key={item.userId}>
-                            <TableCell>{item.username}</TableCell>
-                            <TableCell>{item.role}</TableCell>
-                            <TableCell align="right">{item.totalTokens.toLocaleString()}</TableCell>
-                            <TableCell align="right">${item.totalCost.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.messageCount.toLocaleString()}</TableCell>
-                            <TableCell>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleEditLimit(null, item.userId)}
-                              >
-                                设置限制
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25, 50]}
-                    component="div"
-                    count={userStats.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                  />
-                </TableContainer>
+                {userStats.length === 0 ? (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    在选定时间范围内没有用户使用数据。
+                  </Alert>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>用户名</TableCell>
+                          <TableCell>角色</TableCell>
+                          <TableCell align="right">使用量 (tokens)</TableCell>
+                          <TableCell align="right">成本 (USD)</TableCell>
+                          <TableCell align="right">消息数</TableCell>
+                          <TableCell>操作</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {userStats
+                          .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                          .map((item) => (
+                            <TableRow key={item.userId}>
+                              <TableCell>{item.username}</TableCell>
+                              <TableCell>{item.role}</TableCell>
+                              <TableCell align="right">{item.totalTokens.toLocaleString()}</TableCell>
+                              <TableCell align="right">${item.totalCost.toFixed(4)}</TableCell>
+                              <TableCell align="right">{item.messageCount.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => handleEditLimit(null, item.userId)}
+                                >
+                                  设置限制
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                    <TablePagination
+                      rowsPerPageOptions={[5, 10, 25, 50]}
+                      component="div"
+                      count={userStats.length}
+                      rowsPerPage={rowsPerPage}
+                      page={page}
+                      onPageChange={handleChangePage}
+                      onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
+                  </TableContainer>
+                )}
               </>
             )}
           </>
@@ -663,19 +702,6 @@ export default function TokenStatsAdmin() {
                     type="number"
                     value={pricingForm.inputPrice}
                     onChange={(e) => setPricingForm({...pricingForm, inputPrice: parseFloat(e.target.value)})}
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  <TextField
-                    fullWidth
-                    margin="dense"
-                    label="缓存输入价格 (USD/1M tokens)"
-                    type="number"
-                    value={pricingForm.cachedInputPrice}
-                    onChange={(e) => setPricingForm({...pricingForm, cachedInputPrice: parseFloat(e.target.value)})}
                     InputProps={{
                       startAdornment: <InputAdornment position="start">$</InputAdornment>,
                     }}

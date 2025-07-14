@@ -73,37 +73,33 @@ export async function calculateTokenCost(
   completionTokens: number
 ): Promise<number> {
   try {
-    // 获取模型价格配置
+    // 获取模型信息，价格设置现在直接在Model表中
     const model = await prisma.model.findUnique({
-      where: { id: modelId },
-      include: { pricing: true },
-    })
+      where: { id: modelId }
+    });
 
-    if (!model || !model.pricing) {
-      // 如果没有配置价格，使用默认价格
-      return calculateDefaultTokenCost(model?.modelId || modelId, promptTokens, completionTokens)
+    if (!model) {
+      return calculateDefaultTokenCost(modelId, promptTokens, completionTokens);
     }
-
-    const { pricing } = model
     
-    // 根据计价类型计算成本
-    if (pricing.pricingType === 'usage' && pricing.usagePrice) {
+    // 直接使用模型的价格设置
+    if (model.pricingType === 'usage' && model.usagePrice) {
       // 按次计费，每次API调用收取固定费用
-      return pricing.usagePrice
+      return model.usagePrice;
     } else {
       // 按token计费
-      // 输入token计算（默认常规输入）
-      const inputCost = promptTokens * (pricing.inputPrice / 1000000)
+      // 输入token计算
+      const inputCost = promptTokens * (model.inputPrice / 1000000);
       
       // 输出token计算
-      const outputCost = completionTokens * (pricing.outputPrice / 1000000)
+      const outputCost = completionTokens * (model.outputPrice / 1000000);
       
-      return inputCost + outputCost
+      return inputCost + outputCost;
     }
   } catch (error) {
-    console.error('Error calculating token cost:', error)
+    console.error('Error calculating token cost:', error);
     // 出错时回退到默认计算方式
-    return calculateDefaultTokenCost(modelId, promptTokens, completionTokens)
+    return calculateDefaultTokenCost(modelId, promptTokens, completionTokens);
   }
 }
 
@@ -116,6 +112,10 @@ function calculateDefaultTokenCost(
   promptTokens: number, 
   completionTokens: number
 ): number {
+  // 用户请求的默认定价：输入US$2.00 / 1M 令牌; 输出$8.00 / 1M 令牌
+  const defaultInputPrice = 2.0 / 1000000; // $2.00 per 1M tokens
+  const defaultOutputPrice = 8.0 / 1000000; // $8.00 per 1M tokens
+  
   // 简化的默认定价表
   const pricing: Record<string, { input: number; output: number }> = {
     'gpt-4o-mini': { input: 0.00015 / 1000, output: 0.0006 / 1000 },
@@ -127,12 +127,13 @@ function calculateDefaultTokenCost(
     'claude-3-opus-20240229': { input: 0.015 / 1000, output: 0.075 / 1000 },
   }
 
-  const modelPricing = pricing[modelId]
+  const modelPricing = pricing[modelId];
   if (!modelPricing) {
-    return 0 // 未知模型，返回0成本
+    // 对于未知模型，使用默认定价
+    return promptTokens * defaultInputPrice + completionTokens * defaultOutputPrice;
   }
 
-  return promptTokens * modelPricing.input + completionTokens * modelPricing.output
+  return promptTokens * modelPricing.input + completionTokens * modelPricing.output;
 }
 
 /**

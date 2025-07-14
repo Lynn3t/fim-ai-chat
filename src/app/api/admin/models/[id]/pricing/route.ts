@@ -28,11 +28,41 @@ export async function GET(
 
     const modelId = params.id
     
-    const pricing = await prisma.modelPricing.findUnique({
-      where: { modelId }
+    // 直接从Model表中获取价格设置
+    const model = await prisma.model.findUnique({
+      where: { id: modelId },
+      select: {
+        pricingType: true,
+        inputPrice: true,
+        outputPrice: true,
+        usagePrice: true
+      }
     })
 
-    return NextResponse.json(pricing || null)
+    // 如果没有找到模型，返回默认配置
+    if (!model) {
+      return NextResponse.json({
+        id: null,
+        modelId: modelId,
+        pricingType: 'token',
+        inputPrice: 2.0, // $2.00 / 1M tokens
+        outputPrice: 8.0, // $8.00 / 1M tokens
+        usagePrice: null,
+        createdAt: null,
+        updatedAt: null,
+        isDefault: true, // 标记为默认值
+      })
+    }
+
+    // 格式化为前端期望的结构
+    return NextResponse.json({
+      id: modelId,
+      modelId: modelId,
+      pricingType: model.pricingType,
+      inputPrice: model.inputPrice,
+      outputPrice: model.outputPrice,
+      usagePrice: model.usagePrice,
+    })
 
   } catch (error) {
     console.error('Error fetching model pricing:', error)
@@ -48,7 +78,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { adminUserId, pricingType, inputPrice, cachedInputPrice, outputPrice, usagePrice } = await request.json()
+    const { adminUserId, pricingType, inputPrice, outputPrice, usagePrice } = await request.json()
 
     if (!adminUserId) {
       return NextResponse.json(
@@ -80,27 +110,34 @@ export async function POST(
       )
     }
 
-    // 创建或更新模型价格
-    const pricing = await prisma.modelPricing.upsert({
-      where: { modelId },
-      update: {
-        pricingType,
-        inputPrice,
-        cachedInputPrice,
-        outputPrice,
-        usagePrice,
+    // 直接更新Model表中的价格设置
+    const updatedModel = await prisma.model.update({
+      where: { id: modelId },
+      data: {
+        pricingType: pricingType || 'token',
+        inputPrice: inputPrice !== undefined ? inputPrice : 2.0,
+        outputPrice: outputPrice !== undefined ? outputPrice : 8.0,
+        usagePrice: usagePrice || null,
       },
-      create: {
-        modelId,
-        pricingType,
-        inputPrice,
-        cachedInputPrice,
-        outputPrice,
-        usagePrice,
-      },
+      select: {
+        id: true,
+        modelId: true,
+        pricingType: true,
+        inputPrice: true,
+        outputPrice: true,
+        usagePrice: true
+      }
     })
 
-    return NextResponse.json(pricing)
+    // 格式化为前端期望的结构
+    return NextResponse.json({
+      id: updatedModel.id,
+      modelId: updatedModel.id,
+      pricingType: updatedModel.pricingType,
+      inputPrice: updatedModel.inputPrice,
+      outputPrice: updatedModel.outputPrice,
+      usagePrice: updatedModel.usagePrice,
+    })
 
   } catch (error) {
     console.error('Error updating model pricing:', error)

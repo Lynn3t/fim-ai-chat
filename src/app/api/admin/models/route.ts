@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 获取所有模型
+    // 获取所有模型，包括定价信息
     const models = await prisma.model.findMany({
       include: {
         provider: {
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
             displayName: true,
           },
         },
+        pricing: true, // 包含模型定价信息
       },
       orderBy: [
         { provider: { name: 'asc' } },
@@ -41,7 +42,28 @@ export async function GET(request: NextRequest) {
       ],
     })
 
-    return NextResponse.json(models)
+    // 为没有定价信息的模型提供默认值
+    const modelsWithDefaultPricing = models.map(model => {
+      if (!model.pricing) {
+        return {
+          ...model,
+          pricing: {
+            id: null,
+            modelId: model.id,
+            pricingType: 'token',
+            inputPrice: 2.0, // $2.00 / 1M 令牌
+            cachedInputPrice: 2.0,
+            outputPrice: 8.0, // $8.00 / 1M 令牌
+            usagePrice: null,
+            createdAt: null,
+            updatedAt: null,
+          }
+        };
+      }
+      return model;
+    });
+
+    return NextResponse.json(modelsWithDefaultPricing)
 
   } catch (error) {
     console.error('Error fetching models:', error)

@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
 
         let fullAssistantMessage = ''; // 用于记录完整的助手回复内容
         let tokenUsage: any = null; // 用于记录token使用情况
+        let buffer = ''; // 用于处理被分割的JSON数据
 
         try {
           while (true) {
@@ -125,18 +126,24 @@ export async function POST(request: NextRequest) {
 
             // 解码数据
             const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
+            buffer += chunk;
+            
+            // 处理每一行数据
+            while (buffer.includes('\n')) {
+              const lineEndIndex = buffer.indexOf('\n');
+              const line = buffer.substring(0, lineEndIndex).trim();
+              buffer = buffer.substring(lineEndIndex + 1);
+              
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
+                
                 if (data === '[DONE]') {
                   controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                   continue;
                 }
-
+                
                 try {
-                  // 验证JSON格式并过滤敏感信息
+                  // 尝试解析JSON
                   const jsonData = JSON.parse(data);
                   
                   // 提取token使用信息（如果有）
@@ -164,27 +171,12 @@ export async function POST(request: NextRequest) {
                   controller.enqueue(encoder.encode(`data: ${cleanJson}\n\n`));
                 } catch (error) {
                   // 记录无效的JSON数据
-                  console.error('无效的JSON数据:', data, error);
+                  console.error('无效的JSON数据:', data);
                   
-                  // 尝试修复常见问题
-                  try {
-                    // 如果数据包含多个JSON对象，尝试分割并处理
-                    if (data.includes('}{')) {
-                      const parts = data.split(/(?<=\})(?=\{)/);
-                      for (const part of parts) {
-                        try {
-                          const partData = JSON.parse(part);
-                          if (partData.choices && partData.choices[0].delta && partData.choices[0].delta.content) {
-                            fullAssistantMessage += partData.choices[0].delta.content;
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(partData)}\n\n`));
-                          }
-                        } catch {
-                          // 忽略无法解析的部分
-                        }
-                      }
-                    }
-                  } catch {
-                    // 如果修复尝试失败，忽略这个数据块
+                  // 尝试修复和处理不完整的JSON
+                  // 不向客户端发送错误的数据，而是在日志中记录
+                  if (data.length > 0) {
+                    console.log('Skipping malformed JSON chunk');
                   }
                 }
               }
