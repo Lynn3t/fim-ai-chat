@@ -1948,14 +1948,19 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
       if (response.ok) {
         toast.success(`用户创建成功，密码: ${password}`);
+        // 先关闭模态框
         setShowCreateUserModal(false);
-        setCreateUserData({
-          username: '',
-          email: '',
-          password: '',
-          isGeneratingPassword: false
-        });
-        loadUsers();
+        // 延迟一点再重置数据，避免可能的渲染冲突
+        setTimeout(() => {
+          setCreateUserData({
+            username: '',
+            email: '',
+            password: '',
+            isGeneratingPassword: false
+          });
+          // 重新加载用户列表
+          loadUsers();
+        }, 100);
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || '创建用户失败';
@@ -2121,6 +2126,9 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     setFormData 
   }: CreateUserModalProps) {
     
+    // 添加控制台日志帮助调试
+    console.log("CreateUserModal rendering with isOpen:", isOpen, "formData:", formData);
+    
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       onSubmit();
@@ -2133,7 +2141,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-[9999] overflow-y-auto">
+      <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
         <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
           <div className="fixed inset-0 transition-opacity" onClick={onClose}>
             <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
@@ -2142,7 +2150,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
           <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
 
           <div 
-            className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -2151,7 +2159,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                   <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                     创建新用户
                   </h3>
-                  <div className="mt-2">
+                  <div className="mt-2 z-[99999]">
                     <form onSubmit={handleSubmit}>
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2160,9 +2168,18 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                         <input
                           type="text"
                           value={formData.username}
-                          onChange={(e) => setFormData({...formData, username: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          onChange={(e) => {
+                            // 使用函数形式的setState确保获取最新状态
+                            setFormData(prevState => ({
+                              ...prevState,
+                              username: e.target.value
+                            }));
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.stopPropagation()}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                           placeholder="输入用户名"
+                          style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
                           required
                         />
                       </div>
@@ -2174,8 +2191,16 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                         <input
                           type="email"
                           value={formData.email}
-                          onChange={(e) => setFormData({...formData, email: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          onChange={(e) => {
+                            setFormData(prevState => ({
+                              ...prevState,
+                              email: e.target.value
+                            }));
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.stopPropagation()}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                          style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
                           placeholder="输入邮箱（可选）"
                         />
                       </div>
@@ -2187,8 +2212,12 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           </label>
                           <button
                             type="button"
-                            onClick={handleGeneratePassword}
-                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGeneratePassword();
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 pointer-events-auto"
+                            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
                           >
                             生成随机密码
                           </button>
@@ -2196,8 +2225,16 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                         <input
                           type="text"
                           value={formData.password}
-                          onChange={(e) => setFormData({...formData, password: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          onChange={(e) => {
+                            setFormData(prevState => ({
+                              ...prevState,
+                              password: e.target.value
+                            }));
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.stopPropagation()}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                          style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
                           placeholder="留空将自动生成12位强密码"
                         />
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -2861,7 +2898,16 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                   variant="contained" 
                   color="primary" 
                   sx={{ mr: 1 }}
-                  onClick={() => setShowCreateUserModal(true)}
+                  onClick={() => {
+                    // 先重置状态，再打开模态框
+                    setCreateUserData({
+                      username: '',
+                      email: '',
+                      password: '',
+                      isGeneratingPassword: false
+                    });
+                    setShowCreateUserModal(true);
+                  }}
                 >
                   创建用户
                 </Button>
@@ -3361,15 +3407,6 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
           />
         )}
 
-        {/* 创建邀请码对话框 */}
-        <CreateInviteModal
-          isOpen={showCreateInviteModal}
-          onClose={() => setShowCreateInviteModal(false)}
-          onSubmit={createInviteCodeFromForm}
-          formData={inviteFormData}
-          setFormData={setInviteFormData}
-        />
-
         {/* 重置密码对话框 */}
         <ResetPasswordModal
           isOpen={showResetPasswordModal}
@@ -3536,174 +3573,199 @@ function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: Provid
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          {title}
-        </h3>
+    <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+        </div>
+        
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        
+        <div 
+          className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            {title}
+          </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              提供商名称 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="例如: OpenAI, Anthropic"
-              required
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              将自动生成内部标识符和显示名称
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              图标选择 <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={formData.icon}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData(prev => ({ ...prev, icon: value }));
-                  setShowCustomEmoji(value === 'custom');
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                提供商名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, name: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="例如: OpenAI, Anthropic"
                 required
-              >
-                {iconOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-8 pointer-events-none">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm">
-                    {(() => {
-                      const selectedOption = iconOptions.find(opt => opt.value === formData.icon);
-                      if (!selectedOption) return '🤖';
-
-                      if (selectedOption.component) {
-                        const IconComponent = selectedOption.component;
-                        return <IconComponent size={16} />;
-                      }
-                      return selectedOption.emoji;
-                    })()}
-                  </span>
-                </div>
-              </div>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                将自动生成内部标识符和显示名称
+              </p>
             </div>
 
-            {/* 自定义 Emoji 输入框 */}
-            {showCustomEmoji && (
-              <div className="mt-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  自定义 Emoji
-                </label>
-                <input
-                  type="text"
-                  value={customEmoji}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                图标选择 <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.icon}
                   onChange={(e) => {
-                    // 只允许输入一个字符（emoji）
                     const value = e.target.value;
-                    if (value.length <= 1) {
-                      setCustomEmoji(value);
-                    }
+                    setFormData(prevState => ({ ...prevState, icon: value }));
+                    setShowCustomEmoji(value === 'custom');
                   }}
-                  placeholder="输入一个 emoji，如：🚀"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  maxLength={1}
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  可以输入任何 emoji 或符号作为图标
-                </p>
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none pointer-events-auto"
+                  style={{ pointerEvents: 'auto' }}
+                  required
+                >
+                  {iconOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-8 pointer-events-none">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm">
+                      {(() => {
+                        const selectedOption = iconOptions.find(opt => opt.value === formData.icon);
+                        if (!selectedOption) return '🤖';
+
+                        if (selectedOption.component) {
+                          const IconComponent = selectedOption.component;
+                          return <IconComponent size={16} />;
+                        }
+                        return selectedOption.emoji;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
-            )}
 
+              {/* 自定义 Emoji 输入框 */}
+              {showCustomEmoji && (
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    自定义 Emoji
+                  </label>
+                  <input
+                    type="text"
+                    value={customEmoji}
+                    onChange={(e) => {
+                      // 只允许输入一个字符（emoji）
+                      const value = e.target.value;
+                      if (value.length <= 1) {
+                        setCustomEmoji(value);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="输入一个 emoji，如：🚀"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                    style={{ pointerEvents: 'auto' }}
+                    maxLength={1}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    可以输入任何 emoji 或符号作为图标
+                  </p>
+                </div>
+              )}
+            </div>
 
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Base URL <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="url"
+                value={formData.baseUrl}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, baseUrl: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="https://api.openai.com/v1"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Base URL <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="url"
-              value={formData.baseUrl}
-              onChange={(e) => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="https://api.openai.com/v1"
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={formData.apiKey}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, apiKey: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="sk-..."
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={formData.apiKey}
-              onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="sk-..."
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                描述
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, description: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                rows={3}
+                placeholder="提供商描述..."
+              />
+            </div>
 
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isEnabled"
+                checked={formData.isEnabled}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, isEnabled: e.target.checked }))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+              />
+              <label htmlFor="isEnabled" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                启用提供商
+              </label>
+            </div>
 
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              描述
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              rows={3}
-              placeholder="提供商描述..."
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="isEnabled"
-              checked={formData.isEnabled}
-              onChange={(e) => setFormData(prev => ({ ...prev, isEnabled: e.target.checked }))}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="isEnabled" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-              启用提供商
-            </label>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              {initialData ? '更新' : '创建'}
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => e.stopPropagation()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {initialData ? '更新' : '创建'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -3740,77 +3802,96 @@ function CreateInviteModal({ isOpen, onClose, onSubmit, formData, setFormData }:
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          创建邀请码
-        </h3>
+    <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+        </div>
+        
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        
+        <div 
+          className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            创建邀请码
+          </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              邀请码数量 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              value={formData.count}
-              onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="1"
-              required
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              一次最多创建 100 个邀请码
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              每个邀请码可使用次数 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="1000"
-              value={formData.maxUses}
-              onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="1"
-              required
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              每个邀请码最多可使用 1000 次
-            </p>
-          </div>
-
-          {/* 预览信息 */}
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">创建预览</h4>
-            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <div>将创建 <span className="font-medium text-gray-900 dark:text-white">{formData.count}</span> 个邀请码</div>
-              <div>每个邀请码可使用 <span className="font-medium text-gray-900 dark:text-white">{formData.maxUses}</span> 次</div>
-              <div>总共可注册 <span className="font-medium text-gray-900 dark:text-white">{formData.count * formData.maxUses}</span> 个用户</div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                邀请码数量 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={formData.count}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, count: parseInt(e.target.value) || 1 }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="1"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                一次最多创建 100 个邀请码
+              </p>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              创建邀请码
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                每个邀请码可使用次数 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                value={formData.maxUses}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, maxUses: parseInt(e.target.value) || 1 }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="1"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                每个邀请码最多可使用 1000 次
+              </p>
+            </div>
+
+            {/* 预览信息 */}
+            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">创建预览</h4>
+              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <div>将创建 <span className="font-medium text-gray-900 dark:text-white">{formData.count}</span> 个邀请码</div>
+                <div>每个邀请码可使用 <span className="font-medium text-gray-900 dark:text-white">{formData.maxUses}</span> 次</div>
+                <div>总共可注册 <span className="font-medium text-gray-900 dark:text-white">{formData.count * formData.maxUses}</span> 个用户</div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => e.stopPropagation()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                创建邀请码
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -3861,74 +3942,94 @@ function AddModelModal({ isOpen, onClose, onSubmit }: AddModelModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          添加自定义模型
-        </h3>
+    <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+        </div>
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative p-6"
+            onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            添加自定义模型
+          </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              模型ID <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.modelId}
-              onChange={(e) => setFormData(prev => ({ ...prev, modelId: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="例如: gpt-4o-mini"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              用于API请求的模型标识符
-            </p>
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                模型ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.modelId}
+                onChange={(e) => setFormData(prev => ({ ...prev, modelId: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
+                placeholder="例如: gpt-4o-mini"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                用于API请求的模型标识符
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              模型名称 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="例如: GPT-4o Mini"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              用户界面显示的模型名称
-            </p>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                模型名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
+                placeholder="例如: GPT-4o Mini"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                用户界面显示的模型名称
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              描述（可选）
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              rows={3}
-              placeholder="模型描述..."
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                描述（可选）
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
+                rows={3}
+                placeholder="模型描述..."
+              />
+            </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              添加模型
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => e.stopPropagation()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                添加模型
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -3962,84 +4063,103 @@ function CustomGroupModal({ isOpen, onClose, providerId, providers, onSubmit }: 
   };
 
   const toggleModel = (modelId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      modelIds: prev.modelIds.includes(modelId)
-        ? prev.modelIds.filter(id => id !== modelId)
-        : [...prev.modelIds, modelId]
+    setFormData(prevState => ({
+      ...prevState,
+      modelIds: prevState.modelIds.includes(modelId)
+        ? prevState.modelIds.filter(id => id !== modelId)
+        : [...prevState.modelIds, modelId]
     }));
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          创建自定义分组
-        </h3>
+    <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+        </div>
+        
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        
+        <div 
+          className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative p-6 max-h-[80vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            创建自定义分组
+          </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              分组名称 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.groupName}
-              onChange={(e) => setFormData(prev => ({ ...prev, groupName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="例如: 对话模型"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              选择模型 <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
-              {models.map((model: any) => (
-                <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.modelIds.includes(model.id)}
-                    onChange={() => toggleModel(model.id)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {model.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {model.modelId}
-                    </div>
-                  </div>
-                </label>
-              ))}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                分组名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.groupName}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, groupName: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                placeholder="例如: 对话模型"
+                required
+              />
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              已选择 {formData.modelIds.length} 个模型
-            </p>
-          </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              disabled={!formData.groupName.trim() || formData.modelIds.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-            >
-              创建分组
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                选择模型 <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
+                {models.map((model: any) => (
+                  <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.modelIds.includes(model.id)}
+                      onChange={() => toggleModel(model.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                      style={{ pointerEvents: 'auto' }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {model.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {model.modelId}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                已选择 {formData.modelIds.length} 个模型
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => e.stopPropagation()}
+                disabled={!formData.groupName.trim() || formData.modelIds.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                创建分组
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -4078,24 +4198,24 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
   };
 
   const toggleModel = (modelId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedModels: prev.selectedModels.includes(modelId)
-        ? prev.selectedModels.filter(id => id !== modelId)
-        : [...prev.selectedModels, modelId]
+    setFormData(prevState => ({
+      ...prevState,
+      selectedModels: prevState.selectedModels.includes(modelId)
+        ? prevState.selectedModels.filter(id => id !== modelId)
+        : [...prevState.selectedModels, modelId]
     }));
   };
 
   const selectAll = () => {
-    setFormData(prev => ({
-      ...prev,
+    setFormData(prevState => ({
+      ...prevState,
       selectedModels: models.map((m: any) => m.id)
     }));
   };
 
   const deselectAll = () => {
-    setFormData(prev => ({
-      ...prev,
+    setFormData(prevState => ({
+      ...prevState,
       selectedModels: []
     }));
   };
@@ -4103,107 +4223,128 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          🤖 AI 智能重命名
-        </h3>
-
-        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            AI将根据预设规则将模型ID转换为易读的名称，例如：
-          </p>
-          <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1">
-            <li>• gpt-4o-mini → GPT-4o Mini</li>
-            <li>• deepseek-chat-v3-0324 → DeepSeek V3 [0324]</li>
-            <li>• deepseek-ai/deepseek-r1 → DeepSeek R1 {`{deepseek-ai}`}</li>
-          </ul>
+    <div className="fixed inset-0 z-[99999] overflow-y-auto" style={{ zIndex: 99999 }}>
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
         </div>
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative p-6 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            🤖 AI 智能重命名
+          </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              选择AI模型进行重命名 <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.aiModelId}
-              onChange={(e) => setFormData(prev => ({ ...prev, aiModelId: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              required
-            >
-              <option value="">请选择用于重命名的AI模型</option>
-              {availableAIModels.map((model: any) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} ({model.modelId})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                选择要重命名的模型 <span className="text-red-500">*</span>
-              </label>
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  全选
-                </button>
-                <button
-                  type="button"
-                  onClick={deselectAll}
-                  className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-                >
-                  全不选
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
-              {models.map((model: any) => (
-                <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.selectedModels.includes(model.id)}
-                    onChange={() => toggleModel(model.id)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {model.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {model.modelId}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              已选择 {formData.selectedModels.length} 个模型
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              AI将根据预设规则将模型ID转换为易读的名称，例如：
             </p>
+            <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1">
+              <li>• gpt-4o-mini → GPT-4o Mini</li>
+              <li>• deepseek-chat-v3-0324 → DeepSeek V3 [0324]</li>
+              <li>• deepseek-ai/deepseek-r1 → DeepSeek R1 {`{deepseek-ai}`}</li>
+            </ul>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              disabled={!formData.aiModelId || formData.selectedModels.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              🤖 开始AI重命名
-            </button>
-          </div>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                选择AI模型进行重命名 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.aiModelId}
+                onChange={(e) => setFormData(prevState => ({ ...prevState, aiModelId: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                style={{ pointerEvents: 'auto' }}
+                required
+              >
+                <option value="">请选择用于重命名的AI模型</option>
+                {availableAIModels.map((model: any) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name} ({model.modelId})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  选择要重命名的模型 <span className="text-red-500">*</span>
+                </label>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectAll();
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    全选
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deselectAll();
+                    }}
+                    className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+                  >
+                    全不选
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3">
+                {models.map((model: any) => (
+                  <label key={model.id} className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.selectedModels.includes(model.id)}
+                      onChange={() => toggleModel(model.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                      style={{ pointerEvents: 'auto' }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {model.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {model.modelId}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                已选择 {formData.selectedModels.length} 个模型
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => e.stopPropagation()}
+                disabled={!formData.aiModelId || formData.selectedModels.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                🤖 开始AI重命名
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
