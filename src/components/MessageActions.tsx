@@ -7,7 +7,8 @@ import {
   Box, 
   Button, 
   IconButton,
-  Paper
+  Paper,
+  Typography
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
@@ -309,7 +310,7 @@ export function MessageActions({
   return (
     <Box 
       ref={messageActionsRef}
-      sx={{ position: 'relative' }}
+      sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}
       onMouseEnter={() => {
         setIsVisible(true); // Always show buttons when hovering directly over them
         handleMouseEnter();
@@ -380,6 +381,22 @@ export function MessageActions({
         >
           <DeleteIcon fontSize="small" />
         </IconButton>
+
+        {/* Token usage info - only shown for assistant messages */}
+        {messageRole === 'assistant' && tokenUsage && (
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: 'text.disabled', 
+              ml: 1,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            [输入: {tokenUsage.prompt_tokens ?? '未知'}, 输出: {tokenUsage.completion_tokens ?? '未知'}]
+            {tokenUsage.is_estimated && <span> (估算)</span>}
+          </Typography>
+        )}
       </Box>
     </Box>
   );

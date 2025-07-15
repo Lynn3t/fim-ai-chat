@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
 
     // 在发送请求前计算输入的token数量（用于备份和比较）
     const userMessage = messages[messages.length - 1];
-    const estimatedPromptTokens = estimateTokens(userMessage.content);
+    const promptContent = messages.map(m => m.content).join('\n');
+    const estimatedPromptTokens = estimateTokens(promptContent);
 
     // 构建请求URL
     const apiUrl = `${model.provider.baseUrl}/chat/completions`;
@@ -209,14 +210,17 @@ export async function POST(request: NextRequest) {
           if (!tokenUsage && fullAssistantMessage) {
             const estimatedCompletionTokens = estimateTokens(fullAssistantMessage);
             tokenUsage = {
-              prompt_tokens: estimatedPromptTokens,
+              prompt_tokens: estimatedPromptTokens, // 使用上面修正过的估算值
               completion_tokens: estimatedCompletionTokens,
               total_tokens: estimatedPromptTokens + estimatedCompletionTokens,
               is_estimated: true // 标记为估算值
             };
-            
-            // 发送估算的token信息
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage: tokenUsage })}\n\n`));
+          }
+
+          // 在流结束后发送token使用情况
+          if (tokenUsage) {
+            const tokenUsagePayload = `[TOKEN_USAGE]${JSON.stringify(tokenUsage)}\n\n`;
+            controller.enqueue(encoder.encode(tokenUsagePayload));
           }
 
           // 记录token使用情况
