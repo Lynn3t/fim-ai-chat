@@ -2216,7 +2216,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                               e.stopPropagation();
                               handleGeneratePassword();
                             }}
-                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 pointer-events-auto"
+                            className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 pointer-events-auto"
                             style={{ pointerEvents: 'auto', position: 'relative', zIndex: 99999 }}
                           >
                             生成随机密码
@@ -2380,7 +2380,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                   id="enable_last_used_model"
                   checked={systemSettings.enable_last_used_model ?? true}
                   onChange={(e) => setSystemSettings(prev => ({ ...prev, enable_last_used_model: e.target.checked }))}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
                 />
                 <label htmlFor="enable_last_used_model" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   自动记住上次使用的模型作为默认选择
@@ -2390,7 +2390,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
               <div className="flex justify-end">
                 <button
                   onClick={() => updateSystemSettings(systemSettings)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
                 >
                   保存AI设置
                 </button>
@@ -2406,7 +2406,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                   </h3>
                   <button
                     onClick={() => setShowAddProviderModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
                   >
                     添加提供商
                   </button>
@@ -2450,8 +2450,8 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                       </div>
                                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                         provider.isEnabled
-                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                          : 'bg-gray-300 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                                       }`}>
                                         {provider.isEnabled ? '启用' : '禁用'}
                                       </span>
@@ -2477,21 +2477,21 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                     onClick={() => toggleProviderStatus(provider.id, provider.isEnabled)}
                                     className={`px-3 py-1 text-xs rounded ${
                                       provider.isEnabled
-                                        ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800'
-                                        : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800'
+                                        ? 'bg-gray-300 text-gray-800 hover:bg-gray-400 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                        : 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                                     }`}
                                   >
                                     {provider.isEnabled ? '禁用' : '启用'}
                                   </button>
                                   <button
                                     onClick={() => setEditingProvider(provider)}
-                                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
+                                    className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                                   >
                                     编辑
                                   </button>
                                   <button
                                     onClick={() => deleteProvider(provider.id, provider.displayName)}
-                                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800"
+                                    className="px-3 py-1 text-xs bg-gray-300 text-gray-800 rounded hover:bg-gray-400 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                                   >
                                     删除
                                   </button>
@@ -2510,31 +2510,31 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                     <button
                                       onClick={() => fetchModelsFromAPI(provider)}
                                       disabled={isLoading}
-                                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                       {isLoading ? '获取中...' : 'v1/models 获取'}
                                     </button>
                                     <button
                                       onClick={() => openAddModelModal(provider.id)}
-                                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800 transition-colors"
+                                      className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
                                     >
                                       自定义模型
                                     </button>
                                     <button
                                       onClick={() => autoGroupModels(provider.id)}
-                                      className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:hover:bg-purple-800 transition-colors"
+                                      className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
                                     >
                                       🤖 自动分组
                                     </button>
                                     <button
                                       onClick={() => openCustomGroupModal(provider.id)}
-                                      className="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:hover:bg-orange-800 transition-colors"
+                                      className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
                                     >
                                       📁 自定义分组
                                     </button>
                                     <button
                                       onClick={() => openAIRenameModal(provider.id)}
-                                      className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-800 transition-colors"
+                                      className="px-3 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
                                     >
                                       ✨ AI 起名
                                     </button>
@@ -2579,7 +2579,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                                 }`}>
                                                   {model.name}
                                                   {model._isTemporary && (
-                                                    <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
+                                                    <span className="ml-2 text-xs text-gray-600 dark:text-gray-400">
                                                       (导入中...)
                                                     </span>
                                                   )}
@@ -2587,7 +2587,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                                                 <div className="text-xs text-gray-500 dark:text-gray-400">
                                                   ID: {model.modelId}
                                                   {model.group && (
-                                                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                                                    <span className="ml-2 text-xs text-gray-600 dark:text-gray-400">
                                                       分组: {model.group}
                                                     </span>
                                                   )}
@@ -3150,13 +3150,13 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                             {code.currentUses} / {code.maxUses}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              code.currentUses >= code.maxUses
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            }`}>
-                              {code.currentUses >= code.maxUses ? '已用完' : '可用'}
-                            </span>
+                                                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                code.currentUses >= code.maxUses
+                                  ? 'bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                  : 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                              }`}>
+                                {code.currentUses >= code.maxUses ? '已用完' : '可用'}
+                              </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             {code.creator.username}
@@ -3167,7 +3167,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button
                                                                                 onClick={() => openDeleteInviteDialog(code.id, code.code)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
                             >
                               删除
                             </button>
@@ -3302,7 +3302,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
                     id="enableRateLimit"
                     checked={systemSettings.enableRateLimit ?? true}
                     onChange={(e) => setSystemSettings(prev => ({ ...prev, enableRateLimit: e.target.checked }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-black focus:ring-gray-500 border-gray-300 rounded"
                   />
                   <label htmlFor="enableRateLimit" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                     启用请求频率限制
@@ -3737,7 +3737,7 @@ function ProviderModal({ isOpen, onClose, onSubmit, title, initialData }: Provid
                 checked={formData.isEnabled}
                 onChange={(e) => setFormData(prevState => ({ ...prevState, isEnabled: e.target.checked }))}
                 onClick={(e) => e.stopPropagation()}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded pointer-events-auto"
                 style={{ pointerEvents: 'auto' }}
               />
               <label htmlFor="isEnabled" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
@@ -4280,7 +4280,7 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
                       e.stopPropagation();
                       selectAll();
                     }}
-                    className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
                   >
                     全选
                   </button>

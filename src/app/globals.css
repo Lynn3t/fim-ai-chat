@@ -2,6 +2,23 @@
 
 /* 移除root变量，我们现在使用Material UI的主题系统 */
 
+/* 自定义复选框颜色 */
+input[type="checkbox"] {
+  color: black !important;
+  background-color: currentColor !important;
+}
+
+/* 重写Tailwind类，将复选框的蓝色改为黑色 */
+.text-blue-600 {
+  --tw-text-opacity: 1;
+  color: rgb(0 0 0 / var(--tw-text-opacity)) !important;
+}
+
+.focus\:ring-blue-500:focus {
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(75 85 99 / var(--tw-ring-opacity)) !important;
+}
+
 /* 动画效果 */
 @keyframes slide-in {
   from {

@@ -138,7 +138,7 @@ export function MarkdownRenderer({
                 href={props.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-gray-600 dark:text-gray-400 hover:underline"
               >
                 {props.children}
               </a>

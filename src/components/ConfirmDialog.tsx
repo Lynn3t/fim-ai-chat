@@ -52,22 +52,22 @@ export function ConfirmDialog({
   const getTypeStyles = () => {
     switch (type) {
       case 'danger':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-gray-700 bg-gray-100 border-gray-300';
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-gray-500 bg-gray-50 border-gray-200';
       default:
-        return 'text-blue-600 bg-blue-50 border-blue-200';
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
   const getConfirmButtonStyles = () => {
     switch (type) {
       case 'danger':
-        return 'bg-red-600 hover:bg-red-700';
+        return 'bg-gray-700 hover:bg-gray-800';
       case 'warning':
-        return 'bg-yellow-600 hover:bg-yellow-700';
+        return 'bg-gray-600 hover:bg-gray-700';
       default:
-        return 'bg-blue-600 hover:bg-blue-700';
+        return 'bg-gray-800 hover:bg-gray-900';
     }
   };
 

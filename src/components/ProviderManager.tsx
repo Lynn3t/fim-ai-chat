@@ -257,7 +257,7 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
         <button
           onClick={handleAdd}
           disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 transition-colors"
         >
           添加提供商
         </button>
@@ -267,7 +267,7 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {isLoading && providers.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 mx-auto"></div>
             <p className="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
           </div>
         ) : providers.length === 0 ? (
@@ -330,8 +330,8 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         provider.isEnabled
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                          : 'bg-gray-300 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                       }`}>
                         {provider.isEnabled ? '启用' : '禁用'}
                       </span>
@@ -339,19 +339,19 @@ export default function ProviderManager({ adminUserId }: ProviderManagerProps) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <button
                         onClick={() => handleEdit(provider)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
                       >
                         编辑
                       </button>
                       <button
                         onClick={() => toggleProvider(provider)}
-                        className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
+                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                       >
                         {provider.isEnabled ? '禁用' : '启用'}
                       </button>
                       <button
                         onClick={() => handleDelete(provider)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        className="text-gray-700 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
                       >
                         删除
                       </button>

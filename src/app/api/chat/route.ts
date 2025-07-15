@@ -13,15 +13,31 @@ interface ChatRequest {
   messages: Message[];
   userId: string;
   modelId: string;
+  stream?: boolean;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, userId, modelId }: ChatRequest = await request.json();
+    const {
+      messages,
+      userId,
+      modelId,
+      stream = true,
+      temperature,
+      max_tokens,
+      top_p,
+      frequency_penalty,
+      presence_penalty,
+    }: ChatRequest = await request.json();
 
-    if (!messages || !userId || !modelId) {
+    if (!messages || messages.length === 0 || !userId || !modelId) {
       return NextResponse.json({
-        error: 'Missing required fields: messages, userId, modelId'
+        error: 'Missing or empty required fields: messages, userId, modelId'
       }, { status: 400 });
     }
 
@@ -86,13 +102,13 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: model.modelId,
-        messages: messages,
-        stream: true,
-        temperature: model.temperature || 0.7,
-        max_tokens: model.maxTokens || 2000,
-        ...(model.topP && { top_p: model.topP }),
-        ...(model.frequencyPenalty && { frequency_penalty: model.frequencyPenalty }),
-        ...(model.presencePenalty && { presence_penalty: model.presencePenalty }),
+        messages,
+        stream,
+        temperature: temperature ?? model.temperature ?? 0.7,
+        max_tokens: max_tokens ?? model.maxTokens ?? 2000,
+        ...(top_p !== undefined ? { top_p } : model.topP ? { top_p: model.topP } : {}),
+        ...(frequency_penalty !== undefined ? { frequency_penalty } : model.frequencyPenalty ? { frequency_penalty: model.frequencyPenalty } : {}),
+        ...(presence_penalty !== undefined ? { presence_penalty } : model.presencePenalty ? { presence_penalty: model.presencePenalty } : {}),
       }),
     });
 
@@ -105,9 +121,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If client requested no streaming, return full JSON
+    if (!stream) {
+      const json = await response.json();
+      return NextResponse.json(json);
+    }
+
     // 创建流式响应
     const encoder = new TextEncoder();
-    const stream = new ReadableStream({
+    const sseStream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
         if (!reader) {
@@ -222,7 +244,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return new Response(stream, {
+    return new Response(sseStream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

@@ -116,7 +116,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
                     type="checkbox"
                     checked={selectedModels.has(modelId)}
                     onChange={() => toggleModel(modelId)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
                   />
                   <div className="flex-1">
                     <p className="font-medium text-gray-900 dark:text-white">
@@ -127,7 +127,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
                     </p>
                   </div>
                   {selectedModels.has(modelId) && (
-                    <div className="text-blue-600 dark:text-blue-400">
+                    <div className="text-gray-600 dark:text-gray-400">
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
@@ -151,7 +151,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
             <button
               onClick={handleImport}
               disabled={selectedModels.size === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               导入 {selectedModels.size} 个模型
             </button>

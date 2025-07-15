@@ -11,9 +11,14 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
+    // Publicly allow fetching a single setting by key
     const key = searchParams.get('key')
-
+    if (key) {
+      const value = await getSystemSetting(key)
+      return NextResponse.json({ key, value })
+    }
+    // For fetching all settings, require adminUserId and admin permission
+    const adminUserId = searchParams.get('adminUserId')
     if (!adminUserId) {
       return NextResponse.json(
         { error: 'adminUserId is required' },
@@ -30,30 +35,24 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (key) {
-      // 获取单个设置
-      const value = await getSystemSetting(key)
-      return NextResponse.json({ key, value })
-    } else {
-      // 获取所有设置
-      const settings = await getAllSystemSettings()
-      
-      // 添加设置描述信息
-      const settingsWithMeta = Object.entries(settings).map(([key, value]) => {
-        const defaultSetting = DEFAULT_SYSTEM_SETTINGS.find(s => s.key === key)
-        return {
-          key,
-          value,
-          type: defaultSetting?.type || typeof value,
-          description: defaultSetting?.description || ''
-        }
-      })
+    // 获取所有设置
+    const settings = await getAllSystemSettings()
+    
+    // 添加设置描述信息
+    const settingsWithMeta = Object.entries(settings).map(([key, value]) => {
+      const defaultSetting = DEFAULT_SYSTEM_SETTINGS.find(s => s.key === key)
+      return {
+        key,
+        value,
+        type: defaultSetting?.type || typeof value,
+        description: defaultSetting?.description || ''
+      }
+    })
 
-      return NextResponse.json({
-        settings: settingsWithMeta,
-        raw: settings
-      })
-    }
+    return NextResponse.json({
+      settings: settingsWithMeta,
+      raw: settings
+    })
 
   } catch (error) {
     console.error('Error fetching system settings:', error)
