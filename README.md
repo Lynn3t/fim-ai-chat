@@ -124,7 +124,6 @@ Create a `.env.local` file in the root directory:
 
 ```env
 DATABASE_URL="file:./dev.db"
-NEXTAUTH_SECRET="your-secret-key"
 ```
 
 ### AI Provider Setup
