@@ -7,7 +7,7 @@ FimAI Chat 是一个基于 Next.js 的多模型 AI 聊天应用，支持多种 A
 - 聊天体验：流式响应、Markdown 及 LaTeX 渲染、消息复制/删除/编辑、聊天历史记录
 - 用户体系：管理员、注册用户与访客三种角色，支持访问码登录与令牌统计
 - 配置中心：在前端页面管理 API 配置、模型参数及用户权限
-- 数据持久化：使用 SQLite 与 Prisma 保存会话、消息及系统设置
+- 数据持久化：使用 PostgreSQL 与 Prisma 保存会话、消息及系统设置
 - UI/UX：支持深浅色主题，响应式布局，Tailwind CSS 与 Material UI 组件
 
 ## 快速开始
@@ -84,7 +84,7 @@ prisma/
 在项目根目录创建 `.env.local`：
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@localhost:5432/fimai?schema=public"
 ```
 
 ### AI 服务商配置
@@ -95,7 +95,7 @@ DATABASE_URL="file:./dev.db"
 
 ## 技术栈
 - Next.js 15 + React 19
-- Prisma ORM 与 SQLite
+- Prisma ORM 与 PostgreSQL
 - Tailwind CSS 与 Material UI
 - @lobehub/ui、@dnd-kit 等前端库
 - react-markdown 与 KaTeX
