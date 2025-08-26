@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null
   chatConfig: ChatConfig | null
   isLoading: boolean
-  login: (username: string) => Promise<{ success: boolean; error?: string }>
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   loginWithAccessCode: (username: string, accessCode: string) => Promise<{ success: boolean; error?: string }>
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>
   logout: () => void
