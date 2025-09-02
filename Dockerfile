@@ -18,6 +18,8 @@ RUN npx prisma generate
 
 # Copy source and build
 COPY . .
+# Ensure optional public directory exists to avoid COPY failures in runtime stage
+RUN mkdir -p public
 RUN npm run build
 
 # Runtime stage
@@ -33,6 +35,7 @@ ENV HOSTNAME=0.0.0.0
 
 # Copy build artifacts and minimal runtime files
 COPY --from=builder /app/.next ./.next
+# Copy public assets (may be empty if project has none)
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY package*.json ./
@@ -44,4 +47,3 @@ EXPOSE 3000
 
 # Apply DB migrations on start, then launch Next
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
-
