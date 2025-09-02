@@ -3,7 +3,7 @@ services:
   web:
     # Prefer pulling the prebuilt image from GHCR (built by GitHub Actions)
     # Set GHCR_OWNER in .env; defaults to "itsfimall" if unset.
-    image: ghcr.io/${GHCR_OWNER:-itsfimall}/fim-ai-chat:latest
+    image: ghcr.io/${GHCR_OWNER:-lynn3t}/fim-ai-chat:latest
     # To build locally from source instead, comment the line above and uncomment below:
     # build: .
     ports:
@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
