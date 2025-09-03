@@ -1,26 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  recordTokenUsage, 
-  getUserTokenStats, 
-  getUserTokenHistory 
+import {
+  recordTokenUsage,
+  getUserTokenStats,
+  getUserTokenHistory
 } from '@/lib/db/token-usage'
+import { withAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const action = searchParams.get('action')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
 
     if (action === 'history') {
       // 获取详细使用记录
@@ -50,11 +43,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// 使用withAuth装饰器包装
+export const GET = withAuth(_GET);
+
+async function _POST(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
     const {
-      userId,
       conversationId,
       messageId,
       providerId,
@@ -66,9 +61,9 @@ export async function POST(request: NextRequest) {
       outputText,
     } = data
 
-    if (!userId || !providerId || !modelId) {
+    if (!providerId || !modelId) {
       return NextResponse.json(
-        { error: 'userId, providerId, and modelId are required' },
+        { error: 'providerId, and modelId are required' },
         { status: 400 }
       )
     }
@@ -96,3 +91,6 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+// 使用withAuth装饰器包装
+export const POST = withAuth(_POST);

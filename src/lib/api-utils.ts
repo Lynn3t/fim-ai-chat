@@ -26,25 +26,8 @@ export async function getUserFromRequest(request: NextRequest): Promise<string |
       }
     }
     
-    // 如果JWT验证失败或没有找到令牌，则回退到查询参数方法（为了向后兼容）
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || searchParams.get('adminUserId');
-
-    if (!userId) {
-      return null;
-    }
-
-    // 验证用户是否存在且活跃
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, isActive: true, role: true },
-    });
-
-    if (!user || !user.isActive) {
-      return null;
-    }
-
-    return user.id;
+    // JWT验证失败，直接返回null，不再回退到查询参数方法
+    return null;
   } catch (error) {
     console.error('Error getting user from request:', error);
     return null;

@@ -1,37 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  getAllUsers, 
-  updateUserStatus, 
+import {
+  getAllUsers,
+  updateUserStatus,
   updateUserAccessCodePermission,
-  updateUserPermissions 
+  updateUserPermissions
 } from '@/lib/db/admin'
 import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
     const includeStats = searchParams.get('includeStats') === 'true'
     const role = searchParams.get('role') as 'ADMIN' | 'USER' | 'GUEST' | null
     const isActive = searchParams.get('isActive')
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
 
     const users = await getAllUsers({
       includeStats,
@@ -52,14 +36,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// 使用withAdminAuth装饰器包装
+export const GET = withAdminAuth(GET);
+
+export async function POST(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, username, email, password, role = 'USER' } = data
+    const { username, email, password, role = 'USER' } = data
 
-    if (!adminUserId || !username) {
+    if (!username) {
       return NextResponse.json(
-        { error: 'adminUserId and username are required' },
+        { error: 'Username is required' },
         { status: 400 }
       )
     }
@@ -71,21 +58,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
     // 检查用户名是否已存在
     const { prisma } = await import('@/lib/prisma')
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { 
+          {
             username: {
               equals: username,
               mode: 'insensitive' // 不区分大小写
@@ -164,24 +142,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+// 使用withAdminAuth装饰器包装
+export const POST = withAdminAuth(POST);
+
+export async function PATCH(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, userId, action, ...updateData } = data
+    const { userId, action, ...updateData } = data
 
-    if (!adminUserId || !userId || !action) {
+    if (!userId || !action) {
       return NextResponse.json(
-        { error: 'adminUserId, userId, and action are required' },
+        { error: 'userId and action are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -224,24 +196,18 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+// 使用withAdminAuth装饰器包装
+export const PATCH = withAdminAuth(PATCH);
+
+export async function DELETE(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, userId } = data
+    const { userId } = data
 
-    if (!adminUserId || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { error: 'adminUserId and userId are required' },
+        { error: 'userId is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -317,3 +283,6 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+// 使用withAdminAuth装饰器包装
+export const DELETE = withAdminAuth(DELETE);
