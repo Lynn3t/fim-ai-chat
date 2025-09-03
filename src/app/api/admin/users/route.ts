@@ -8,7 +8,7 @@ import {
 import { checkUserPermission } from '@/lib/auth'
 import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
     const includeStats = searchParams.get('includeStats') === 'true'
@@ -37,9 +37,9 @@ export async function GET(request: NextRequest, userId: string) {
 }
 
 // 使用withAdminAuth装饰器包装
-export const GET = withAdminAuth(GET);
+export const GET = withAdminAuth(handleGet);
 
-export async function POST(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
     const { username, email, password, role = 'USER' } = data
@@ -114,10 +114,7 @@ export async function POST(request: NextRequest, userId: string) {
       await prisma.userPermission.create({
         data: {
           userId: user.id,
-          allowedModelIds: null, // 默认可以使用所有模型
           tokenLimit: null, // 默认无限制
-          canShareAccess: true,
-          isActive: true,
         },
       })
     }
@@ -143,9 +140,9 @@ export async function POST(request: NextRequest, userId: string) {
 }
 
 // 使用withAdminAuth装饰器包装
-export const POST = withAdminAuth(POST);
+export const POST = withAdminAuth(handlePost);
 
-export async function PATCH(request: NextRequest, adminUserId: string) {
+async function handlePatch(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
     const { userId, action, ...updateData } = data
@@ -197,9 +194,9 @@ export async function PATCH(request: NextRequest, adminUserId: string) {
 }
 
 // 使用withAdminAuth装饰器包装
-export const PATCH = withAdminAuth(PATCH);
+export const PATCH = withAdminAuth(handlePatch);
 
-export async function DELETE(request: NextRequest, adminUserId: string) {
+async function handleDelete(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
     const { userId } = data
@@ -285,4 +282,4 @@ export async function DELETE(request: NextRequest, adminUserId: string) {
 }
 
 // 使用withAdminAuth装饰器包装
-export const DELETE = withAdminAuth(DELETE);
+export const DELETE = withAdminAuth(handleDelete);

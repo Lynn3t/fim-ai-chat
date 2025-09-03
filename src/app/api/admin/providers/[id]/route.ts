@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkUserPermission } from '@/lib/auth'
+import { sanitizeProvider } from '@/lib/api-utils'
 
 export async function GET(
   request: NextRequest,
@@ -8,6 +9,26 @@ export async function GET(
 ) {
   try {
     const { id: providerId } = await params
+
+    // 从查询参数或请求体中获取用户ID
+    const { searchParams } = new URL(request.url)
+    const adminUserId = searchParams.get('adminUserId') || (await request.json()).adminUserId
+
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'adminUserId is required' },
+        { status: 400 }
+      )
+    }
+
+    // 检查管理员权限
+    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      )
+    }
 
     // 获取提供商信息
     const provider = await prisma.provider.findUnique({
@@ -26,7 +47,8 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(provider)
+    // 过滤敏感信息
+    return NextResponse.json(sanitizeProvider(provider))
   } catch (error) {
     console.error('Error fetching provider:', error)
     return NextResponse.json(
