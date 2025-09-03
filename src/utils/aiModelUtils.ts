@@ -23,7 +23,7 @@ export const AI_MODEL_CATEGORIES: AIModelCategory[] = [
   { name: 'Qwen', pattern: /(qwen|qwq|qvq)/i, iconName: 'Alibaba' },
   { name: 'ChatGPT', pattern: /(gpt|o1|o3|o4|openai)/i, iconName: 'OpenAI' },
   { name: 'Mistral', pattern: /mistral/i, iconName: 'Mistral' },
-  { name: 'Yi', pattern: /yi/i, iconName: 'Yi' },
+  { name: 'Yi', pattern: /\byi[-_:]|^yi$/i, iconName: 'Yi' },
   { name: 'SenseNova', pattern: /(sensenova|sense)/i, iconName: 'SenseTime' },
   { name: 'Spark', pattern: /spark/i, iconName: 'iFlytek' },
   { name: 'MiniMax', pattern: /(minimax|abab)/i, iconName: 'MiniMax' },

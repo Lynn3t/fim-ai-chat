@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyToken } from '@/lib/auth';
 
 /**
  * 从请求中获取用户ID
  */
 export async function getUserFromRequest(request: NextRequest): Promise<string | null> {
   try {
-    // 从查询参数中获取userId（临时方案，实际项目应该使用JWT或session）
+    // 首先尝试从Authorization头部获取JWT令牌
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7); // 移除 'Bearer ' 前缀
+      const decoded = verifyToken(token);
+      
+      if (decoded && decoded.userId) {
+        // 验证用户是否存在且活跃
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: { id: true, isActive: true, role: true },
+        });
+        
+        if (user && user.isActive) {
+          return user.id;
+        }
+      }
+    }
+    
+    // 如果JWT验证失败或没有找到令牌，则回退到查询参数方法（为了向后兼容）
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || searchParams.get('adminUserId');
 

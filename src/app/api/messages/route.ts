@@ -3,6 +3,7 @@ import { getConversationMessages, createMessage } from '@/lib/db/conversations'
 import { checkChatPermissions } from '@/lib/chat-permissions'
 import { recordTokenUsage } from '@/lib/db/token-usage'
 
+import { getUserFromRequest } from '@/lib/api-utils';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -36,9 +37,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 从JWT中获取用户ID
+    const userId = await getUserFromRequest(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const data = await request.json()
     const {
-      userId,
       modelId,
       providerId,
       conversationId,
@@ -52,7 +61,7 @@ export async function POST(request: NextRequest) {
       saveToDatabase = true, // 默认保存到数据库
     } = data
 
-    if (!userId || !modelId || !providerId || !role || !content) {
+    if (!modelId || !providerId || !role || !content) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

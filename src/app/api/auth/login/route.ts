@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loginUser } from '@/lib/auth'
+import { loginUser, generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,8 +29,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 生成JWT令牌
+    const token = generateToken(result.user!.id);
+    
     return NextResponse.json({
       success: true,
+      token,
       user: {
         id: result.user!.id,
         username: result.user!.username,

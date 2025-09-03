@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserConversations, createConversation, searchConversations } from '@/lib/db/conversations'
+import { getUserFromRequest } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
+    // 从JWT中获取用户ID
+    const userId = await getUserFromRequest(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const query = searchParams.get('q')
     const includeArchived = searchParams.get('includeArchived') === 'true'
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
 
     let conversations
     if (query) {

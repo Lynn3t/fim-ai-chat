@@ -171,18 +171,19 @@ async function main() {
     update: {},
     create: {
       userId: user.id,
-      allowedModelIds: null, // null表示可以使用所有模型
+      permissions: [], // 默认权限列表
+      limitType: 'none', // 无限制
+      limitPeriod: 'monthly', // 限制周期
       tokenLimit: null, // null表示无限制
-      canShareAccess: true,
-      isActive: true,
+      costLimit: null, // null表示无限制
+      tokenUsed: 0, // 已使用的 token 数量
+      lastResetAt: new Date(), // 上次重置时间
     },
   })
 
   console.log('✅ 数据库种子完成!')
   console.log(`📊 创建了 ${openaiModels.length + anthropicModels.length} 个模型`)
   console.log(`👤 创建了示例用户: ${user.email}`)
-  console.log(`🔑 管理员邀请码: fimai_ADMIN_MASTER_KEY`)
-  console.log(`💡 使用管理员邀请码注册第一个管理员账户`)
 }
 
 main()

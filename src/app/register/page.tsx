@@ -390,7 +390,8 @@ export default function RegisterPage() {
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Typography variant="body2" component="ul" sx={{ pl: 2, m: 0 }}>
-            <li>需要邀请码才能注册，请联系管理员获取</li>
+            <li>通常需要邀请码才能注册，请联系管理员获取</li>
+            <li>如果是系统首次注册（无管理员时），无需邀请码</li>
             <li>用户名不区分大小写，请使用字母、数字组合</li>
             <li>邮箱地址用于密码找回，强烈建议设置</li>
           </Typography>

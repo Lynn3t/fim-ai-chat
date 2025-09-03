@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { checkChatPermissions } from '@/lib/chat-permissions';
 import { estimateTokens, extractTokenUsage } from '@/lib/token-counter';
 import { recordTokenUsage } from '@/lib/db/token-usage';
+import { getUserFromRequest } from '@/lib/api-utils';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -11,7 +12,6 @@ interface Message {
 
 interface ChatRequest {
   messages: Message[];
-  userId: string;
   modelId: string;
   stream?: boolean;
   temperature?: number;
@@ -23,9 +23,17 @@ interface ChatRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // 从请求中获取用户ID
+    const userId = await getUserFromRequest(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const {
       messages,
-      userId,
       modelId,
       stream = true,
       temperature,
@@ -35,9 +43,9 @@ export async function POST(request: NextRequest) {
       presence_penalty,
     }: ChatRequest = await request.json();
 
-    if (!messages || messages.length === 0 || !userId || !modelId) {
+    if (!messages || messages.length === 0 || !modelId) {
       return NextResponse.json({
-        error: 'Missing or empty required fields: messages, userId, modelId'
+        error: 'Missing or empty required fields: messages, modelId'
       }, { status: 400 });
     }
 

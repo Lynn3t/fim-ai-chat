@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { registerUser } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +14,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!inviteCode && !accessCode) {
+    // 检查是否已有管理员用户
+    const adminCount = await prisma.user.count({
+      where: { role: 'ADMIN' },
+    })
+
+    // 如果还没有管理员，则允许注册第一个管理员账户，无需邀请码或访问码
+    const isFirstAdmin = adminCount === 0
+
+    if (!isFirstAdmin && !inviteCode && !accessCode) {
       return NextResponse.json(
         { error: 'Either invite code or access code is required' },
         { status: 400 }
@@ -21,9 +30,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 如果使用邀请码注册（管理员或用户），密码是必需的
-    if (inviteCode && !password) {
+    if ((inviteCode || isFirstAdmin) && !password) {
       return NextResponse.json(
-        { error: 'Password is required for invite code registration' },
+        { error: 'Password is required for registration' },
         { status: 400 }
       )
     }
@@ -34,6 +43,7 @@ export async function POST(request: NextRequest) {
       password,
       inviteCode,
       accessCode,
+      isFirstAdmin, // 传递参数给注册函数
     })
 
     if (!result.success) {

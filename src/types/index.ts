@@ -219,6 +219,7 @@ export interface RegisterData {
   password?: string;
   inviteCode?: string;
   accessCode?: string;
+  isFirstAdmin?: boolean; // 是否是第一个管理员注册
 }
 
 export interface LoginData {

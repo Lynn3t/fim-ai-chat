@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import type { User, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
 import { validateInviteCode, useInviteCode, validateAccessCode, useAccessCode } from '@/lib/db/codes'
 import { isAdminInviteCode } from '@/lib/codes'
 
@@ -18,6 +19,7 @@ export interface RegisterData {
   password?: string // 访客用户可以不提供密码
   inviteCode?: string
   accessCode?: string
+  isFirstAdmin?: boolean // 是否是第一个管理员注册
 }
 
 export interface AuthResult {
@@ -31,13 +33,13 @@ export interface AuthResult {
  */
 export async function registerUser(data: RegisterData): Promise<AuthResult> {
   try {
-    const { email, username, password, inviteCode, accessCode } = data
+    const { email, username, password, inviteCode, accessCode, isFirstAdmin } = data
 
     // 检查用户名是否已存在（不区分大小写）
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { 
+          {
             username: {
               equals: username,
               mode: 'insensitive' // 不区分大小写
@@ -55,7 +57,49 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
     let role: UserRole = 'USER'
     let hostUserId: string | undefined
 
-    if (inviteCode) {
+    // 如果是第一个管理员注册
+    if (isFirstAdmin) {
+      // 管理员必须提供密码
+      if (!password) {
+        return { success: false, error: '密码不能为空' }
+      }
+
+      // 验证邮箱格式（如果提供了邮箱）
+      if (email && !isValidEmail(email)) {
+        return { success: false, error: '邮箱格式不正确' }
+      }
+
+      role = 'ADMIN'
+
+      // 哈希密码
+      const hashedPassword = await bcrypt.hash(password, 12)
+
+      // 创建管理员用户
+      const user = await prisma.user.create({
+        data: {
+          email,
+          username,
+          password: hashedPassword,
+          role,
+        },
+      })
+
+      // 创建用户设置
+      await prisma.userSettings.create({
+        data: {
+          userId: user.id,
+          theme: 'light',
+          language: 'zh-CN',
+          enableMarkdown: true,
+          enableLatex: true,
+          enableCodeHighlight: true,
+          messagePageSize: 50,
+        },
+      })
+
+      return { success: true, user }
+
+    } else if (inviteCode) {
       // 使用邀请码注册（管理员或用户）
       const validation = await validateInviteCode(inviteCode)
       if (!validation.valid) {
@@ -317,5 +361,29 @@ export async function getUserAllowedModels(userId: string): Promise<string[]> {
   } catch (error) {
     console.error('Get allowed models error:', error)
     return []
+  }
+}
+
+/**
+ * 生成JWT令牌
+ */
+export function generateToken(userId: string): string {
+  const secret: string = process.env.JWT_SECRET || 'fallback-secret-key-for-development';
+  const expiresIn: string = process.env.JWT_EXPIRES_IN || '24h';
+  
+  return jwt.sign({ userId }, secret, { expiresIn });
+}
+
+/**
+ * 验证JWT令牌
+ */
+export function verifyToken(token: string): { userId: string } | null {
+  try {
+    const secret: string = process.env.JWT_SECRET || 'fallback-secret-key-for-development';
+    const decoded = jwt.verify(token, secret) as { userId: string };
+    return decoded;
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return null;
   }
 }
