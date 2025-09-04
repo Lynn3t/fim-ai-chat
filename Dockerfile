@@ -40,10 +40,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY package*.json ./
 
-# Install production deps and ensure Prisma client exists
-RUN npm ci --omit=dev && npx prisma generate
+# Install production deps, tsx and ensure Prisma client exists
+RUN npm ci --omit=dev && npx prisma generate && npm install tsx
 
 EXPOSE 3000
 
-# Apply DB migrations on start, then launch Next
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# Apply DB migrations and optionally seed data on start, then launch Next
+CMD ["sh", "-c", "npx prisma migrate deploy && (test \"$AUTO_SEED\" = \"true\" && npm run db:seed || echo 'Skipping seed') && npm start"]

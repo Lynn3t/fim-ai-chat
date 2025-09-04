@@ -138,52 +138,8 @@ async function main() {
     })
   }
 
-  // 创建示例普通用户
-  const user = await prisma.user.upsert({
-    where: { email: 'demo@example.com' },
-    update: {},
-    create: {
-      email: 'demo@example.com',
-      username: 'demo',
-      avatar: null,
-      role: 'USER',
-    },
-  })
-
-  // 创建用户设置
-  await prisma.userSettings.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: {
-      userId: user.id,
-      theme: 'light',
-      language: 'zh-CN',
-      enableMarkdown: true,
-      enableLatex: true,
-      enableCodeHighlight: true,
-      messagePageSize: 50,
-    },
-  })
-
-  // 创建用户权限配置
-  await prisma.userPermission.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: {
-      userId: user.id,
-      permissions: [], // 默认权限列表
-      limitType: 'none', // 无限制
-      limitPeriod: 'monthly', // 限制周期
-      tokenLimit: null, // null表示无限制
-      costLimit: null, // null表示无限制
-      tokenUsed: 0, // 已使用的 token 数量
-      lastResetAt: new Date(), // 上次重置时间
-    },
-  })
-
   console.log('✅ 数据库种子完成!')
   console.log(`📊 创建了 ${openaiModels.length + anthropicModels.length} 个模型`)
-  console.log(`👤 创建了示例用户: ${user.email}`)
 }
 
 main()

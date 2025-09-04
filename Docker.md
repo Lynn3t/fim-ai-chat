@@ -1,108 +1,53 @@
-# 在 Linux 环境中使用 Docker 部署 fim-ai-chat
+# Docker 配置与自动 Seed 指南
 
-本文档介绍如何在 Linux 主机上使用 Docker 和 Docker Compose 运行 fim-ai-chat 服务器。
+本文档说明如何在 Docker 环境中配置和使用数据库自动 seed 功能。
 
-## 前置条件
+## 自动 Seed 功能
 
-- 已安装 [Docker](https://docs.docker.com/get-docker/)（推荐 20+ 版本）
-- 已安装 [Docker Compose](https://docs.docker.com/compose/install/)（v2 及以上）
-- 服务器开放 3000 端口供外部访问
+项目支持在 Docker 容器启动时自动执行数据库 seed 操作。这个功能通过环境变量 `AUTO_SEED` 控制。
 
-## 准备工作
+### 启用自动 Seed
 
-1. **设置环境变量**：在项目根目录创建 `.env` 文件，提供 PostgreSQL 连接字符串，例如：
+要启用自动 seed，在 `docker-compose.yml` 中设置环境变量：
 
-    ```bash
-    DATABASE_URL="postgresql://postgres:postgres@db:5432/fimai?schema=public"
-    ```
-
-2. **创建生产用的 `Dockerfile`**（示例）：
-
-    ```Dockerfile
-    # 使用精简的 Node.js 运行时镜像
-    FROM node:20-alpine
-
-    # 设置工作目录
-    WORKDIR /app
-
-    # 仅复制依赖声明以利用 Docker 缓存
-    COPY package*.json ./
-
-    # 安装生产依赖
-    RUN npm ci --omit=dev
-
-    # 复制项目源码
-    COPY . .
-
-    # 构建 Next.js 应用
-    RUN npm run build
-
-    # 暴露应用端口
-    EXPOSE 3000
-
-    # 启动服务
-    CMD ["npm", "start"]
-    ```
-
-3. **（可选）创建 `docker-compose.yml`** 以同时运行 PostgreSQL 数据库：
-
-    ```yaml
-    version: "3.9"
-    services:
-      web:
-        build: .
-        ports:
-          - "3000:3000"
-        env_file: .env
-        depends_on:
-          - db
-      db:
-        image: postgres:15-alpine
-        restart: unless-stopped
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: fimai
-        volumes:
-          - postgres_data:/var/lib/postgresql/data
-    volumes:
-      postgres_data:
-    ```
-
-## 运行步骤
-
-1. **构建镜像**：
-
-    ```bash
-    docker compose build
-    ```
-
-2. **启动服务**：
-
-    ```bash
-    docker compose up -d
-    ```
-
-3. **数据库迁移**（首次运行时执行）：
-
-    ```bash
-    docker compose exec web npm run db:migrate
-    docker compose exec web npm run db:seed # 如需种子数据
-    ```
-
-4. 浏览器访问 `http://<服务器 IP>:3000` 即可访问 fim-ai-chat。
-
-## 常用维护命令
-
-```bash
-# 查看日志
-docker compose logs -f web
-
-# 停止并删除容器
-docker compose down
-
-# 仅重启应用服务
-docker compose restart web
+```yaml
+environment:
+  - AUTO_SEED=true
 ```
 
-如需自定义配置（如端口、环境变量等），请在 `docker-compose.yml` 中调整相应内容。
+当 `AUTO_SEED` 设置为 `true` 时，容器启动时会自动执行以下操作：
+1. 数据库迁移部署 (`npx prisma migrate deploy`)
+2. 执行 seed 脚本 (`npm run db:seed`)
+
+### 禁用自动 Seed
+
+如果不想在每次启动时都执行 seed，可以：
+1. 移除 `AUTO_SEED` 环境变量
+2. 将其设置为其他值（如 `false`）
+
+在这种情况下，只会执行数据库迁移部署，不会执行 seed 操作。
+
+## 手动执行 Seed
+
+你也可以在容器运行时手动执行 seed：
+
+```bash
+# 进入运行中的容器
+docker exec -it fim-ai-chat-web-1 sh
+
+# 执行 seed 命令
+npm run db:seed
+```
+
+## Seed 脚本详情
+
+Seed 脚本位于 [`prisma/seed.ts`](file:///d:/Users/Fimall/Documents/Codes/fim-ai-chat/prisma/seed.ts)，它会创建：
+- 默认的 AI 提供商（OpenAI、Anthropic）
+- 常用的 AI 模型
+- 示例用户和相关配置
+
+## 注意事项
+
+1. Seed 操作是幂等的，重复执行不会创建重复数据
+2. 生产环境中建议谨慎使用自动 seed，避免意外修改数据
+3. 可以根据需要自定义 seed 脚本来满足特定需求
