@@ -1,4 +1,8 @@
 import { PrismaClient } from '@prisma/client'
+import { validateEnvironmentVariables } from '@/lib/auth'
+
+// 在应用启动时验证关键环境变量
+validateEnvironmentVariables()
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

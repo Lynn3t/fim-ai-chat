@@ -87,7 +87,7 @@ interface ConfigData {
 }
 
 function ChatPageContent() {
-  const { user, chatConfig } = useAuth();
+  const { user, chatConfig, authenticatedFetch } = useAuth();
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -162,7 +162,7 @@ function ChatPageContent() {
     if (!user || !chatConfig?.canSaveToDatabase) return;
 
     try {
-      const response = await fetch(`/api/conversations?userId=${user.id}`);
+      const response = await authenticatedFetch('/api/conversations');
       if (response.ok) {
         const conversations = await response.json();
         const histories: ChatHistory[] = conversations.map((conv: any) => ({
@@ -198,7 +198,7 @@ function ChatPageContent() {
         // 确保用户已登录
         if (!user || !user.id) return;
         
-        const response = await fetch(`/api/admin/model-groups?userId=${user.id}`);
+        const response = await authenticatedFetch('/api/admin/model-groups');
         if (response.ok) {
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
@@ -213,7 +213,7 @@ function ChatPageContent() {
 
     const loadUserSettings = async () => {
       try {
-        const response = await fetch(`/api/user/settings?userId=${user.id}`);
+        const response = await authenticatedFetch('/api/user/settings');
         if (response.ok) {
           const settings = await response.json();
           setUserSettings(settings);
@@ -231,7 +231,7 @@ function ChatPageContent() {
 
     const loadProviders = async () => {
       try {
-        const response = await fetch(`/api/providers?userId=${user.id}`);
+        const response = await authenticatedFetch('/api/providers');
         if (response.ok && isMounted) {
           const result = await response.json();
           console.log('Providers API response:', result);
@@ -311,7 +311,7 @@ function ChatPageContent() {
       // 2. 如果用户没有设置默认模型，尝试使用系统设置的默认模型
       if (!defaultModelId && !localStorage.getItem('fimai-last-used-model')) {
         // 尝试获取系统默认模型设置
-        fetch('/api/admin/system-settings?key=system_default_model_id')
+        authenticatedFetch('/api/admin/system-settings?key=system_default_model_id')
           .then(response => response.json())
           .then(data => {
             if (data.value) {
@@ -420,7 +420,7 @@ function ChatPageContent() {
       // 获取系统设置的标题生成模型ID
       let titleModelId = selectedModelId;
       try {
-        const titleModelResponse = await fetch('/api/admin/system-settings?key=title_generation_model_id');
+        const titleModelResponse = await authenticatedFetch('/api/admin/system-settings?key=title_generation_model_id');
         if (titleModelResponse.ok) {
           const titleModelData = await titleModelResponse.json();
           const fetchedValue = titleModelData.value;
@@ -447,13 +447,12 @@ function ChatPageContent() {
       // 构建标题生成请求
       const titlePrompt = `请根据以下用户消息生成一个简短的聊天标题（不超过8个字）：\n\n${firstMessage}\n\n只需回复标题文本，不要有任何其他内容。`;
      
-      const titleResponse = await fetch('/api/chat', {
+      const titleResponse = await authenticatedFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [{ role: 'user', content: titlePrompt }],
           modelId: titleModelId,
-          userId: user?.id || 'guest',
           temperature: 0.3,
           stream: false
         })
@@ -509,7 +508,7 @@ function ChatPageContent() {
         // 延迟验证 (1秒后)
         setTimeout(async () => {
           try {
-            const response = await fetch(`/api/conversations/${historyId}/messages`);
+            const response = await authenticatedFetch(`/api/conversations/${historyId}/messages`);
             if (response.ok) {
               const serverMessages = await response.json();
               
@@ -566,7 +565,7 @@ function ChatPageContent() {
     // 2. 如果是数据库用户，发送删除请求
     if (user && chatConfig?.canSaveToDatabase) {
       try {
-        const response = await fetch(`/api/conversations/${historyId}`, {
+        const response = await authenticatedFetch(`/api/conversations/${historyId}`, {
           method: 'DELETE',
         });
 
@@ -577,7 +576,7 @@ function ChatPageContent() {
         // 3. 延迟验证 (1.5秒后)
         setTimeout(async () => {
           try {
-            const verifyResponse = await fetch(`/api/conversations/${historyId}`);
+            const verifyResponse = await authenticatedFetch(`/api/conversations/${historyId}`);
 
             // 4. 如果对话仍然存在，说明删除失败
             if (verifyResponse.ok) {
@@ -677,12 +676,11 @@ function ChatPageContent() {
     if (!currentModel) return;
 
     try {
-      await fetch('/api/messages', {
+      await authenticatedFetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversationId: currentChatId,
-          userId: user.id,
           providerId: currentModel.provider.id,
           modelId: currentModel.model.id,
           role: messageRole,
@@ -711,7 +709,7 @@ function ChatPageContent() {
 
     // 检查聊天权限
     try {
-      const permissionResponse = await fetch(`/api/chat/permissions?userId=${user.id}&modelId=${currentModel.model.id}`);
+      const permissionResponse = await authenticatedFetch(`/api/chat/permissions?modelId=${currentModel.model.id}`);
       const permissions = await permissionResponse.json();
 
       if (!permissions.canChat) {
@@ -754,11 +752,10 @@ function ChatPageContent() {
     if (!conversationId && chatConfig?.canSaveToDatabase) {
       try {
         const title = await generateChatTitle(userMessage.content);
-        const convResponse = await fetch('/api/conversations', {
+        const convResponse = await authenticatedFetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: user.id,
             providerId: currentModel.provider.id,
             modelId: currentModel.model.id,
             title,
@@ -804,7 +801,7 @@ function ChatPageContent() {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          const fetchResponse = await fetch('/api/chat', {
+          const fetchResponse = await authenticatedFetch('/api/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1008,7 +1005,7 @@ function ChatPageContent() {
     if (currentChatId && chatConfig?.canSaveToDatabase) {
       try {
         // 使用软删除API
-        await fetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
+        await authenticatedFetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
           method: 'DELETE'
         });
         
@@ -1016,7 +1013,7 @@ function ChatPageContent() {
         if (message.role === 'user') {
           const nextMessage = messages[messageIndex + 1];
           if (nextMessage && nextMessage.role === 'assistant') {
-            await fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
+            await authenticatedFetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
               method: 'DELETE'
             });
           }
@@ -1055,14 +1052,14 @@ function ChatPageContent() {
       const message = messages[messageIndex];
       if (message.role === 'user') {
         // 删除用户消息
-        fetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
+        authenticatedFetch(`/api/conversations/${currentChatId}/messages/${messageId}`, {
           method: 'DELETE'
         }).catch(error => console.error('删除消息失败:', error));
         
         // 删除后面的AI回复
         const nextMessage = messages[messageIndex + 1];
         if (nextMessage && nextMessage.role === 'assistant') {
-          fetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
+          authenticatedFetch(`/api/conversations/${currentChatId}/messages/${nextMessage.id}`, {
             method: 'DELETE'
           }).catch(error => console.error('删除消息失败:', error));
         }
@@ -1110,7 +1107,7 @@ function ChatPageContent() {
     
     // 保存用户默认模型设置
     if (user && user.id) {
-      fetch(`/api/user/settings?userId=${user.id}`, {
+      authenticatedFetch('/api/user/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1131,7 +1128,7 @@ function ChatPageContent() {
     }
     
     // 检查是否启用记录最后使用模型功能
-    fetch('/api/admin/system-settings?key=enable_last_used_model')
+    authenticatedFetch('/api/admin/system-settings?key=enable_last_used_model')
       .then(response => response.json())
       .then(data => {
         // 如果系统设置启用了记录最后使用模型，或者没有明确禁用（默认启用）
@@ -1151,7 +1148,7 @@ function ChatPageContent() {
     if (!currentChatId || !chatConfig?.canSaveToDatabase) return;
     
     try {
-      await fetch(`/api/conversations/${currentChatId}`, {
+      await authenticatedFetch(`/api/conversations/${currentChatId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle }),

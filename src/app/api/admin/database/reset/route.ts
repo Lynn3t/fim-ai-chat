@@ -1,31 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
 
 const execAsync = promisify(exec)
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, confirmText } = data
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
+    const { confirmText } = data
 
     // 验证确认文本
     if (confirmText !== 'RESET DATABASE') {
@@ -97,27 +81,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
     // 返回数据库重置信息
     return NextResponse.json({
       available: true,
@@ -142,3 +107,6 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAdminAuth(handlePost)
+export const GET = withAdminAuth(handleGet)

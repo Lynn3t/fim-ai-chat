@@ -111,7 +111,7 @@ interface SystemTokenSettings {
 }
 
 export default function TokenStatsAdmin() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, authenticatedFetch } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('pricing')
   const [isLoading, setIsLoading] = useState<boolean>(true) // 设为true，表示初始加载状态
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -202,7 +202,7 @@ export default function TokenStatsAdmin() {
     
     try {
       console.log('TokenStatsAdmin: Loading pricing data...')
-      const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=pricing`)
+      const response = await authenticatedFetch('/api/admin/token-stats?action=pricing')
       
       if (response.ok) {
         const data = await response.json()
@@ -227,7 +227,7 @@ export default function TokenStatsAdmin() {
     
     try {
       console.log('TokenStatsAdmin: Loading user limits data...')
-      const response = await fetch(`/api/admin/token-stats?adminUserId=${currentUser.id}&action=user-limits`)
+      const response = await authenticatedFetch('/api/admin/token-stats?action=user-limits')
       
       if (response.ok) {
         const data = await response.json()
@@ -254,10 +254,10 @@ export default function TokenStatsAdmin() {
       if (endDate) dateParams.append('endDate', endDate.toISOString())
       
       const action = activeTab === 'models' ? 'models' : 'users'
-      const url = `/api/admin/token-stats?adminUserId=${currentUser.id}&action=${action}&${dateParams.toString()}`
+      const url = `/api/admin/token-stats?action=${action}&${dateParams.toString()}`
       console.log('TokenStatsAdmin: Fetching from URL:', url)
       
-      const response = await fetch(url)
+      const response = await authenticatedFetch(url)
       
       if (response.ok) {
         const data = await response.json()
@@ -283,7 +283,7 @@ export default function TokenStatsAdmin() {
     if (!currentUser || !currentUser.id) return
     
     try {
-      const response = await fetch(`/api/admin/system-settings?adminUserId=${currentUser.id}`)
+      const response = await authenticatedFetch('/api/admin/system-settings')
       
       if (response.ok) {
         const data = await response.json()
@@ -306,13 +306,12 @@ export default function TokenStatsAdmin() {
     
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/admin/system-settings`, {
+      const response = await authenticatedFetch('/api/admin/system-settings', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           settings: {
             default_user_token_limit: systemTokenSettings.defaultTokenLimit,
             default_limit_type: systemTokenSettings.defaultLimitType,
@@ -354,13 +353,12 @@ export default function TokenStatsAdmin() {
     
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/admin/models/${currentModel.modelId}/pricing`, {
+      const response = await authenticatedFetch(`/api/admin/models/${currentModel.modelId}/pricing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           ...pricingForm,
         }),
       })
@@ -409,13 +407,12 @@ export default function TokenStatsAdmin() {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/${selectedUser.userId}/limits`, {
+      const response = await authenticatedFetch(`/api/admin/users/${selectedUser.userId}/limits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           ...limitForm,
         }),
       });
@@ -476,11 +473,10 @@ export default function TokenStatsAdmin() {
               unmatched.push(item.model.modelId)
               return Promise.resolve(null)
             }
-            return fetch(`/api/admin/models/${item.id}/pricing`, {
+            return authenticatedFetch(`/api/admin/models/${item.id}/pricing`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                adminUserId: currentUser.id,
                 pricingType: 'token',
                 inputPrice: pricing.inputPrice,
                 outputPrice: pricing.outputPrice,

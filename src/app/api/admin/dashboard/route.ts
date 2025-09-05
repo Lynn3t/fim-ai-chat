@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSystemStats } from '@/lib/db/admin'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
     const systemStats = await getSystemStats()
 
     // 转换数据格式以匹配前端期望
@@ -47,3 +28,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)

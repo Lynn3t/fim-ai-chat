@@ -1,37 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 import { 
   getTokenUsageLeaderboard, 
   getModelUsageStats 
 } from '@/lib/db/token-usage'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
     const action = searchParams.get('action')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    console.log('GET /api/admin/token-stats params:', { adminUserId, action, startDate, endDate, limit })
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
+    console.log('GET /api/admin/token-stats params:', { userId, action, startDate, endDate, limit })
 
     const start = startDate ? new Date(startDate) : undefined
     const end = endDate ? new Date(endDate) : undefined
@@ -160,4 +143,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}
+
+export const GET = withAdminAuth(handleGet) 

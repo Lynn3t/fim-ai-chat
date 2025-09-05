@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkUserPermission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
     // 获取所有模型，包括定价信息
     const models = await prisma.model.findMany({
       include: {
@@ -74,24 +55,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+async function handlePatch(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, modelId, isEnabled, ...updateData } = data
+    const { modelId, isEnabled, ...updateData } = data
 
-    if (!adminUserId || !modelId) {
+    if (!modelId) {
       return NextResponse.json(
-        { error: 'adminUserId and modelId are required' },
+        { error: 'modelId is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -136,24 +108,15 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, providerId, modelId, name, description, group, ...modelData } = data
+    const { providerId, modelId, name, description, group, ...modelData } = data
 
-    if (!adminUserId || !providerId || !modelId || !name) {
+    if (!providerId || !modelId || !name) {
       return NextResponse.json(
-        { error: 'adminUserId, providerId, modelId, and name are required' },
+        { error: 'providerId, modelId, and name are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -227,31 +190,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function handlePut(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, models } = data
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
+    const { models } = data
 
     if (!Array.isArray(models)) {
       return NextResponse.json(
         { error: 'models array is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -276,24 +223,15 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function handleDelete(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, modelId } = data
+    const { modelId } = data
 
-    if (!adminUserId || !modelId) {
+    if (!modelId) {
       return NextResponse.json(
-        { error: 'adminUserId and modelId are required' },
+        { error: 'modelId is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -343,3 +281,9 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)
+export const PATCH = withAdminAuth(handlePatch)
+export const POST = withAdminAuth(handlePost)
+export const PUT = withAdminAuth(handlePut)
+export const DELETE = withAdminAuth(handleDelete)

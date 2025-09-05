@@ -115,7 +115,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function UserConfig() {
-  const { user, chatConfig } = useAuth();
+  const { user, chatConfig, authenticatedFetch } = useAuth();
   const toast = useToast();
   const [tabValue, setTabValue] = useState(0);
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
@@ -139,7 +139,7 @@ export default function UserConfig() {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/user/dashboard?userId=${user.id}`);
+      const response = await authenticatedFetch('/api/user/dashboard');
       if (response.ok) {
         const data = await response.json();
         setTokenStats(data.tokenStats);
@@ -175,11 +175,10 @@ export default function UserConfig() {
     if (!user) return;
     
     try {
-      const response = await fetch('/api/user/codes', {
+      const response = await authenticatedFetch('/api/user/codes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           type: 'access',
           allowedModelIds: selectedModelIds,
           maxUses: 10, // 默认10次使用
@@ -203,11 +202,10 @@ export default function UserConfig() {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/user/codes', {
+      const response = await authenticatedFetch('/api/user/codes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           type: 'invite',
           maxUses: 1,
         }),
@@ -237,11 +235,10 @@ export default function UserConfig() {
     if (!user) return;
     
     try {
-      const response = await fetch('/api/user/codes', {
+      const response = await authenticatedFetch('/api/user/codes', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           codeId,
           type: 'invite',
         }),
@@ -264,11 +261,10 @@ export default function UserConfig() {
     if (!user) return;
     
     try {
-      const response = await fetch('/api/user/codes', {
+      const response = await authenticatedFetch('/api/user/codes', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           codeId,
           type: 'access',
         }),
@@ -296,11 +292,10 @@ export default function UserConfig() {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/user/settings', {
+      const response = await authenticatedFetch('/api/user/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
           defaultModelId: modelId
         }),
       });

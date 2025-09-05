@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
+import { sanitizeProviders } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
     // 获取所有提供商
     const providers = await prisma.provider.findMany({
       include: {
@@ -40,7 +22,7 @@ export async function GET(request: NextRequest) {
       orderBy: { order: 'asc' },
     })
 
-    return NextResponse.json(providers)
+    return NextResponse.json(sanitizeProviders(providers))
 
   } catch (error) {
     console.error('Error fetching providers:', error)
@@ -51,24 +33,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, name, displayName, baseUrl, apiKey, icon, description } = data
+    const { name, displayName, baseUrl, apiKey, icon, description } = data
 
-    if (!adminUserId || !name || !displayName) {
+    if (!name || !displayName) {
       return NextResponse.json(
-        { error: 'adminUserId, name, and displayName are required' },
+        { error: 'name and displayName are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -116,7 +89,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(newProvider, { status: 201 })
+    return NextResponse.json(sanitizeProvider(newProvider), { status: 201 })
 
   } catch (error) {
     console.error('Error creating provider:', error)
@@ -127,31 +100,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function handlePut(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, providers } = data
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
+    const { providers } = data
 
     if (!Array.isArray(providers)) {
       return NextResponse.json(
         { error: 'providers array is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -179,3 +136,7 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)
+export const POST = withAdminAuth(handlePost)
+export const PUT = withAdminAuth(handlePut)

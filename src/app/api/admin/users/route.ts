@@ -5,7 +5,6 @@ import {
   updateUserAccessCodePermission,
   updateUserPermissions
 } from '@/lib/db/admin'
-import { checkUserPermission } from '@/lib/auth'
 import { withAdminAuth } from '@/lib/api-utils'
 
 async function handleGet(request: NextRequest, userId: string) {

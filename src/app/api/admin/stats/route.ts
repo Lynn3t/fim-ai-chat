@@ -3,32 +3,15 @@ import {
   getTokenUsageLeaderboard, 
   getModelUsageStats 
 } from '@/lib/db/token-usage'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const type = searchParams.get('type')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const limit = parseInt(searchParams.get('limit') || '10')
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(userId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
 
     const start = startDate ? new Date(startDate) : undefined
     const end = endDate ? new Date(endDate) : undefined
@@ -51,3 +34,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)

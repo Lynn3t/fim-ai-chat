@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 
 interface BatchModelData {
   modelId: string
@@ -11,29 +11,19 @@ interface BatchModelData {
 }
 
 interface BatchCreateRequest {
-  adminUserId: string
   providerId: string
   models: BatchModelData[]
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data: BatchCreateRequest = await request.json()
-    const { adminUserId, providerId, models } = data
+    const { providerId, models } = data
 
-    if (!adminUserId || !providerId || !Array.isArray(models) || models.length === 0) {
+    if (!providerId || !Array.isArray(models) || models.length === 0) {
       return NextResponse.json(
-        { error: 'adminUserId, providerId, and models array are required' },
+        { error: 'providerId and models array are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -150,3 +140,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withAdminAuth(handlePost)

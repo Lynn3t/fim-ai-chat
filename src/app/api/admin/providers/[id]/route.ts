@@ -1,198 +1,127 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 import { sanitizeProvider } from '@/lib/api-utils'
 
-export async function GET(
+async function getProviderHandler(
   request: NextRequest,
+  userId: string,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id: providerId } = await params
+  const { id: providerId } = await params
 
-    // 从查询参数或请求体中获取用户ID
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId') || (await request.json()).adminUserId
+  // 获取提供商信息
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    include: {
+      models: {
+        orderBy: { order: 'asc' },
+      },
+    },
+  })
 
-    if (!adminUserId) {
+  if (!provider) {
+    return NextResponse.json(
+      { error: 'Provider not found' },
+      { status: 404 }
+    )
+  }
+
+  // 过滤敏感信息
+  return NextResponse.json(sanitizeProvider(provider))
+}
+
+export const GET = withAdminAuth(getProviderHandler)
+
+async function updateProviderHandler(
+  request: NextRequest,
+  userId: string,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const data = await request.json()
+  const { ...updateData } = data
+  const { id: providerId } = await params
+
+  // 检查提供商是否存在
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId }
+  })
+
+  if (!provider) {
+    return NextResponse.json(
+      { error: 'Provider not found' },
+      { status: 404 }
+    )
+  }
+
+  // 如果更新名称，检查是否与其他提供商冲突
+  if (updateData.name && updateData.name !== provider.name) {
+    const existingProvider = await prisma.provider.findUnique({
+      where: { name: updateData.name }
+    })
+
+    if (existingProvider) {
       return NextResponse.json(
-        { error: 'adminUserId is required' },
+        { error: 'Provider with this name already exists' },
         { status: 400 }
       )
     }
+  }
 
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
-    // 获取提供商信息
-    const provider = await prisma.provider.findUnique({
-      where: { id: providerId },
-      include: {
-        models: {
-          orderBy: { order: 'asc' },
+  // 更新提供商
+  const updatedProvider = await prisma.provider.update({
+    where: { id: providerId },
+    data: updateData,
+    include: {
+      models: {
+        select: {
+          id: true,
+          modelId: true,
+          name: true,
+          isEnabled: true,
+          group: true,
         },
+        orderBy: { order: 'asc' },
       },
-    })
+    },
+  })
 
-    if (!provider) {
-      return NextResponse.json(
-        { error: 'Provider not found' },
-        { status: 404 }
-      )
-    }
-
-    // 过滤敏感信息
-    return NextResponse.json(sanitizeProvider(provider))
-  } catch (error) {
-    console.error('Error fetching provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch provider' },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json(updatedProvider)
 }
 
-export async function PATCH(
+export const PATCH = withAdminAuth(updateProviderHandler)
+
+async function deleteProviderHandler(
   request: NextRequest,
+  userId: string,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const data = await request.json()
-    const { adminUserId, ...updateData } = data
-    const { id: providerId } = await params
+  const { id: providerId } = await params
 
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
+  // 检查提供商是否存在
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    include: {
+      models: true,
+    },
+  })
 
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
-    // 检查提供商是否存在
-    const provider = await prisma.provider.findUnique({
-      where: { id: providerId }
-    })
-
-    if (!provider) {
-      return NextResponse.json(
-        { error: 'Provider not found' },
-        { status: 404 }
-      )
-    }
-
-    // 如果更新名称，检查是否与其他提供商冲突
-    if (updateData.name && updateData.name !== provider.name) {
-      const existingProvider = await prisma.provider.findUnique({
-        where: { name: updateData.name }
-      })
-
-      if (existingProvider) {
-        return NextResponse.json(
-          { error: 'Provider with this name already exists' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // 更新提供商
-    const updatedProvider = await prisma.provider.update({
-      where: { id: providerId },
-      data: updateData,
-      include: {
-        models: {
-          select: {
-            id: true,
-            modelId: true,
-            name: true,
-            isEnabled: true,
-            group: true,
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-    })
-
-    return NextResponse.json(updatedProvider)
-
-  } catch (error) {
-    console.error('Error updating provider:', error)
+  if (!provider) {
     return NextResponse.json(
-      { error: 'Failed to update provider' },
-      { status: 500 }
+      { error: 'Provider not found' },
+      { status: 404 }
     )
   }
+
+  // 删除提供商（会级联删除相关模型）
+  await prisma.provider.delete({
+    where: { id: providerId }
+  })
+
+  return NextResponse.json({ 
+    success: true, 
+    message: `Provider "${provider.displayName}" and ${provider.models.length} models deleted successfully` 
+  })
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
-    const { id: providerId } = await params
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
-
-    // 检查提供商是否存在
-    const provider = await prisma.provider.findUnique({
-      where: { id: providerId },
-      include: {
-        models: true,
-      },
-    })
-
-    if (!provider) {
-      return NextResponse.json(
-        { error: 'Provider not found' },
-        { status: 404 }
-      )
-    }
-
-    // 删除提供商（会级联删除相关模型）
-    await prisma.provider.delete({
-      where: { id: providerId }
-    })
-
-    return NextResponse.json({ 
-      success: true, 
-      message: `Provider "${provider.displayName}" and ${provider.models.length} models deleted successfully` 
-    })
-
-  } catch (error) {
-    console.error('Error deleting provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete provider' },
-      { status: 500 }
-    )
-  }
-}
+export const DELETE = withAdminAuth(deleteProviderHandler)

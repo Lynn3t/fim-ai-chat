@@ -208,7 +208,7 @@ function getProviderIcon(iconKey?: string): React.ReactNode {
 }
 
 export default function AdminConfig() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, authenticatedFetch } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
   const toast = { success: toastSuccess, error: toastError };
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'invites' | 'system' | 'models'>('dashboard');
@@ -296,7 +296,7 @@ export default function AdminConfig() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/dashboard?adminUserId=${currentUser.id}`);
+      const response = await authenticatedFetch('/api/admin/dashboard');
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -321,7 +321,7 @@ export default function AdminConfig() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/users?adminUserId=${currentUser.id}`);
+      const response = await authenticatedFetch('/api/admin/users');
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
@@ -346,7 +346,7 @@ export default function AdminConfig() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/codes?adminUserId=${currentUser.id}&type=invite`);
+      const response = await authenticatedFetch('/api/admin/codes?type=invite');
       if (response.ok) {
         const data = await response.json();
         setInviteCodes(data);
@@ -365,7 +365,7 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/admin/system-settings?adminUserId=${currentUser.id}`);
+      const response = await authenticatedFetch('/api/admin/system-settings');
       if (response.ok) {
         const data = await response.json();
         setSystemSettings(data);
@@ -387,7 +387,7 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/admin/model-groups?userId=${currentUser.id}`);
+      const response = await authenticatedFetch('/api/admin/model-groups');
       if (response.ok) {
         const result = await response.json();
         if (result.success && Array.isArray(result.data)) {
@@ -405,7 +405,7 @@ export default function AdminConfig() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/providers?adminUserId=${currentUser.id}`);
+      const response = await authenticatedFetch('/api/admin/providers');
       if (response.ok) {
         const data = await response.json();
         console.log('Admin Providers API response:', data);
@@ -441,11 +441,10 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch('/api/admin/providers', {
+      const response = await authenticatedFetch('/api/admin/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           ...providerData,
         }),
       });
@@ -469,11 +468,10 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/admin/providers/${providerId}`, {
+      const response = await authenticatedFetch(`/api/admin/providers/${providerId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           ...providerData,
         }),
       });
@@ -501,7 +499,7 @@ export default function AdminConfig() {
     }
 
     try {
-      const response = await fetch(`/api/admin/providers/${providerId}?adminUserId=${currentUser.id}`, {
+      const response = await authenticatedFetch(`/api/admin/providers/${providerId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -539,11 +537,10 @@ export default function AdminConfig() {
 
     // 2. 发送API请求
     try {
-      const response = await fetch(`/api/admin/providers/${providerId}`, {
+      const response = await authenticatedFetch(`/api/admin/providers/${providerId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           isEnabled: !isEnabled,
         }),
       });
@@ -555,7 +552,7 @@ export default function AdminConfig() {
       // 3. 延迟验证 (1.5秒后)
       setTimeout(async () => {
         try {
-          const verifyResponse = await fetch(`/api/admin/providers/${providerId}`);
+          const verifyResponse = await authenticatedFetch(`/api/admin/providers/${providerId}`);
           if (verifyResponse.ok) {
             const provider = await verifyResponse.json();
 
@@ -622,7 +619,7 @@ export default function AdminConfig() {
 
       console.log('Sending provider order update:', updateData);
 
-      const response = await fetch('/api/admin/providers', {
+      const response = await authenticatedFetch('/api/admin/providers', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData),
@@ -710,11 +707,10 @@ export default function AdminConfig() {
 
     try {
       // 2. 延迟验证 - 发送API请求
-      const response = await fetch(`/api/admin/model-groups?userId=${currentUser.id}`, {
+      const response = await authenticatedFetch('/api/admin/model-groups', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           groupOrders: newGroupOrders
         }),
       });
@@ -773,7 +769,7 @@ export default function AdminConfig() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
 
-      const response = await fetch('/api/fetch-models', {
+      const response = await authenticatedFetch('/api/fetch-models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -825,11 +821,10 @@ export default function AdminConfig() {
         toast.success(`开始导入 ${models.length} 个模型...`);
 
         // 2. 批量创建模型 - 使用单个API调用
-        const batchResponse = await fetch('/api/admin/models/batch', {
+        const batchResponse = await authenticatedFetch('/api/admin/models/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            adminUserId: currentUser.id,
             providerId: provider.id,
             models: models.map((modelId: string) => ({
               modelId: modelId,
@@ -854,7 +849,7 @@ export default function AdminConfig() {
           setTimeout(async () => {
             try {
               // 重新加载提供商数据验证
-              const verifyResponse = await fetch(`/api/admin/providers/${provider.id}`);
+              const verifyResponse = await authenticatedFetch(`/api/admin/providers/${provider.id}`);
               if (verifyResponse.ok) {
                 const updatedProvider = await verifyResponse.json();
                 const serverModels = updatedProvider.models || [];
@@ -925,11 +920,10 @@ export default function AdminConfig() {
     if (!currentUser || !selectedProviderId) return;
 
     try {
-      const response = await fetch('/api/admin/models', {
+      const response = await authenticatedFetch('/api/admin/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           providerId: selectedProviderId,
           modelId: modelData.modelId,
           name: modelData.name,
@@ -996,11 +990,10 @@ export default function AdminConfig() {
 
     // 2. 发送API请求
     try {
-      const response = await fetch(`/api/admin/models/${modelId}`, {
+      const response = await authenticatedFetch(`/api/admin/models/${modelId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           isEnabled: !isEnabled,
         }),
       });
@@ -1012,7 +1005,7 @@ export default function AdminConfig() {
       // 3. 延迟验证 (1.5秒后)
       setTimeout(async () => {
         try {
-          const verifyResponse = await fetch(`/api/admin/models/${modelId}`);
+          const verifyResponse = await authenticatedFetch(`/api/admin/models/${modelId}`);
           if (verifyResponse.ok) {
             const model = await verifyResponse.json();
 
@@ -1131,11 +1124,10 @@ export default function AdminConfig() {
 
     try {
       // 发送API请求
-      const response = await fetch(`/api/admin/models/${data.id}?adminUserId=${currentUser.id}`, {
+      const response = await authenticatedFetch(`/api/admin/models/${data.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           name: data.name,
           group: data.group
         }),
@@ -1190,7 +1182,7 @@ export default function AdminConfig() {
     }
 
     try {
-      const response = await fetch(`/api/admin/models/${modelId}?adminUserId=${currentUser.id}`, {
+      const response = await authenticatedFetch(`/api/admin/models/${modelId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -1219,11 +1211,10 @@ export default function AdminConfig() {
     }
 
     try {
-      const response = await fetch('/api/admin/models/auto-group', {
+      const response = await authenticatedFetch('/api/admin/models/auto-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           providerId: providerId,
         }),
       });
@@ -1261,11 +1252,10 @@ export default function AdminConfig() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch('/api/admin/models/auto-group', {
+      const response = await authenticatedFetch('/api/admin/models/auto-group', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           modelIds: groupData.modelIds,
           groupName: groupData.groupName,
         }),
@@ -1327,7 +1317,7 @@ Qwen/Qwen2.5-Coder-32B-Instruct -> Qwen2.5 Coder 32B 指示版 {Qwen}
 ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
       // 调用AI模型进行重命名
-      const response = await fetch('/api/chat', {
+      const response = await authenticatedFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1381,11 +1371,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       const updatePromises = modelsToRename.map((model: any) => {
         const newName = renameMap.get(model.modelId);
         if (newName) {
-          return fetch(`/api/admin/models/${model.id}`, {
+          return authenticatedFetch(`/api/admin/models/${model.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              adminUserId: currentUser.id,
               name: newName,
             }),
           });
@@ -1402,7 +1391,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
         try {
           // 验证每个模型的名称是否正确更新
           const verifyPromises = modelsToRename.map((model: any) =>
-            fetch(`/api/admin/models/${model.id}`)
+            authenticatedFetch(`/api/admin/models/${model.id}`)
           );
 
           const verifyResponses = await Promise.all(verifyPromises);
@@ -1489,11 +1478,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
     // 2. 发送API请求
     try {
-      const response = await fetch('/api/admin/models', {
+      const response = await authenticatedFetch('/api/admin/models', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           models: reorderedModels.map((model, index) => ({
             id: model.id,
             order: index
@@ -1508,7 +1496,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       // 3. 延迟验证 (2秒后)
       setTimeout(async () => {
         try {
-          const verifyResponse = await fetch(`/api/admin/models?providerId=${providerId}`);
+          const verifyResponse = await authenticatedFetch(`/api/admin/models?providerId=${providerId}`);
           if (verifyResponse.ok) {
             const serverModels = await verifyResponse.json();
 
@@ -1576,11 +1564,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
     // 2. 发送API请求
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await authenticatedFetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           isActive: !isActive,
         }),
       });
@@ -1592,7 +1579,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       // 3. 延迟验证 (1.5秒后)
       setTimeout(async () => {
         try {
-          const verifyResponse = await fetch(`/api/admin/users/${userId}`);
+          const verifyResponse = await authenticatedFetch(`/api/admin/users/${userId}`);
           if (verifyResponse.ok) {
             const user = await verifyResponse.json();
 
@@ -1656,7 +1643,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
     // 2. 发送API请求
     try {
-      const response = await fetch(`/api/admin/users/${userId}?adminUserId=${currentUser.id}`, {
+      const response = await authenticatedFetch(`/api/admin/users/${userId}`, {
         method: 'DELETE'
       });
 
@@ -1687,11 +1674,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       const promises = [];
       for (let i = 0; i < count; i++) {
         promises.push(
-          fetch('/api/admin/codes', {
+          authenticatedFetch('/api/admin/codes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              adminUserId: currentUser.id,
               type: 'invite',
               maxUses,
             }),
@@ -1733,7 +1719,7 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/admin/codes/${codeId}?adminUserId=${currentUser.id}`, {
+      const response = await authenticatedFetch(`/api/admin/codes/${codeId}`, {
         method: 'DELETE'
       });
 
@@ -1756,11 +1742,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
     if (!currentUser) return;
 
     try {
-      const response = await fetch('/api/admin/system-settings', {
+      const response = await authenticatedFetch('/api/admin/system-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           ...settings,
         }),
       });
@@ -1785,10 +1770,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
     try {
       // 加载用户排行榜
-      const leaderboardResponse = await fetch(`/api/admin/stats?userId=${currentUser.id}&type=users`);
+      const leaderboardResponse = await authenticatedFetch('/api/admin/stats?type=users');
       
       // 加载模型统计
-      const modelStatsResponse = await fetch(`/api/admin/stats?userId=${currentUser.id}&type=models`);
+      const modelStatsResponse = await authenticatedFetch('/api/admin/stats?type=models');
       
       if (leaderboardResponse.ok && modelStatsResponse.ok) {
         const userLeaderboard = await leaderboardResponse.json();
@@ -1934,11 +1919,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
       // 如果没有密码，生成一个随机密码
       const password = createUserData.password || generatePassword(12);
       
-      const response = await fetch(`/api/admin/users`, {
+      const response = await authenticatedFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           username: createUserData.username,
           email: createUserData.email || undefined, // 如果为空字符串，则传undefined
           password: password,
@@ -1977,11 +1961,10 @@ ${modelsToRename.map((m: any) => m.modelId).join('\n')}`;
 
     setIsResettingPassword(true);
     try {
-      const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
+      const response = await authenticatedFetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           newPassword: resetPasswordData.newPassword
         }),
       });
@@ -4356,11 +4339,10 @@ function AIRenameModal({ isOpen, onClose, providerId, providers, onSubmit }: AIR
 
     setIsResettingPassword(true);
     try {
-      const response = await fetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
+      const response = await authenticatedFetch(`/api/admin/users/${resetPasswordData.userId}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminUserId: currentUser.id,
           newPassword: resetPasswordData.newPassword
         }),
       });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkUserPermission } from '@/lib/auth'
+import { withAdminAuth } from '@/lib/api-utils'
 import { 
   getAllSystemSettings, 
   updateSystemSettings, 
@@ -8,7 +8,7 @@ import {
   DEFAULT_SYSTEM_SETTINGS
 } from '@/lib/db/system-settings'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
     // Publicly allow fetching a single setting by key
@@ -16,23 +16,6 @@ export async function GET(request: NextRequest) {
     if (key) {
       const value = await getSystemSetting(key)
       return NextResponse.json({ key, value })
-    }
-    // For fetching all settings, require adminUserId and admin permission
-    const adminUserId = searchParams.get('adminUserId')
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
     }
 
     // 获取所有设置
@@ -63,24 +46,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, key, value, type } = data
+    const { key, value, type } = data
 
-    if (!adminUserId || !key || value === undefined) {
+    if (!key || value === undefined) {
       return NextResponse.json(
-        { error: 'adminUserId, key, and value are required' },
+        { error: 'key and value are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -106,24 +80,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+async function handlePatch(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, settings } = data
+    const { settings } = data
 
-    if (!adminUserId || !settings || typeof settings !== 'object') {
+    if (!settings || typeof settings !== 'object') {
       return NextResponse.json(
-        { error: 'adminUserId and settings object are required' },
+        { error: 'settings object is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -147,3 +112,7 @@ export async function PATCH(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)
+export const POST = withAdminAuth(handlePost)
+export const PATCH = withAdminAuth(handlePatch)

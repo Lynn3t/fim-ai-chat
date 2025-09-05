@@ -7,20 +7,21 @@ interface AuthContextType {
   user: User | null
   chatConfig: ChatConfig | null
   isLoading: boolean
+  token: string | null
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   loginWithAccessCode: (username: string, accessCode: string) => Promise<{ success: boolean; error?: string }>
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   refreshChatConfig: () => Promise<void>
+  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>
 }
-
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [chatConfig, setChatConfig] = useState<ChatConfig | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // 从localStorage恢复用户状态
@@ -47,17 +48,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
 
       const savedUser = localStorage.getItem('fimai_user');
-      if (savedUser) {
+      const savedToken = localStorage.getItem('fimai_token');
+      if (savedUser && savedToken) {
         try {
           const userData = JSON.parse(savedUser);
           if (isMounted) {
             setUser(userData);
+            setToken(savedToken);
             // 获取聊天配置
-            fetchChatConfig(userData.id);
+            await fetchChatConfig();
           }
         } catch (error) {
           console.error('Failed to parse saved user:', error);
           localStorage.removeItem('fimai_user');
+          localStorage.removeItem('fimai_token');
         }
       }
 
@@ -73,23 +77,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [])
 
-  const fetchChatConfig = async (userId: string) => {
+  // 带认证的fetch函数
+  const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+    const headers = new Headers(options.headers);
+    
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  };
+
+  const fetchChatConfig = async () => {
+    if (!token) return;
+    
     try {
-      const response = await fetch(`/api/chat/permissions?userId=${userId}&action=config`)
+      const response = await authenticatedFetch('/api/chat/permissions?action=config');
       if (response.ok) {
-        const config = await response.json()
-        setChatConfig(config)
-      } else if (response.status === 500) {
-        // 如果用户不存在，清除本地存储的用户数据
-        console.warn('User not found in database, clearing local storage')
-        localStorage.removeItem('fimai_user')
-        setUser(null)
-        setChatConfig(null)
+        const config = await response.json();
+        setChatConfig(config);
+      } else if (response.status === 401 || response.status === 500) {
+        // Token无效或用户不存在，清除本地存储
+        console.warn('Authentication failed or user not found, clearing local storage');
+        localStorage.removeItem('fimai_user');
+        localStorage.removeItem('fimai_token');
+        setUser(null);
+        setToken(null);
+        setChatConfig(null);
       }
     } catch (error) {
-      console.error('Failed to fetch chat config:', error)
+      console.error('Failed to fetch chat config:', error);
     }
-  }
+  };
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -101,10 +123,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json()
 
-      if (data.success && data.user) {
+      if (data.success && data.user && data.token) {
         setUser(data.user)
-        setChatConfig(data.chatConfig)
+        setToken(data.token)
         localStorage.setItem('fimai_user', JSON.stringify(data.user))
+        localStorage.setItem('fimai_token', data.token)
+        
+        // 获取聊天配置
+        await fetchChatConfig()
+        
         return { success: true }
       } else {
         return { success: false, error: data.error || 'Login failed' }
@@ -162,13 +189,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
+    setToken(null)
     setChatConfig(null)
     localStorage.removeItem('fimai_user')
+    localStorage.removeItem('fimai_token')
   }
 
   const refreshChatConfig = async () => {
-    if (user) {
-      await fetchChatConfig(user.id)
+    if (token) {
+      await fetchChatConfig()
     }
   }
 
@@ -178,11 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         chatConfig,
         isLoading,
+        token,
         login,
         loginWithAccessCode,
         register,
         logout,
         refreshChatConfig,
+        authenticatedFetch,
       }}
     >
       {children}

@@ -1,31 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkUserPermission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInviteCode } from '@/lib/codes'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest, userId: string) {
   try {
     const { searchParams } = new URL(request.url)
-    const adminUserId = searchParams.get('adminUserId')
     const type = searchParams.get('type') || 'invite' // 'invite' or 'access'
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
-
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'adminUserId is required' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
-    }
 
     if (type === 'invite') {
       // 获取邀请码列表
@@ -77,24 +60,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, type, role, maxUses, expiresAt } = data
+    const { type, role, maxUses, expiresAt } = data
 
-    if (!adminUserId || !type) {
+    if (!type) {
       return NextResponse.json(
-        { error: 'adminUserId and type are required' },
+        { error: 'type is required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -107,7 +81,7 @@ export async function POST(request: NextRequest) {
           code,
           maxUses: maxUses || 1,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
-          createdBy: adminUserId,
+          createdBy: userId,
         },
         include: {
           creator: {
@@ -128,7 +102,7 @@ export async function POST(request: NextRequest) {
         data: {
           code,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
-          createdBy: adminUserId,
+          createdBy: userId,
         },
         include: {
           creator: {
@@ -157,24 +131,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function handleDelete(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, codeId, type } = data
+    const { codeId, type } = data
 
-    if (!adminUserId || !codeId || !type) {
+    if (!codeId || !type) {
       return NextResponse.json(
-        { error: 'adminUserId, codeId, and type are required' },
+        { error: 'codeId and type are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -209,24 +174,15 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+async function handlePatch(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { adminUserId, codeId, type, action, ...updateData } = data
+    const { codeId, type, action, ...updateData } = data
 
-    if (!adminUserId || !codeId || !type || !action) {
+    if (!codeId || !type || !action) {
       return NextResponse.json(
-        { error: 'adminUserId, codeId, type, and action are required' },
+        { error: 'codeId, type, and action are required' },
         { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const hasPermission = await checkUserPermission(adminUserId, 'admin_panel')
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -296,3 +252,8 @@ export async function PATCH(request: NextRequest) {
     )
   }
 }
+
+export const GET = withAdminAuth(handleGet)
+export const POST = withAdminAuth(handlePost)
+export const DELETE = withAdminAuth(handleDelete)
+export const PATCH = withAdminAuth(handlePatch)

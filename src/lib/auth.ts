@@ -6,6 +6,32 @@ import { validateInviteCode, useInviteCode, validateAccessCode, useAccessCode } 
 import { isAdminInviteCode } from '@/lib/codes'
 
 /**
+ * 获取并验证JWT密钥
+ */
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required but not set. Please set JWT_SECRET in your environment variables.');
+  }
+  if (secret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters long for security.');
+  }
+  return secret;
+}
+
+/**
+ * 验证关键环境变量
+ */
+export function validateEnvironmentVariables(): void {
+  try {
+    getJWTSecret();
+  } catch (error) {
+    console.error('❌ Environment validation failed:', (error as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
  * 验证邮箱格式
  */
 function isValidEmail(email: string): boolean {
@@ -368,7 +394,7 @@ export async function getUserAllowedModels(userId: string): Promise<string[]> {
  * 生成JWT令牌
  */
 export function generateToken(userId: string): string {
-  const secret: string = process.env.JWT_SECRET || 'fallback-secret-key-for-development';
+  const secret = getJWTSecret();
   const expiresIn: string = process.env.JWT_EXPIRES_IN || '24h';
   
   return jwt.sign({ userId }, secret, { expiresIn });
@@ -379,7 +405,7 @@ export function generateToken(userId: string): string {
  */
 export function verifyToken(token: string): { userId: string } | null {
   try {
-    const secret: string = process.env.JWT_SECRET || 'fallback-secret-key-for-development';
+    const secret = getJWTSecret();
     const decoded = jwt.verify(token, secret) as { userId: string };
     return decoded;
   } catch (error) {
