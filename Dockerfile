@@ -7,6 +7,8 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # Increase Node/V8 heap to avoid OOM during build
 ENV NODE_OPTIONS="--max-old-space-size=2048"
+# Skip environment validation during build
+ENV VALIDATE_ENV=false
 
 # Install deps
 COPY package*.json ./
@@ -20,6 +22,9 @@ RUN npx prisma generate
 COPY . .
 # Ensure optional public directory exists to avoid COPY failures in runtime stage
 RUN mkdir -p public
+# Set JWT_SECRET for build process
+ARG JWT_SECRET
+ENV JWT_SECRET=${JWT_SECRET:-default-build-secret-not-for-production}
 RUN npm run build
 
 # Runtime stage
