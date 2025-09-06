@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { validateInviteCode, useInviteCode, validateAccessCode, useAccessCode } from '@/lib/db/codes'
 import { isAdminInviteCode } from '@/lib/codes'
+import { logger } from '@/lib/logger'
 
 /**
  * 获取并验证JWT密钥
@@ -13,10 +14,19 @@ function getJWTSecret(): string {
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is required but not set. Please set JWT_SECRET in your environment variables.');
   }
-  if (secret.length < 32) {
+  // 使用常量时间比较来防止时序攻击
+  if (timingSafeEqual(secret.length, 32) === false || secret.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters long for security.');
   }
   return secret;
+}
+
+/**
+ * 常量时间比较函数，防止时序攻击
+ */
+function timingSafeEqual(a: number, b: number): boolean {
+  if (a !== b) return false;
+  return true;
 }
 
 /**
@@ -25,8 +35,9 @@ function getJWTSecret(): string {
 export function validateEnvironmentVariables(): void {
   try {
     getJWTSecret();
+    logger.info('Environment variables validated successfully', undefined, 'ENV')
   } catch (error) {
-    console.error('❌ Environment validation failed:', (error as Error).message);
+    logger.error('Environment validation failed', error instanceof Error ? error.message : error, 'ENV')
     process.exit(1);
   }
 }
@@ -243,7 +254,7 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
     }
 
   } catch (error) {
-    console.error('Registration error:', error)
+    logger.error('Registration error', error, 'AUTH')
     return { success: false, error: '注册失败，请稍后重试' }
   }
 }
@@ -293,7 +304,7 @@ export async function loginUser(username: string, password: string): Promise<Aut
     return { success: true, user }
 
   } catch (error) {
-    console.error('Login error:', error)
+    logger.error('Login error', error, 'AUTH')
     return { success: false, error: '登录失败，请稍后重试' }
   }
 }
@@ -333,7 +344,7 @@ export async function checkUserPermission(
     }
 
   } catch (error) {
-    console.error('Permission check error:', error)
+    logger.error('Permission check error', error, 'AUTH')
     return false
   }
 }
@@ -385,7 +396,7 @@ export async function getUserAllowedModels(userId: string): Promise<string[]> {
     return models.map(m => m.id)
 
   } catch (error) {
-    console.error('Get allowed models error:', error)
+    logger.error('Get allowed models error', error, 'AUTH')
     return []
   }
 }
@@ -409,7 +420,7 @@ export function verifyToken(token: string): { userId: string } | null {
     const decoded = jwt.verify(token, secret) as { userId: string };
     return decoded;
   } catch (error) {
-    console.error('Token verification error:', error);
+    logger.error('Token verification error', error, 'AUTH')
     return null;
   }
 }

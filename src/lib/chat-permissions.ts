@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getUserAllowedModels } from '@/lib/auth'
 import type { UserRole } from '@prisma/client'
 import { updateUserTokenUsage, checkAndResetLimits } from '@/lib/db/token-usage'
+import { logger } from '@/lib/logger'
 
 export interface ChatPermissionCheck {
   canChat: boolean
@@ -11,16 +12,27 @@ export interface ChatPermissionCheck {
 }
 
 /**
- * 检查用户的聊天权限
+ * 检查用户的聊天权限 - 优化版本
  */
 export async function checkChatPermissions(
   userId: string,
   modelId: string
 ): Promise<ChatPermissionCheck> {
   try {
+    // 单次查询获取用户信息、权限和设置
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { permissions: true },
+      include: {
+        permissions: true,
+        settings: true,
+        hostUser: {
+          select: {
+            id: true,
+            isActive: true,
+            canShareAccessCode: true,
+          }
+        }
+      },
     })
 
     if (!user) {
@@ -71,14 +83,14 @@ export async function checkChatPermissions(
         }
       }
       
-      // 检查成本限制
+      // 检查成本限制 - 优化查询，只获取必要的成本数据
       if (user.permissions.limitType === 'cost' && user.permissions.costLimit) {
-        // 获取当前周期内的总成本
         const periodStart = user.permissions.lastResetAt;
         const costStats = await prisma.tokenUsage.aggregate({
           where: {
             userId,
-            createdAt: { gte: periodStart }
+            createdAt: { gte: periodStart },
+            cost: { gt: 0 } // 只查询有成本的记录
           },
           _sum: { cost: true }
         });
@@ -106,7 +118,7 @@ export async function checkChatPermissions(
     }
 
   } catch (error) {
-    console.error('Error checking chat permissions:', error)
+    logger.error('Error checking chat permissions', error, 'PERMISSIONS')
     return {
       canChat: false,
       canSaveToDatabase: false,
@@ -117,7 +129,7 @@ export async function checkChatPermissions(
 }
 
 /**
- * 检查访客的宿主用户权限
+ * 检查访客的宿主用户权限 - 优化版本
  */
 export async function checkGuestHostPermissions(guestUserId: string): Promise<{
   hostActive: boolean
@@ -125,10 +137,17 @@ export async function checkGuestHostPermissions(guestUserId: string): Promise<{
   error?: string
 }> {
   try {
+    // 优化查询，只获取必要字段
     const guest = await prisma.user.findUnique({
       where: { id: guestUserId },
-      include: {
-        hostUser: true,
+      select: {
+        role: true,
+        hostUser: {
+          select: {
+            isActive: true,
+            canShareAccessCode: true,
+          }
+        }
       },
     })
 
@@ -154,7 +173,7 @@ export async function checkGuestHostPermissions(guestUserId: string): Promise<{
     }
 
   } catch (error) {
-    console.error('Error checking guest host permissions:', error)
+    logger.error('Error checking guest host permissions', error, 'PERMISSIONS')
     return {
       hostActive: false,
       hostCanShare: false,
@@ -164,7 +183,7 @@ export async function checkGuestHostPermissions(guestUserId: string): Promise<{
 }
 
 /**
- * 获取用户的聊天配置
+ * 获取用户的聊天配置 - 优化版本
  */
 export async function getUserChatConfig(userId: string): Promise<{
   role: string
@@ -174,9 +193,24 @@ export async function getUserChatConfig(userId: string): Promise<{
   tokenUsed?: number
   hostUserId?: string
 }> {
+  // 单次查询获取用户信息、权限和设置
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { permissions: true },
+    include: {
+      permissions: {
+        select: {
+          tokenLimit: true,
+          tokenUsed: true,
+        }
+      },
+      settings: {
+        select: {
+          messagePageSize: true,
+          enableMarkdown: true,
+          enableLatex: true,
+        }
+      }
+    },
   })
 
   if (!user) {
@@ -187,6 +221,7 @@ export async function getUserChatConfig(userId: string): Promise<{
   
   let tokenUsed = 0
   if (user.permissions?.tokenLimit) {
+    // 优化查询，只获取token总数
     const tokenUsage = await prisma.tokenUsage.aggregate({
       where: { userId },
       _sum: { totalTokens: true },

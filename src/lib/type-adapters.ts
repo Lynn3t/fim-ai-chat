@@ -9,6 +9,7 @@ import type {
   ChatHistory as GlobalChatHistory,
   TokenUsage as GlobalTokenUsage
 } from '@/types';
+import { logger } from '@/lib/logger';
 
 // 聊天页面的本地类型定义
 export interface ChatMessage {
@@ -183,12 +184,17 @@ export function adaptGlobalHistoriesToChatHistories(globalHistories: GlobalChatH
 /**
  * 验证消息格式
  */
-export function validateChatMessage(message: any): message is ChatMessage {
+export function validateChatMessage(message: unknown): message is ChatMessage {
   return (
     typeof message === 'object' &&
+    message !== null &&
+    'id' in message &&
     typeof message.id === 'string' &&
+    'content' in message &&
     typeof message.content === 'string' &&
-    ['user', 'assistant'].includes(message.role) &&
+    'role' in message &&
+    ['user', 'assistant'].includes(message.role as string) &&
+    'timestamp' in message &&
     message.timestamp instanceof Date
   );
 }
@@ -196,13 +202,19 @@ export function validateChatMessage(message: any): message is ChatMessage {
 /**
  * 验证提供商格式
  */
-export function validateChatProvider(provider: any): provider is ChatAIProvider {
+export function validateChatProvider(provider: unknown): provider is ChatAIProvider {
   return (
     typeof provider === 'object' &&
+    provider !== null &&
+    'id' in provider &&
     typeof provider.id === 'string' &&
+    'name' in provider &&
     typeof provider.name === 'string' &&
+    'baseUrl' in provider &&
     typeof provider.baseUrl === 'string' &&
+    'enabled' in provider &&
     typeof provider.enabled === 'boolean' &&
+    'models' in provider &&
     Array.isArray(provider.models)
   );
 }
@@ -210,7 +222,7 @@ export function validateChatProvider(provider: any): provider is ChatAIProvider 
 /**
  * 安全的类型转换
  */
-export function safeAdaptGlobalMessageToChatMessage(globalMessage: any): ChatMessage | null {
+export function safeAdaptGlobalMessageToChatMessage(globalMessage: unknown): ChatMessage | null {
   try {
     if (!globalMessage || typeof globalMessage !== 'object') {
       return null;
@@ -218,7 +230,7 @@ export function safeAdaptGlobalMessageToChatMessage(globalMessage: any): ChatMes
     
     return adaptGlobalMessageToChatMessage(globalMessage as GlobalMessage);
   } catch (error) {
-    console.error('Failed to adapt global message to chat message:', error);
+    logger.error('Failed to adapt global message to chat message', error, 'TYPE_ADAPTER');
     return null;
   }
 }
@@ -226,7 +238,7 @@ export function safeAdaptGlobalMessageToChatMessage(globalMessage: any): ChatMes
 /**
  * 安全的批量类型转换
  */
-export function safeAdaptGlobalProvidersToChatProviders(globalProviders: any[]): ChatAIProvider[] {
+export function safeAdaptGlobalProvidersToChatProviders(globalProviders: unknown[]): ChatAIProvider[] {
   if (!Array.isArray(globalProviders)) {
     return [];
   }
@@ -236,7 +248,7 @@ export function safeAdaptGlobalProvidersToChatProviders(globalProviders: any[]):
       try {
         return adaptGlobalProviderToChatProvider(provider as GlobalAIProvider);
       } catch (error) {
-        console.error('Failed to adapt provider:', error);
+        logger.error('Failed to adapt provider', error, 'TYPE_ADAPTER');
         return null;
       }
     })

@@ -8,6 +8,22 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 
+interface CodeProps {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: unknown;
+}
+
+interface ComponentProps {
+  children?: React.ReactNode;
+  [key: string]: unknown;
+}
+
+interface LinkProps extends ComponentProps {
+  href?: string;
+}
+
 interface MarkdownRendererProps {
   content: string;
   className?: string;
@@ -31,13 +47,11 @@ export function MarkdownRenderer({
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          code(props: any) {
+          code(props: CodeProps) {
             const { inline, className, children, ...rest } = props;
             const match = /language-(\w+)/.exec(className || '');
 
             if (!inline && match) {
-              // 只传递必要的props给SyntaxHighlighter
               return (
                 <SyntaxHighlighter
                   style={oneDark}
@@ -65,12 +79,10 @@ export function MarkdownRenderer({
               </code>
             );
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          pre(props: any) {
+          pre(props: ComponentProps) {
             return <div className="overflow-x-auto">{props.children}</div>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          table(props: any) {
+          table(props: ComponentProps) {
             return (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -79,60 +91,49 @@ export function MarkdownRenderer({
               </div>
             );
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          th(props: any) {
+          th(props: ComponentProps) {
             return (
               <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-3 py-2 text-left font-semibold">
                 {props.children}
               </th>
             );
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          td(props: any) {
+          td(props: ComponentProps) {
             return (
               <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                 {props.children}
               </td>
             );
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          blockquote(props: any) {
+          blockquote(props: ComponentProps) {
             return (
               <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4">
                 {props.children}
               </blockquote>
             );
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          h1(props: any) {
+          h1(props: ComponentProps) {
             return <h1 className="text-2xl font-bold mb-4 mt-6">{props.children}</h1>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          h2(props: any) {
+          h2(props: ComponentProps) {
             return <h2 className="text-xl font-bold mb-3 mt-5">{props.children}</h2>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          h3(props: any) {
+          h3(props: ComponentProps) {
             return <h3 className="text-lg font-bold mb-2 mt-4">{props.children}</h3>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ul(props: any) {
+          ul(props: ComponentProps) {
             return <ul className="list-disc list-inside mb-4 space-y-1">{props.children}</ul>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ol(props: any) {
+          ol(props: ComponentProps) {
             return <ol className="list-decimal list-inside mb-4 space-y-1">{props.children}</ol>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          li(props: any) {
+          li(props: ComponentProps) {
             return <li className="mb-1">{props.children}</li>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          p(props: any) {
+          p(props: ComponentProps) {
             return <p className="my-0 leading-relaxed">{props.children}</p>;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          a(props: any) {
+          a(props: LinkProps) {
             return (
               <a
                 href={props.href}

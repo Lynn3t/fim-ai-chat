@@ -6,6 +6,15 @@ import {
   updateUserPermissions
 } from '@/lib/db/admin'
 import { withAdminAuth } from '@/lib/api-utils'
+import { 
+  validatePagination, 
+  validateSchema, 
+  createUserSchema, 
+  updateUserStatusSchema,
+  updateAccessCodePermissionSchema,
+  updateUserPermissionsSchema,
+  deleteUserSchema 
+} from '@/lib/validation'
 
 async function handleGet(request: NextRequest, userId: string) {
   try {
@@ -13,21 +22,27 @@ async function handleGet(request: NextRequest, userId: string) {
     const includeStats = searchParams.get('includeStats') === 'true'
     const role = searchParams.get('role') as 'ADMIN' | 'USER' | 'GUEST' | null
     const isActive = searchParams.get('isActive')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    
+    // 验证分页参数
+    const pagination = validatePagination(searchParams)
 
     const users = await getAllUsers({
       includeStats,
       role: role || undefined,
       isActive: isActive !== null ? isActive === 'true' : undefined,
-      limit,
-      offset,
+      ...pagination,
     })
 
     return NextResponse.json(users)
 
   } catch (error) {
     console.error('Error fetching users:', error)
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to fetch users' },
       { status: 500 }
@@ -41,21 +56,10 @@ export const GET = withAdminAuth(handleGet);
 async function handlePost(request: NextRequest, userId: string) {
   try {
     const data = await request.json()
-    const { username, email, password, role = 'USER' } = data
-
-    if (!username) {
-      return NextResponse.json(
-        { error: 'Username is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!password) {
-      return NextResponse.json(
-        { error: 'Password is required' },
-        { status: 400 }
-      )
-    }
+    
+    // 验证输入数据
+    const validatedData = validateSchema(createUserSchema, data)
+    const { username, email, password, role } = validatedData
 
     // 检查用户名是否已存在
     const { prisma } = await import('@/lib/prisma')
@@ -131,6 +135,12 @@ async function handlePost(request: NextRequest, userId: string) {
 
   } catch (error) {
     console.error('Error creating user:', error)
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to create user' },
       { status: 500 }
@@ -144,11 +154,32 @@ export const POST = withAdminAuth(handlePost);
 async function handlePatch(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
-    const { userId, action, ...updateData } = data
+    
+    // 验证输入数据
+    let validatedData
+    switch (data.action) {
+      case 'updateStatus':
+        validatedData = validateSchema(updateUserStatusSchema, data)
+        break
+      case 'updateAccessCodePermission':
+        validatedData = validateSchema(updateAccessCodePermissionSchema, data)
+        break
+      case 'updatePermissions':
+        validatedData = validateSchema(updateUserPermissionsSchema, data)
+        break
+      default:
+        return NextResponse.json(
+          { error: 'Invalid action' },
+          { status: 400 }
+        )
+    }
 
-    if (!userId || !action) {
+    const { userId, action, ...updateData } = validatedData
+
+    // 防止管理员封禁自己
+    if (action === 'updateStatus' && adminUserId === userId && !updateData.isActive) {
       return NextResponse.json(
-        { error: 'userId and action are required' },
+        { error: 'Cannot ban your own account' },
         { status: 400 }
       )
     }
@@ -156,13 +187,6 @@ async function handlePatch(request: NextRequest, adminUserId: string) {
     let result
     switch (action) {
       case 'updateStatus':
-        // 防止管理员封禁自己
-        if (adminUserId === userId && !updateData.isActive) {
-          return NextResponse.json(
-            { error: 'Cannot ban your own account' },
-            { status: 400 }
-          )
-        }
         result = await updateUserStatus(userId, updateData.isActive)
         break
       
@@ -173,18 +197,18 @@ async function handlePatch(request: NextRequest, adminUserId: string) {
       case 'updatePermissions':
         result = await updateUserPermissions(userId, updateData)
         break
-      
-      default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        )
     }
 
     return NextResponse.json(result)
 
   } catch (error) {
     console.error('Error updating user:', error)
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to update user' },
       { status: 500 }
@@ -198,14 +222,10 @@ export const PATCH = withAdminAuth(handlePatch);
 async function handleDelete(request: NextRequest, adminUserId: string) {
   try {
     const data = await request.json()
-    const { userId } = data
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
+    
+    // 验证输入数据
+    const validatedData = validateSchema(deleteUserSchema, data)
+    const { userId } = validatedData
 
     // 防止删除自己
     if (adminUserId === userId) {
@@ -273,6 +293,12 @@ async function handleDelete(request: NextRequest, adminUserId: string) {
 
   } catch (error) {
     console.error('Error deleting user:', error)
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to delete user' },
       { status: 500 }

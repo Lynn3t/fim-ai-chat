@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { logger } from '@/lib/logger';
+
+/**
+ * 安全的错误记录器 - 使用logger替代
+ */
+function logError(error: unknown, context?: string) {
+  logger.error('API error', error, context)
+}
 
 /**
  * 从请求中获取用户ID
@@ -29,7 +37,7 @@ export async function getUserFromRequest(request: NextRequest): Promise<string |
     // JWT验证失败，直接返回null，不再回退到查询参数方法
     return null;
   } catch (error) {
-    console.error('Error getting user from request:', error);
+    logError(error, 'getUserFromRequest');
     return null;
   }
 }
@@ -67,9 +75,39 @@ export async function verifyUserPermission(
 
     return { success: true, user };
   } catch (error) {
-    console.error('Error verifying user permission:', error);
+    logError(error, 'verifyUserPermission');
     return { success: false, error: 'Permission verification failed' };
   }
+}
+
+/**
+ * 创建安全的错误响应
+ */
+export function createSafeErrorResponse(
+  error: string,
+  status: number = 400,
+  details?: unknown
+): NextResponse {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // 安全的详细信息处理
+  const safeDetails = isDevelopment ? details : undefined;
+  
+  // 避免暴露敏感信息
+  const safeError = error.includes('password') || error.includes('secret') || error.includes('token')
+    ? 'Invalid request'
+    : error;
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: safeError,
+      details: safeDetails,
+      timestamp: new Date().toISOString(),
+      requestId: crypto.randomUUID(), // 添加请求ID用于追踪
+    },
+    { status }
+  );
 }
 
 /**
@@ -80,18 +118,34 @@ export function withErrorHandler(handler: (request: NextRequest) => Promise<Next
     try {
       return await handler(request);
     } catch (error) {
-      console.error('API Error:', error);
+      logError(error, 'withErrorHandler');
       
-      // 不要在生产环境中暴露详细错误信息
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const errorMessage = isDevelopment 
-        ? (error as Error).message 
-        : 'Internal server error';
-
-      return NextResponse.json(
-        { error: errorMessage },
-        { status: 500 }
-      );
+      // 根据错误类型返回适当的响应
+      if (error instanceof Error) {
+        // 处理特定类型的错误
+        if (error.message.includes('prisma') || error.message.includes('database')) {
+          return createSafeErrorResponse('Database operation failed', 500);
+        }
+        
+        if (error.message.includes('validation') || error.message.includes('schema')) {
+          return createSafeErrorResponse('Invalid request data', 400);
+        }
+        
+        if (error.message.includes('unauthorized') || error.message.includes('authentication')) {
+          return createSafeErrorResponse('Authentication required', 401);
+        }
+        
+        if (error.message.includes('permission') || error.message.includes('forbidden')) {
+          return createSafeErrorResponse('Insufficient permissions', 403);
+        }
+        
+        if (error.message.includes('not found')) {
+          return createSafeErrorResponse('Resource not found', 404);
+        }
+      }
+      
+      // 默认错误响应
+      return createSafeErrorResponse('Internal server error', 500);
     }
   };
 }
@@ -107,18 +161,12 @@ export function withAuth(
     const userId = await getUserFromRequest(request);
     
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return createSafeErrorResponse('Authentication required', 401);
     }
 
     const permission = await verifyUserPermission(userId, requiredRole);
     if (!permission.success) {
-      return NextResponse.json(
-        { error: permission.error },
-        { status: 403 }
-      );
+      return createSafeErrorResponse(permission.error || 'Insufficient permissions', 403);
     }
 
     return handler(request, userId);
@@ -140,7 +188,7 @@ export function withAdminAuth(
 export function sanitizeProvider(provider: any) {
   if (!provider) return provider;
   
-  const { apiKey, ...sanitized } = provider;
+  const { apiKey, apiSecret, accessToken, refreshToken, ...sanitized } = provider;
   return sanitized;
 }
 
@@ -149,6 +197,23 @@ export function sanitizeProvider(provider: any) {
  */
 export function sanitizeProviders(providers: any[]) {
   return providers.map(sanitizeProvider);
+}
+
+/**
+ * 过滤用户敏感信息
+ */
+export function sanitizeUser(user: any) {
+  if (!user) return user;
+  
+  const { password, ...sanitized } = user;
+  return sanitized;
+}
+
+/**
+ * 过滤用户敏感信息（数组）
+ */
+export function sanitizeUsers(users: any[]) {
+  return users.map(sanitizeUser);
 }
 
 /**
@@ -165,6 +230,7 @@ export function createApiResponse<T>(
       data,
       message,
       timestamp: new Date().toISOString(),
+      requestId: crypto.randomUUID(),
     },
     { status }
   );
@@ -178,15 +244,7 @@ export function createErrorResponse(
   status: number = 400,
   details?: any
 ): NextResponse {
-  return NextResponse.json(
-    {
-      success: false,
-      error,
-      details: process.env.NODE_ENV === 'development' ? details : undefined,
-      timestamp: new Date().toISOString(),
-    },
-    { status }
-  );
+  return createSafeErrorResponse(error, status, details);
 }
 
 /**
@@ -210,6 +268,7 @@ export async function validateRequestBody<T>(
 
     return { success: true, data: body };
   } catch (error) {
+    logError(error, 'validateRequestBody');
     return {
       success: false,
       error: 'Invalid JSON body',
@@ -218,7 +277,7 @@ export async function validateRequestBody<T>(
 }
 
 /**
- * 限流检查（简单实现）
+ * 限流检查（改进实现）
  */
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
@@ -247,4 +306,21 @@ export function checkRateLimit(
     remaining,
     resetTime: record.resetTime,
   };
+}
+
+/**
+ * 清理过期的限流记录
+ */
+export function cleanupRateLimitRecords() {
+  const now = Date.now();
+  for (const [key, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+}
+
+// 每小时清理一次限流记录
+if (typeof setInterval !== 'undefined') {
+  setInterval(cleanupRateLimitRecords, 60 * 60 * 1000);
 }
