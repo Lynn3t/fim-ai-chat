@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { withAdminAuth } from '@/lib/api-utils'
 
-export async function GET() {
+export const GET = withAdminAuth(async () => {
   try {
     // 测试数据库连接
     const userCount = await prisma.user.count()
     const providerCount = await prisma.provider.count()
     const modelCount = await prisma.model.count()
-    
+
     return NextResponse.json({
       status: 'success',
       message: 'Database connection successful',
@@ -28,4 +29,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})

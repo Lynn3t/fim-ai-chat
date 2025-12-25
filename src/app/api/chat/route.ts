@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
           return;
         }
 
+        const decoder = new TextDecoder(); // 实例化在循环外部
         let fullAssistantMessage = ''; // 用于记录完整的助手回复内容
         let tokenUsage: any = null; // 用于记录token使用情况
         let buffer = ''; // 用于处理被分割的JSON数据
@@ -155,55 +156,55 @@ export async function POST(request: NextRequest) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            // 解码数据
-            const chunk = new TextDecoder().decode(value);
+            // 解码数据，使用 stream: true 保持多字节字符状态
+            const chunk = decoder.decode(value, { stream: true });
             buffer += chunk;
-            
+
             // 处理每一行数据
             while (buffer.includes('\n')) {
               const lineEndIndex = buffer.indexOf('\n');
               const line = buffer.substring(0, lineEndIndex).trim();
               buffer = buffer.substring(lineEndIndex + 1);
-              
+
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
-                
+
                 if (data === '[DONE]') {
                   controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                   continue;
                 }
-                
+
                 try {
                   // 尝试解析JSON
                   const jsonData = JSON.parse(data);
-                  
+
                   // 提取token使用信息（如果有）
                   if (jsonData.usage) {
                     tokenUsage = jsonData.usage;
                   }
-                  
+
                   // 收集助手回复内容（用于后续token估算）
                   if (jsonData.choices && jsonData.choices[0].delta && jsonData.choices[0].delta.content) {
                     fullAssistantMessage += jsonData.choices[0].delta.content;
                   }
-                  
+
                   // 移除可能包含的敏感信息
                   delete jsonData.user;
                   delete jsonData.provider;
                   if (jsonData.model) {
                     // 保留基本模型信息，移除详细配置
-                    jsonData.model = typeof jsonData.model === 'string' ? 
-                      jsonData.model : 
+                    jsonData.model = typeof jsonData.model === 'string' ?
+                      jsonData.model :
                       { name: jsonData.model.name, id: jsonData.model.id };
                   }
-                  
+
                   // 确保输出的是有效的JSON
                   const cleanJson = JSON.stringify(jsonData);
                   controller.enqueue(encoder.encode(`data: ${cleanJson}\n\n`));
                 } catch (error) {
                   // 记录无效的JSON数据
                   console.error('无效的JSON数据:', data);
-                  
+
                   // 尝试修复和处理不完整的JSON
                   // 不向客户端发送错误的数据，而是在日志中记录
                   if (data.length > 0) {

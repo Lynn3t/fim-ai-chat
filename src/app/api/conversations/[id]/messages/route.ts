@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getConversationMessages } from '@/lib/db/conversations'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,

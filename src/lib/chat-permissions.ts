@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getUserAllowedModels } from '@/lib/auth'
 import type { UserRole } from '@prisma/client'
 import { updateUserTokenUsage, checkAndResetLimits } from '@/lib/db/token-usage'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 export interface ChatPermissionCheck {
   canChat: boolean

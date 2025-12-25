@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { validateInviteCode, useInviteCode, validateAccessCode, useAccessCode } from '@/lib/db/codes'
 import { isAdminInviteCode } from '@/lib/codes'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 /**
  * 获取并验证JWT密钥

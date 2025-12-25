@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 /**
  * 安全的错误记录器 - 使用logger替代
@@ -20,20 +20,20 @@ export async function getUserFromRequest(request: NextRequest): Promise<string |
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7); // 移除 'Bearer ' 前缀
       const decoded = verifyToken(token);
-      
+
       if (decoded && decoded.userId) {
         // 验证用户是否存在且活跃
         const user = await prisma.user.findUnique({
           where: { id: decoded.userId },
           select: { id: true, isActive: true, role: true },
         });
-        
+
         if (user && user.isActive) {
           return user.id;
         }
       }
     }
-    
+
     // JWT验证失败，直接返回null，不再回退到查询参数方法
     return null;
   } catch (error) {
@@ -89,10 +89,10 @@ export function createSafeErrorResponse(
   details?: unknown
 ): NextResponse {
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   // 安全的详细信息处理
   const safeDetails = isDevelopment ? details : undefined;
-  
+
   // 避免暴露敏感信息
   const safeError = error.includes('password') || error.includes('secret') || error.includes('token')
     ? 'Invalid request'
@@ -119,31 +119,31 @@ export function withErrorHandler(handler: (request: NextRequest) => Promise<Next
       return await handler(request);
     } catch (error) {
       logError(error, 'withErrorHandler');
-      
+
       // 根据错误类型返回适当的响应
       if (error instanceof Error) {
         // 处理特定类型的错误
         if (error.message.includes('prisma') || error.message.includes('database')) {
           return createSafeErrorResponse('Database operation failed', 500);
         }
-        
+
         if (error.message.includes('validation') || error.message.includes('schema')) {
           return createSafeErrorResponse('Invalid request data', 400);
         }
-        
+
         if (error.message.includes('unauthorized') || error.message.includes('authentication')) {
           return createSafeErrorResponse('Authentication required', 401);
         }
-        
+
         if (error.message.includes('permission') || error.message.includes('forbidden')) {
           return createSafeErrorResponse('Insufficient permissions', 403);
         }
-        
+
         if (error.message.includes('not found')) {
           return createSafeErrorResponse('Resource not found', 404);
         }
       }
-      
+
       // 默认错误响应
       return createSafeErrorResponse('Internal server error', 500);
     }
@@ -159,7 +159,7 @@ export function withAuth(
 ) {
   return withErrorHandler(async (request: NextRequest) => {
     const userId = await getUserFromRequest(request);
-    
+
     if (!userId) {
       return createSafeErrorResponse('Authentication required', 401);
     }
@@ -187,7 +187,7 @@ export function withAdminAuth(
  */
 export function sanitizeProvider(provider: any) {
   if (!provider) return provider;
-  
+
   const { apiKey, apiSecret, accessToken, refreshToken, ...sanitized } = provider;
   return sanitized;
 }
@@ -204,7 +204,7 @@ export function sanitizeProviders(providers: any[]) {
  */
 export function sanitizeUser(user: any) {
   if (!user) return user;
-  
+
   const { password, ...sanitized } = user;
   return sanitized;
 }
@@ -256,7 +256,7 @@ export async function validateRequestBody<T>(
 ): Promise<{ success: boolean; data?: T; error?: string }> {
   try {
     const body = await request.json();
-    
+
     for (const field of requiredFields) {
       if (!(field in body) || body[field] === undefined || body[field] === null) {
         return {
@@ -279,7 +279,13 @@ export async function validateRequestBody<T>(
 /**
  * 限流检查（改进实现）
  */
+/**
+ * 限流检查（改进实现）
+ * 注意：此实现在 Serverless 环境（如 Vercel）中可能无法跨请求持久化。
+ * 生产环境建议使用 Redis 或 Upstash。
+ */
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const MAX_MAP_SIZE = 10000; // 防止内存泄漏
 
 export function checkRateLimit(
   identifier: string,
@@ -287,20 +293,29 @@ export function checkRateLimit(
   windowMs: number = 60000
 ): { allowed: boolean; remaining: number; resetTime: number } {
   const now = Date.now();
-  const key = identifier;
-  
-  let record = rateLimitMap.get(key);
-  
+
+  // 如果 Map 过大，清理过期记录
+  if (rateLimitMap.size > MAX_MAP_SIZE) {
+    cleanupRateLimitRecords();
+    // 如果清理后仍然过大，清空整个 Map (极端情况保护)
+    if (rateLimitMap.size > MAX_MAP_SIZE) {
+      rateLimitMap.clear();
+      logger.warn('Rate limit map cleared due to size limit', undefined, 'RATE_LIMIT');
+    }
+  }
+
+  let record = rateLimitMap.get(identifier);
+
   if (!record || now > record.resetTime) {
     record = { count: 0, resetTime: now + windowMs };
-    rateLimitMap.set(key, record);
+    rateLimitMap.set(identifier, record);
   }
-  
+
   record.count++;
-  
+
   const allowed = record.count <= maxRequests;
   const remaining = Math.max(0, maxRequests - record.count);
-  
+
   return {
     allowed,
     remaining,
@@ -318,9 +333,4 @@ export function cleanupRateLimitRecords() {
       rateLimitMap.delete(key);
     }
   }
-}
-
-// 每小时清理一次限流记录
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupRateLimitRecords, 60 * 60 * 1000);
 }

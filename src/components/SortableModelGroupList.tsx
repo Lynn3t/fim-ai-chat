@@ -24,7 +24,7 @@ import { AIIcon } from './AIIcon';
 import { SortableList } from './SortableList';
 import { getGroupIcon } from '@/utils/aiModelUtils';
 
-interface ModelGroup {
+export interface ModelGroup {
   id: string;
   name: string;
   models: any[];
@@ -39,11 +39,11 @@ interface SortableModelGroupItemProps {
   renderModel: (model: any) => React.ReactNode;
 }
 
-function SortableModelGroupItem({ 
-  group, 
-  onToggle, 
-  onModelReorder, 
-  renderModel 
+function SortableModelGroupItem({
+  group,
+  onToggle,
+  onModelReorder,
+  renderModel
 }: SortableModelGroupItemProps) {
   const {
     attributes,
@@ -83,12 +83,12 @@ function SortableModelGroupItem({
           />
         </svg>
       </div>
-      
+
       {/* 分组内容，添加左边距为拖拽手柄留出空间 */}
       <div className="pl-8">
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
           {/* 分组标题 - 可点击折叠/展开 */}
-          <div 
+          <div
             className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             onClick={() => onToggle(group.id)}
           >
@@ -96,7 +96,7 @@ function SortableModelGroupItem({
               <div className="flex items-center space-x-3">
                 {/* 分组图标 */}
                 <AIIcon modelId={group.models[0]?.modelId || ''} size={20} />
-                
+
                 {/* 分组名称和数量 */}
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -107,13 +107,12 @@ function SortableModelGroupItem({
                   </p>
                 </div>
               </div>
-              
+
               {/* 展开/折叠图标 */}
               <div className="flex items-center space-x-2">
                 <svg
-                  className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
-                    group.expanded ? 'rotate-180' : ''
-                  }`}
+                  className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${group.expanded ? 'rotate-180' : ''
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -189,7 +188,7 @@ export function SortableModelGroupList({
       const newIndex = groups.findIndex((group) => group.id === over.id);
 
       const reorderedGroups = arrayMove(groups, oldIndex, newIndex);
-      
+
       // 更新order字段
       const groupsWithOrder = reorderedGroups.map((group, index) => ({
         ...group,

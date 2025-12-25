@@ -81,8 +81,8 @@ const getTheme = (mode: ThemeMode) => {
 const THEME_STORAGE_KEY = 'fim-ai-theme-mode';
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  // 初始状态设为null，避免首次渲染不匹配
-  const [mode, setMode] = useState<ThemeMode | null>(null);
+  // 初始状态设为light，避免首次渲染不匹配
+  const [mode, setMode] = useState<ThemeMode>('light');
   
   // 加载主题偏好
   useEffect(() => {
@@ -111,11 +111,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       return newMode;
     });
   };
-
-  // 等待客户端模式确定后再渲染
-  if (mode === null) {
-    return null; // 或者返回一个加载指示器
-  }
 
   // 动态创建主题
   const theme = getTheme(mode);

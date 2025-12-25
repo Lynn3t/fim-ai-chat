@@ -9,7 +9,7 @@ import type {
   ChatHistory as GlobalChatHistory,
   TokenUsage as GlobalTokenUsage
 } from '@/types';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 // 聊天页面的本地类型定义
 export interface ChatMessage {

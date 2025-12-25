@@ -5,7 +5,7 @@ import { promisify } from 'util'
 import path from 'path'
 import crypto from 'crypto'
 import { validateSchema, databaseResetSchema } from '@/lib/validation'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 const execAsync = promisify(exec)
 
