@@ -1,83 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
 import logger from '@/lib/logger';
+import { handleApiError } from '@/lib/error-handler';
 
 /**
  * 安全的错误记录器 - 使用logger替代
  */
 function logError(error: unknown, context?: string) {
   logger.error('API error', error, context)
-}
-
-/**
- * 从请求中获取用户ID
- */
-export async function getUserFromRequest(request: NextRequest): Promise<string | null> {
-  try {
-    // 首先尝试从Authorization头部获取JWT令牌
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7); // 移除 'Bearer ' 前缀
-      const decoded = verifyToken(token);
-
-      if (decoded && decoded.userId) {
-        // 验证用户是否存在且活跃
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.userId },
-          select: { id: true, isActive: true, role: true },
-        });
-
-        if (user && user.isActive) {
-          return user.id;
-        }
-      }
-    }
-
-    // JWT验证失败，直接返回null，不再回退到查询参数方法
-    return null;
-  } catch (error) {
-    logError(error, 'getUserFromRequest');
-    return null;
-  }
-}
-
-/**
- * 验证用户权限
- */
-export async function verifyUserPermission(
-  userId: string,
-  requiredRole?: 'ADMIN' | 'USER' | 'GUEST'
-): Promise<{ success: boolean; user?: any; error?: string }> {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, username: true, role: true, isActive: true },
-    });
-
-    if (!user) {
-      return { success: false, error: 'User not found' };
-    }
-
-    if (!user.isActive) {
-      return { success: false, error: 'User account is inactive' };
-    }
-
-    if (requiredRole) {
-      const roleHierarchy = { ADMIN: 3, USER: 2, GUEST: 1 };
-      const userLevel = roleHierarchy[user.role];
-      const requiredLevel = roleHierarchy[requiredRole];
-
-      if (userLevel < requiredLevel) {
-        return { success: false, error: 'Insufficient permissions' };
-      }
-    }
-
-    return { success: true, user };
-  } catch (error) {
-    logError(error, 'verifyUserPermission');
-    return { success: false, error: 'Permission verification failed' };
-  }
 }
 
 /**
@@ -118,68 +47,10 @@ export function withErrorHandler(handler: (request: NextRequest) => Promise<Next
     try {
       return await handler(request);
     } catch (error) {
-      logError(error, 'withErrorHandler');
-
-      // 根据错误类型返回适当的响应
-      if (error instanceof Error) {
-        // 处理特定类型的错误
-        if (error.message.includes('prisma') || error.message.includes('database')) {
-          return createSafeErrorResponse('Database operation failed', 500);
-        }
-
-        if (error.message.includes('validation') || error.message.includes('schema')) {
-          return createSafeErrorResponse('Invalid request data', 400);
-        }
-
-        if (error.message.includes('unauthorized') || error.message.includes('authentication')) {
-          return createSafeErrorResponse('Authentication required', 401);
-        }
-
-        if (error.message.includes('permission') || error.message.includes('forbidden')) {
-          return createSafeErrorResponse('Insufficient permissions', 403);
-        }
-
-        if (error.message.includes('not found')) {
-          return createSafeErrorResponse('Resource not found', 404);
-        }
-      }
-
-      // 默认错误响应
-      return createSafeErrorResponse('Internal server error', 500);
+      // 使用统一错误处理器
+      return handleApiError(error, `${request.method} ${request.nextUrl.pathname}`);
     }
   };
-}
-
-/**
- * 需要认证的API装饰器
- */
-export function withAuth(
-  handler: (request: NextRequest, userId: string) => Promise<NextResponse>,
-  requiredRole?: 'ADMIN' | 'USER' | 'GUEST'
-) {
-  return withErrorHandler(async (request: NextRequest) => {
-    const userId = await getUserFromRequest(request);
-
-    if (!userId) {
-      return createSafeErrorResponse('Authentication required', 401);
-    }
-
-    const permission = await verifyUserPermission(userId, requiredRole);
-    if (!permission.success) {
-      return createSafeErrorResponse(permission.error || 'Insufficient permissions', 403);
-    }
-
-    return handler(request, userId);
-  });
-}
-
-/**
- * 管理员权限装饰器
- */
-export function withAdminAuth(
-  handler: (request: NextRequest, userId: string) => Promise<NextResponse>
-) {
-  return withAuth(handler, 'ADMIN');
 }
 
 /**
@@ -276,9 +147,6 @@ export async function validateRequestBody<T>(
   }
 }
 
-/**
- * 限流检查（改进实现）
- */
 /**
  * 限流检查（改进实现）
  * 注意：此实现在 Serverless 环境（如 Vercel）中可能无法跨请求持久化。

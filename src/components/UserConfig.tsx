@@ -1,19 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/Toast';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Tabs, 
-  Tab, 
-  Grid, 
-  Card, 
-  CardContent, 
-  Button, 
+import {
+  Box,
+  Typography,
+  Paper,
+  Tabs,
+  Tab,
+  Grid,
+  Card,
+  CardContent,
+  Button,
   Divider,
   List,
   ListItem,
@@ -21,7 +19,6 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Chip,
-  TextField,
   FormControlLabel,
   Checkbox,
   Dialog,
@@ -47,46 +44,7 @@ import {
   ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { useTheme } from '@/contexts/ThemeContext';
-
-interface TokenStats {
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  totalCost: number;
-  todayTokens: number;
-  todayCost: number;
-}
-
-interface AccessCode {
-  id: string;
-  code: string;
-  isActive: boolean;
-  maxUses: number;
-  currentUses: number;
-  allowedModelIds: string[];
-  expiresAt?: string;
-  createdAt: string;
-}
-
-interface InviteCode {
-  id: string;
-  code: string;
-  isUsed: boolean;
-  maxUses: number;
-  currentUses: number;
-  expiresAt?: string;
-  createdAt: string;
-}
-
-interface Model {
-  id: string;
-  name: string;
-  modelId: string;
-  provider: {
-    id: string;
-    name: string;
-  };
-}
+import { useUserConfig } from '@/hooks/useUserConfig';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -115,211 +73,52 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function UserConfig() {
-  const { user, chatConfig, authenticatedFetch } = useAuth();
-  const toast = useToast();
+  const {
+    user,
+    tokenStats,
+    accessCodes,
+    inviteCodes,
+    availableModels,
+    recentModels,
+    selectedDefaultModel,
+    createAccessCode,
+    createInviteCode,
+    deleteInviteCode,
+    deleteAccessCode,
+    setDefaultModel,
+    clearRecentModels,
+    copyToClipboard,
+  } = useUserConfig();
+
+  const { mode } = useTheme();
+
+  // UI State
   const [tabValue, setTabValue] = useState(0);
-  const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
-  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
-  const [availableModels, setAvailableModels] = useState<Model[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-  const [activeModels, setActiveModels] = useState<any[]>([]);
-  const [recentModels, setRecentModels] = useState<string[]>([]);
-  const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>('');
-  const { mode } = useTheme();
-  // 邀请码删除相关状态
   const [showDeleteInviteDialog, setShowDeleteInviteDialog] = useState(false);
   const [deletingInvite, setDeletingInvite] = useState<{ id: string; code: string } | null>(null);
 
-  // 加载用户仪表板
-  const loadDashboard = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      const response = await authenticatedFetch('/api/user/dashboard');
-      if (response.ok) {
-        const data = await response.json();
-        setTokenStats(data.tokenStats);
-        setAccessCodes(data.accessCodes);
-        setInviteCodes(data.inviteCodes);
-        setAvailableModels(data.allowedModels);
-        
-        // 设置当前默认模型
-        if (data.userSettings?.defaultModelId) {
-          setSelectedDefaultModel(data.userSettings.defaultModelId);
-        }
-        
-        // 加载历史使用的模型列表
-        const lastUsedModelId = localStorage.getItem('fimai-last-used-model');
-        if (lastUsedModelId) {
-          setRecentModels(prev => {
-            const newModels = [lastUsedModelId];
-            return [...new Set([...newModels, ...prev])].slice(0, 5);
-          });
-        }
-      } else {
-        toast.error('加载用户数据失败');
-      }
-    } catch (error) {
-      toast.error('加载用户数据失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 创建访问码
-  const createAccessCode = async (selectedModelIds: string[]) => {
-    if (!user) return;
-    
-    try {
-      const response = await authenticatedFetch('/api/user/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'access',
-          allowedModelIds: selectedModelIds,
-          maxUses: 10, // 默认10次使用
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('访问码创建成功');
-        loadDashboard();
-        setCreateDialogOpen(false);
-      } else {
-        toast.error('创建访问码失败');
-      }
-    } catch (error) {
-      toast.error('创建访问码失败');
-    }
-  };
-
-  // 创建邀请码
-  const createInviteCode = async () => {
-    if (!user) return;
-
-    try {
-      const response = await authenticatedFetch('/api/user/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'invite',
-          maxUses: 1,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('邀请码创建成功');
-        loadDashboard();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || '创建邀请码失败';
-        toast.error(errorMessage);
-      }
-    } catch (error) {
-      toast.error('创建邀请码失败');
-    }
-  };
-
-  // 打开删除邀请码对话框
+  // Handlers
   const openDeleteInviteDialog = (codeId: string, code: string) => {
     setDeletingInvite({ id: codeId, code });
     setShowDeleteInviteDialog(true);
   };
 
-  // 删除邀请码
-  const deleteInviteCode = async (codeId: string) => {
-    if (!user) return;
-    
-    try {
-      const response = await authenticatedFetch('/api/user/codes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          codeId,
-          type: 'invite',
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('邀请码已删除');
-        loadDashboard();
-        setShowDeleteInviteDialog(false);
-      } else {
-        toast.error('删除邀请码失败');
-      }
-    } catch (error) {
-      toast.error('删除邀请码失败');
+  const handleDeleteInviteCode = async () => {
+    if (deletingInvite) {
+      await deleteInviteCode(deletingInvite.id);
+      setShowDeleteInviteDialog(false);
     }
   };
 
-  // 删除访问码
-  const deleteAccessCode = async (codeId: string) => {
-    if (!user) return;
-    
-    try {
-      const response = await authenticatedFetch('/api/user/codes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          codeId,
-          type: 'access',
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('访问码已删除');
-        loadDashboard();
-      } else {
-        toast.error('删除访问码失败');
-      }
-    } catch (error) {
-      toast.error('删除访问码失败');
+  const handleCreateAccessCode = async () => {
+    const success = await createAccessCode(selectedModelIds);
+    if (success) {
+      setCreateDialogOpen(false);
+      setSelectedModelIds([]);
     }
   };
-
-  // 复制代码到剪贴板
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('已复制到剪贴板');
-  };
-
-  // 设置默认模型
-  const setDefaultModel = async (modelId: string) => {
-    if (!user) return;
-
-    try {
-      const response = await authenticatedFetch('/api/user/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          defaultModelId: modelId
-        }),
-      });
-
-      if (response.ok) {
-        setSelectedDefaultModel(modelId);
-        toast.success('默认模型已设置');
-      } else {
-        toast.error('设置默认模型失败');
-      }
-    } catch (error) {
-      toast.error('设置默认模型失败');
-    }
-  };
-
-  const clearLastUsedModel = () => {
-    localStorage.removeItem('fimai-last-used-model');
-    setRecentModels([]);
-    toast.success('已清除最近使用的模型记录');
-  };
-
-  useEffect(() => {
-    loadDashboard();
-  }, [user]);
 
   if (!user || user.role === 'GUEST') {
     return (
@@ -338,8 +137,8 @@ export default function UserConfig() {
     <Paper elevation={2} sx={{ p: 0, borderRadius: 2, overflow: 'hidden' }}>
       {/* 标签页导航 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs 
-          value={tabValue} 
+        <Tabs
+          value={tabValue}
           onChange={(_, newValue) => setTabValue(newValue)}
           variant="fullWidth"
         >
@@ -356,28 +155,28 @@ export default function UserConfig() {
           <Typography variant="h6" gutterBottom>
             使用统计
           </Typography>
-          
+
           {/* 用户信息卡片 */}
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 3, 
-              mb: 3, 
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 3,
               bgcolor: mode === 'light' ? 'primary.50' : 'primary.900',
               borderRadius: 2
             }}
           >
-            <Typography 
-              variant="subtitle1" 
-              sx={{ 
-                mb: 2, 
+            <Typography
+              variant="subtitle1"
+              sx={{
+                mb: 2,
                 color: mode === 'light' ? 'primary.900' : 'primary.100',
                 fontWeight: 500
               }}
             >
               账户信息
             </Typography>
-            
+
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <Typography variant="body2" color="text.secondary">用户名：</Typography>
@@ -391,8 +190,6 @@ export default function UserConfig() {
               </Grid>
             </Grid>
           </Paper>
-          
-
 
           {/* Token统计卡片 */}
           {tokenStats ? (
@@ -481,8 +278,8 @@ export default function UserConfig() {
             <Typography variant="h6">
               访问码管理
             </Typography>
-            <Button 
-              variant="contained" 
+            <Button
+              variant="contained"
               startIcon={<AddIcon />}
               onClick={() => setCreateDialogOpen(true)}
             >
@@ -503,8 +300,8 @@ export default function UserConfig() {
                             <Typography variant="body1" sx={{ mr: 1 }}>
                               {code.code}
                             </Typography>
-                            <IconButton 
-                              size="small" 
+                            <IconButton
+                              size="small"
                               onClick={() => copyToClipboard(code.code)}
                             >
                               <CopyIcon fontSize="small" />
@@ -519,11 +316,11 @@ export default function UserConfig() {
                             <Box sx={{ mt: 1 }}>
                               {code.allowedModelIds?.length > 0 ? (
                                 <Stack direction="row" spacing={1} flexWrap="wrap">
-                                  {Array.isArray(code.allowedModelIds) 
+                                  {Array.isArray(code.allowedModelIds)
                                     ? code.allowedModelIds.map(modelId => {
                                         const model = availableModels.find(m => m.id === modelId);
                                         return (
-                                          <Chip 
+                                          <Chip
                                             key={modelId}
                                             label={model?.name || modelId}
                                             size="small"
@@ -531,10 +328,10 @@ export default function UserConfig() {
                                           />
                                         );
                                       })
-                                    : code.allowedModelIds.split(',').map(modelId => {
+                                    : (code.allowedModelIds as unknown as string).split(',').map(modelId => {
                                         const model = availableModels.find(m => m.id === modelId);
                                         return (
-                                          <Chip 
+                                          <Chip
                                             key={modelId}
                                             label={model?.name || modelId}
                                             size="small"
@@ -554,8 +351,8 @@ export default function UserConfig() {
                         }
                       />
                       <ListItemSecondaryAction>
-                        <IconButton 
-                          edge="end" 
+                        <IconButton
+                          edge="end"
                           onClick={() => deleteAccessCode(code.id)}
                           color="error"
                         >
@@ -568,9 +365,9 @@ export default function UserConfig() {
                 ))
               ) : (
                 <ListItem>
-                  <ListItemText 
-                    primary="暂无访问码" 
-                    secondary="点击右上角按钮创建新的访问码" 
+                  <ListItemText
+                    primary="暂无访问码"
+                    secondary="点击右上角按钮创建新的访问码"
                   />
                 </ListItem>
               )}
@@ -582,8 +379,8 @@ export default function UserConfig() {
             <Typography variant="h6">
               邀请码
             </Typography>
-            <Button 
-              variant="outlined" 
+            <Button
+              variant="outlined"
               startIcon={<AddIcon />}
               onClick={createInviteCode}
             >
@@ -604,18 +401,18 @@ export default function UserConfig() {
                             <Typography variant="body1" sx={{ mr: 1 }}>
                               {code.code}
                             </Typography>
-                            <IconButton 
-                              size="small" 
+                            <IconButton
+                              size="small"
                               onClick={() => copyToClipboard(code.code)}
                             >
                               <CopyIcon fontSize="small" />
                             </IconButton>
                             {code.isUsed && (
-                              <Chip 
-                                label="已使用" 
-                                color="default" 
-                                size="small" 
-                                sx={{ ml: 1 }} 
+                              <Chip
+                                label="已使用"
+                                color="default"
+                                size="small"
+                                sx={{ ml: 1 }}
                               />
                             )}
                           </Box>
@@ -627,8 +424,8 @@ export default function UserConfig() {
                         }
                       />
                       <ListItemSecondaryAction>
-                        <IconButton 
-                          edge="end" 
+                        <IconButton
+                          edge="end"
                           onClick={() => openDeleteInviteDialog(code.id, code.code)}
                           color="error"
                         >
@@ -641,9 +438,9 @@ export default function UserConfig() {
                 ))
               ) : (
                 <ListItem>
-                  <ListItemText 
-                    primary="暂无邀请码" 
-                    secondary="点击右上角按钮创建新的邀请码" 
+                  <ListItemText
+                    primary="暂无邀请码"
+                    secondary="点击右上角按钮创建新的邀请码"
                   />
                 </ListItem>
               )}
@@ -671,11 +468,11 @@ export default function UserConfig() {
                       <Typography variant="body2" color="text.secondary" gutterBottom>
                         模型ID: {model.modelId}
                       </Typography>
-                      <Chip 
-                        label={model.provider.name} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined" 
+                      <Chip
+                        label={model.provider.name}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
                       />
                     </CardContent>
                   </Card>
@@ -751,9 +548,9 @@ export default function UserConfig() {
                     );
                   })}
                 </Stack>
-                <Button 
+                <Button
                   size="small"
-                  onClick={clearLastUsedModel} 
+                  onClick={clearRecentModels}
                   sx={{ mt: 2 }}
                   startIcon={<DeleteIcon />}
                 >
@@ -798,8 +595,8 @@ export default function UserConfig() {
           <Button onClick={() => setShowDeleteInviteDialog(false)} color="primary">
             取消
           </Button>
-          <Button 
-            onClick={() => deletingInvite && deleteInviteCode(deletingInvite.id)} 
+          <Button
+            onClick={handleDeleteInviteCode}
             color="error"
             variant="contained"
           >
@@ -809,8 +606,8 @@ export default function UserConfig() {
       </Dialog>
 
       {/* 创建访问码对话框 */}
-      <Dialog 
-        open={createDialogOpen} 
+      <Dialog
+        open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -820,13 +617,13 @@ export default function UserConfig() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             选择允许访问的模型（不选择则允许所有可用模型）
           </Typography>
-          
+
           <Grid container spacing={1}>
             {availableModels.map((model) => (
               <Grid item xs={12} sm={6} key={model.id}>
                 <FormControlLabel
                   control={
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedModelIds.includes(model.id)}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -847,9 +644,9 @@ export default function UserConfig() {
           <Button onClick={() => setCreateDialogOpen(false)}>
             取消
           </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => createAccessCode(selectedModelIds)}
+          <Button
+            variant="contained"
+            onClick={handleCreateAccessCode}
           >
             创建
           </Button>

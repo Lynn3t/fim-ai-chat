@@ -9,6 +9,10 @@ export interface User {
   hostUserId?: string;
   createdAt: string;
   updatedAt?: string;
+  tokenUsage?: {
+    totalTokens: number;
+    cost: number;
+  };
 }
 
 export interface ChatConfig {
@@ -38,18 +42,38 @@ export interface TokenUsage {
   cost?: number;
 }
 
+// Token 统计类型
+export interface TokenStats {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalCost: number;
+  todayTokens: number;
+  todayCost: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
 // AI提供商和模型类型
 export interface AIProvider {
   id: string;
   name: string;
   displayName: string;
   baseUrl: string;
+  apiKey?: string;
+  icon?: string;
+  description?: string;
   isEnabled: boolean;
   order: number;
-  models: AIModel[];
+  sortOrder?: number;
+  models?: AIModel[];
+  config?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
+
+// 别名，用于组件兼容
+export type Provider = AIProvider;
 
 export interface AIModel {
   id: string;
@@ -58,15 +82,35 @@ export interface AIModel {
   name: string;
   description?: string;
   isEnabled: boolean;
-  order: number;
+  isCustom?: boolean;
+  order?: number;
   group?: string;
   maxTokens?: number;
+  contextWindow?: number;
+  inputPrice?: number;
+  outputPrice?: number;
   temperature?: number;
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
-  createdAt: string;
-  updatedAt: string;
+  providerName?: string;
+  _isTemporary?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 别名，用于组件兼容
+export type Model = AIModel;
+
+// 用户可用模型（简化版本）
+export interface UserModel {
+  id: string;
+  name: string;
+  modelId: string;
+  provider: {
+    id: string;
+    name: string;
+  };
 }
 
 // 聊天历史类型
@@ -97,11 +141,19 @@ export interface InviteCode {
   code: string;
   createdBy: string;
   isActive: boolean;
-  maxUses?: number;
-  usedCount: number;
+  isUsed: boolean;
+  maxUses: number;
+  currentUses: number;
+  usedCount?: number;
+  usedBy?: string;
+  usedAt?: string;
   expiresAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  creator?: {
+    id: string;
+    username: string;
+  };
 }
 
 export interface AccessCode {
@@ -109,13 +161,50 @@ export interface AccessCode {
   code: string;
   createdBy: string;
   isActive: boolean;
-  maxUses?: number;
-  usedCount: number;
+  maxUses: number;
+  currentUses: number;
+  usedCount?: number;
   expiresAt?: string;
-  allowedModelIds?: string;
+  allowedModelIds: string[] | string;
   tokenLimit?: number;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+}
+
+// 系统设置类型
+export interface SystemSettings {
+  systemNameSuffix?: string;
+  systemDescription?: string;
+  allowRegistration?: boolean;
+  requireInviteCode?: boolean;
+  sessionTimeout?: number;
+  maxConcurrentRequests?: number;
+  enableRateLimit?: boolean;
+  title_generation_model_id?: string;
+  system_default_model_id?: string;
+  enable_last_used_model?: boolean;
+}
+
+// 系统统计类型
+export interface SystemStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalInviteCodes: number;
+  usedInviteCodes: number;
+  totalAccessCodes: number;
+  usedAccessCodes: number;
+  detailed?: {
+    userCount?: {
+      admin: number;
+      user?: number;
+      guest?: number;
+    };
+    modelUsage?: {
+      totalModels: number;
+      activeModels: number;
+      totalProviders: number;
+    };
+  };
 }
 
 // API请求和响应类型

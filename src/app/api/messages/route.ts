@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getConversationMessages, createMessage } from '@/lib/db/conversations'
 import { checkChatPermissions } from '@/lib/chat-permissions'
 import { recordTokenUsage } from '@/lib/db/token-usage'
+import { getCurrentUser } from '@/lib/auth-middleware'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
-import { getUserFromRequest } from '@/lib/api-utils';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -13,10 +14,7 @@ export async function GET(request: NextRequest) {
     const includeDeleted = searchParams.get('includeDeleted') === 'true'
 
     if (!conversationId) {
-      return NextResponse.json(
-        { error: 'conversationId is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 conversationId 参数')
     }
 
     const messages = await getConversationMessages(conversationId, {
@@ -27,23 +25,16 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(messages)
   } catch (error) {
-    console.error('Error fetching messages:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch messages' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/messages')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // 从JWT中获取用户ID
-    const userId = await getUserFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    // 从JWT中获取用户
+    const user = await getCurrentUser(request)
+    if (!user) {
+      throw AppError.unauthorized('请先登录')
     }
 
     const data = await request.json()
@@ -62,19 +53,13 @@ export async function POST(request: NextRequest) {
     } = data
 
     if (!modelId || !providerId || !role || !content) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少必要字段')
     }
 
     // 检查聊天权限
-    const permissions = await checkChatPermissions(userId, modelId)
+    const permissions = await checkChatPermissions(user.userId, modelId)
     if (!permissions.canChat) {
-      return NextResponse.json(
-        { error: permissions.error || 'No permission to chat' },
-        { status: 403 }
-      )
+      throw AppError.forbidden(permissions.error || '没有聊天权限')
     }
 
     let message = null
@@ -84,7 +69,7 @@ export async function POST(request: NextRequest) {
       try {
         message = await createMessage({
           conversationId,
-          userId,
+          userId: user.userId,
           providerId,
           modelId,
           role,
@@ -96,7 +81,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         // 如果是访客用户，createMessage会抛出错误，这是正常的
         if (error instanceof Error && error.message.includes('Guest')) {
-          console.log('Guest user message not saved to database')
+          // Guest user message not saved to database
         } else {
           throw error
         }
@@ -106,7 +91,7 @@ export async function POST(request: NextRequest) {
     // 记录token使用量（所有用户都需要记录）
     if (role === 'assistant' && (tokenUsage || inputText || outputText)) {
       await recordTokenUsage({
-        userId,
+        userId: user.userId,
         conversationId: permissions.canSaveToDatabase ? conversationId : undefined,
         messageId: message?.id,
         providerId,
@@ -123,7 +108,7 @@ export async function POST(request: NextRequest) {
     const responseMessage = message || {
       id: `temp_${Date.now()}`,
       conversationId,
-      userId,
+      userId: user.userId,
       providerId,
       modelId,
       role,
@@ -140,10 +125,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(responseMessage, { status: 201 })
 
   } catch (error) {
-    console.error('Error creating message:', error)
-    return NextResponse.json(
-      { error: 'Failed to create message' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/messages')
   }
 }

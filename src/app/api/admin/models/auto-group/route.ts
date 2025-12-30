@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
 import { getAIModelCategoryName } from '@/utils/aiModelUtils'
 
 // 自动分组接口
 async function autoGroupHandler(
   request: NextRequest,
-  userId: string
+  user: AuthUser
 ) {
   const data = await request.json()
   const { providerId, modelIds } = data
@@ -62,7 +62,7 @@ export const POST = withAdminAuth(autoGroupHandler)
 // 批量设置自定义分组
 async function setCustomGroupHandler(
   request: NextRequest,
-  userId: string
+  user: AuthUser
 ) {
   const data = await request.json()
   const { modelIds, groupName } = data
@@ -109,7 +109,7 @@ export const PATCH = withAdminAuth(setCustomGroupHandler)
 // 清除模型分组（设置为null）
 async function clearGroupsHandler(
   request: NextRequest,
-  userId: string
+  user: AuthUser
 ) {
   const data = await request.json()
   const { modelIds } = data

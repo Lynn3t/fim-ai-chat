@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 const schema = z.object({
   resetToken: z.string().min(1, '重置令牌不能为空'),
@@ -14,14 +15,11 @@ export async function POST(request: NextRequest) {
     const validation = schema.safeParse(body)
 
     if (!validation.success) {
-      return NextResponse.json({
-        success: false,
-        error: '输入验证失败: ' + validation.error.message
-      }, { status: 400 })
+      throw AppError.validation('输入验证失败', validation.error.errors)
     }
 
     const { resetToken, newPassword } = validation.data
-    
+
     // 查找具有此重置令牌的用户
     const user = await prisma.user.findFirst({
       where: {
@@ -33,10 +31,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: '无效或已过期的重置令牌'
-      }, { status: 400 })
+      throw AppError.badRequest('无效或已过期的重置令牌')
     }
 
     // 哈希新密码
@@ -56,12 +51,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: '密码已成功重置'
     })
-    
+
   } catch (error) {
-    console.error('密码重置错误:', error)
-    return NextResponse.json({
-      success: false,
-      error: '服务器错误，请稍后重试'
-    }, { status: 500 })
+    return handleApiError(error, 'POST /api/auth/reset-password')
   }
-} 
+}

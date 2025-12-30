@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  createInviteCode, 
-  getUserInviteCodes, 
-  validateInviteCode 
+import {
+  createInviteCode,
+  getUserInviteCodes,
+  validateInviteCode
 } from '@/lib/db/codes'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,16 +24,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(inviteCodes)
     }
 
-    return NextResponse.json(
-      { error: 'Missing required parameters' },
-      { status: 400 }
-    )
+    throw AppError.badRequest('缺少必要参数')
   } catch (error) {
-    console.error('Error handling invite codes:', error)
-    return NextResponse.json(
-      { error: 'Failed to handle invite codes' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/codes/invite')
   }
 }
 
@@ -42,10 +36,7 @@ export async function POST(request: NextRequest) {
     const { createdBy, expiresAt, maxUses } = data
 
     if (!createdBy) {
-      return NextResponse.json(
-        { error: 'createdBy is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 createdBy 参数')
     }
 
     const inviteCode = await createInviteCode({
@@ -56,10 +47,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(inviteCode, { status: 201 })
   } catch (error) {
-    console.error('Error creating invite code:', error)
-    return NextResponse.json(
-      { error: 'Failed to create invite code' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/codes/invite')
   }
 }

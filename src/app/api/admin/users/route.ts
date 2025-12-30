@@ -5,24 +5,25 @@ import {
   updateUserAccessCodePermission,
   updateUserPermissions
 } from '@/lib/db/admin'
-import { withAdminAuth } from '@/lib/api-utils'
-import { 
-  validatePagination, 
-  validateSchema, 
-  createUserSchema, 
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
+import { handleApiError, AppError } from '@/lib/error-handler'
+import {
+  validatePagination,
+  validateSchema,
+  createUserSchema,
   updateUserStatusSchema,
   updateAccessCodePermissionSchema,
   updateUserPermissionsSchema,
-  deleteUserSchema 
+  deleteUserSchema
 } from '@/lib/validation'
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     const { searchParams } = new URL(request.url)
     const includeStats = searchParams.get('includeStats') === 'true'
     const role = searchParams.get('role') as 'ADMIN' | 'USER' | 'GUEST' | null
     const isActive = searchParams.get('isActive')
-    
+
     // 验证分页参数
     const pagination = validatePagination(searchParams)
 
@@ -36,27 +37,17 @@ async function handleGet(request: NextRequest, userId: string) {
     return NextResponse.json(users)
 
   } catch (error) {
-    console.error('Error fetching users:', error)
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'Failed to fetch users' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/admin/users')
   }
 }
 
 // 使用withAdminAuth装饰器包装
 export const GET = withAdminAuth(handleGet);
 
-async function handlePost(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
-    
+
     // 验证输入数据
     const validatedData = validateSchema(createUserSchema, data)
     const { username, email, password, role } = validatedData
@@ -67,10 +58,7 @@ async function handlePost(request: NextRequest, userId: string) {
       where: {
         OR: [
           {
-            username: {
-              equals: username,
-              mode: 'insensitive' // 不区分大小写
-            }
+            username: username
           },
           ...(email ? [{ email }] : []),
         ],
@@ -78,10 +66,7 @@ async function handlePost(request: NextRequest, userId: string) {
     })
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: '用户名或邮箱已存在' },
-        { status: 400 }
-      )
+      throw AppError.conflict('用户名或邮箱已存在')
     }
 
     // 哈希密码
@@ -134,27 +119,17 @@ async function handlePost(request: NextRequest, userId: string) {
     )
 
   } catch (error) {
-    console.error('Error creating user:', error)
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'Failed to create user' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/admin/users')
   }
 }
 
 // 使用withAdminAuth装饰器包装
 export const POST = withAdminAuth(handlePost);
 
-async function handlePatch(request: NextRequest, adminUserId: string) {
+async function handlePatch(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
-    
+
     // 验证输入数据
     let validatedData
     switch (data.action) {
@@ -168,20 +143,14 @@ async function handlePatch(request: NextRequest, adminUserId: string) {
         validatedData = validateSchema(updateUserPermissionsSchema, data)
         break
       default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        )
+        throw AppError.badRequest('无效的操作类型')
     }
 
     const { userId, action, ...updateData } = validatedData
 
     // 防止管理员封禁自己
-    if (action === 'updateStatus' && adminUserId === userId && !updateData.isActive) {
-      return NextResponse.json(
-        { error: 'Cannot ban your own account' },
-        { status: 400 }
-      )
+    if (action === 'updateStatus' && user.userId === userId && !updateData.isActive) {
+      throw AppError.badRequest('不能封禁自己的账户')
     }
 
     let result
@@ -189,11 +158,11 @@ async function handlePatch(request: NextRequest, adminUserId: string) {
       case 'updateStatus':
         result = await updateUserStatus(userId, updateData.isActive)
         break
-      
+
       case 'updateAccessCodePermission':
         result = await updateUserAccessCodePermission(userId, updateData.canShareAccessCode)
         break
-      
+
       case 'updatePermissions':
         result = await updateUserPermissions(userId, updateData)
         break
@@ -202,37 +171,24 @@ async function handlePatch(request: NextRequest, adminUserId: string) {
     return NextResponse.json(result)
 
   } catch (error) {
-    console.error('Error updating user:', error)
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'Failed to update user' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/admin/users')
   }
 }
 
 // 使用withAdminAuth装饰器包装
 export const PATCH = withAdminAuth(handlePatch);
 
-async function handleDelete(request: NextRequest, adminUserId: string) {
+async function handleDelete(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
-    
+
     // 验证输入数据
     const validatedData = validateSchema(deleteUserSchema, data)
     const { userId } = validatedData
 
     // 防止删除自己
-    if (adminUserId === userId) {
-      return NextResponse.json(
-        { error: 'Cannot delete your own account' },
-        { status: 400 }
-      )
+    if (user.userId === userId) {
+      throw AppError.badRequest('不能删除自己的账户')
     }
 
     // 检查要删除的用户是否存在
@@ -242,10 +198,7 @@ async function handleDelete(request: NextRequest, adminUserId: string) {
     })
 
     if (!userToDelete) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('用户不存在')
     }
 
     // 删除用户（硬删除，包括相关数据）
@@ -288,21 +241,11 @@ async function handleDelete(request: NextRequest, adminUserId: string) {
 
     return NextResponse.json({
       success: true,
-      message: 'User deleted successfully'
+      message: '用户删除成功'
     })
 
   } catch (error) {
-    console.error('Error deleting user:', error)
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'Failed to delete user' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/admin/users')
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
@@ -17,7 +17,7 @@ const resetTokens = new Map<string, { timestamp: number; used: boolean }>()
 const cleanupExpiredTokens = () => {
   const now = Date.now()
   const expireTime = 5 * 60 * 1000 // 5分钟
-  
+
   for (const [token, data] of resetTokens.entries()) {
     if (now - data.timestamp > expireTime) {
       resetTokens.delete(token)
@@ -25,7 +25,7 @@ const cleanupExpiredTokens = () => {
   }
 }
 
-async function handlePost(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     
@@ -59,7 +59,7 @@ async function handlePost(request: NextRequest, userId: string) {
     const projectRoot = process.cwd()
     
     try {
-      logger.info('Starting database reset', { userId }, 'DB_RESET')
+      logger.info('Starting database reset', { userId: user.userId }, 'DB_RESET')
       
       // 执行数据库重置命令
       const { stdout: resetOutput, stderr: resetError } = await execAsync('npm run db:reset', {
@@ -88,7 +88,7 @@ async function handlePost(request: NextRequest, userId: string) {
       // 清理已使用的令牌
       resetTokens.delete(resetToken)
 
-      logger.info('Database reset and seed completed successfully', { userId }, 'DB_RESET')
+      logger.info('Database reset and seed completed successfully', { userId: user.userId }, 'DB_RESET')
 
       return NextResponse.json({
         success: true,
@@ -126,7 +126,7 @@ async function handlePost(request: NextRequest, userId: string) {
   }
 }
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     // 生成新的重置令牌
     const resetToken = generateResetToken()

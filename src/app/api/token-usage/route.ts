@@ -4,9 +4,10 @@ import {
   getUserTokenStats,
   getUserTokenHistory
 } from '@/lib/db/token-usage'
-import { withAuth } from '@/lib/api-utils'
+import { requireUser, type AuthUser } from '@/lib/auth-middleware'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
-async function _GET(request: NextRequest, userId: string) {
+async function _GET(request: NextRequest, user: AuthUser) {
   try {
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
@@ -17,7 +18,7 @@ async function _GET(request: NextRequest, userId: string) {
 
     if (action === 'history') {
       // 获取详细使用记录
-      const history = await getUserTokenHistory(userId, {
+      const history = await getUserTokenHistory(user.userId, {
         limit,
         offset,
         startDate: startDate ? new Date(startDate) : undefined,
@@ -27,7 +28,7 @@ async function _GET(request: NextRequest, userId: string) {
     } else {
       // 获取统计数据
       const stats = await getUserTokenStats(
-        userId,
+        user.userId,
         startDate ? new Date(startDate) : undefined,
         endDate ? new Date(endDate) : undefined
       )
@@ -35,18 +36,14 @@ async function _GET(request: NextRequest, userId: string) {
     }
 
   } catch (error) {
-    console.error('Error fetching token usage:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch token usage' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/token-usage')
   }
 }
 
-// 使用withAuth装饰器包装
-export const GET = withAuth(_GET);
+// 使用requireUser装饰器包装
+export const GET = requireUser(_GET)
 
-async function _POST(request: NextRequest, userId: string) {
+async function _POST(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const {
@@ -62,14 +59,11 @@ async function _POST(request: NextRequest, userId: string) {
     } = data
 
     if (!providerId || !modelId) {
-      return NextResponse.json(
-        { error: 'providerId, and modelId are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 providerId 或 modelId 参数')
     }
 
     const tokenUsage = await recordTokenUsage({
-      userId,
+      userId: user.userId,
       conversationId,
       messageId,
       providerId,
@@ -84,13 +78,9 @@ async function _POST(request: NextRequest, userId: string) {
     return NextResponse.json(tokenUsage, { status: 201 })
 
   } catch (error) {
-    console.error('Error recording token usage:', error)
-    return NextResponse.json(
-      { error: 'Failed to record token usage' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/token-usage')
   }
 }
 
-// 使用withAuth装饰器包装
-export const POST = withAuth(_POST);
+// 使用requireUser装饰器包装
+export const POST = requireUser(_POST)

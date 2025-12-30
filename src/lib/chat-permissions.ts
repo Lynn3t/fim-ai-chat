@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getUserAllowedModels } from '@/lib/auth'
-import type { UserRole } from '@prisma/client'
+import type { UserRole } from '@/types/user-role'
 import { updateUserTokenUsage, checkAndResetLimits } from '@/lib/db/token-usage'
 import logger from '@/lib/logger'
 

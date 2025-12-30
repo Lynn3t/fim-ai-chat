@@ -1,37 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loginUser, generateToken } from '@/lib/auth'
+import { handleApiError, AppError } from '@/lib/error-handler'
+import { validateRequest, loginSchema } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
-    const { username, password } = data
-
-    if (!username) {
-      return NextResponse.json(
-        { error: 'Username is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!password) {
-      return NextResponse.json(
-        { error: 'Password is required' },
-        { status: 400 }
-      )
-    }
+    // 验证输入
+    const { username, password } = await validateRequest(request, loginSchema)
 
     const result = await loginUser(username, password)
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 401 }
-      )
+      throw AppError.unauthorized(result.error || '用户名或密码错误')
     }
 
     // 生成JWT令牌
     const token = generateToken(result.user!.id);
-    
+
     return NextResponse.json({
       success: true,
       token,
@@ -46,10 +31,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Login error:', error)
-    return NextResponse.json(
-      { error: 'Login failed' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/auth/login')
   }
 }

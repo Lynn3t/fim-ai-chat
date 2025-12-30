@@ -9,6 +9,7 @@ import {
 } from '@/lib/db/codes'
 import { checkUserPermission } from '@/lib/auth'
 import { getSystemSetting } from '@/lib/db/system-settings'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,20 +17,14 @@ export async function POST(request: NextRequest) {
     const { userId, type, ...codeData } = data
 
     if (!userId || !type) {
-      return NextResponse.json(
-        { error: 'userId and type are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('userId 和 type 不能为空')
     }
 
     if (type === 'invite') {
       // 检查创建邀请码权限
       const hasPermission = await checkUserPermission(userId, 'create_invite')
       if (!hasPermission) {
-        return NextResponse.json(
-          { error: 'No permission to create invite codes' },
-          { status: 403 }
-        )
+        throw AppError.forbidden('没有创建邀请码的权限')
       }
 
       // 检查用户已创建的邀请码数量限制
@@ -37,10 +32,7 @@ export async function POST(request: NextRequest) {
       const existingInviteCodes = await getUserInviteCodes(userId)
 
       if (existingInviteCodes.length >= maxInviteCodes) {
-        return NextResponse.json(
-          { error: `最多只能创建 ${maxInviteCodes} 个邀请码` },
-          { status: 400 }
-        )
+        throw AppError.badRequest(`最多只能创建 ${maxInviteCodes} 个邀请码`)
       }
 
       const inviteCode = await createInviteCode({
@@ -55,10 +47,7 @@ export async function POST(request: NextRequest) {
       // 检查创建访问码权限
       const hasPermission = await checkUserPermission(userId, 'create_access')
       if (!hasPermission) {
-        return NextResponse.json(
-          { error: 'No permission to create access codes' },
-          { status: 403 }
-        )
+        throw AppError.forbidden('没有创建访问码的权限')
       }
 
       // 检查用户已创建的访问码数量限制
@@ -66,10 +55,7 @@ export async function POST(request: NextRequest) {
       const existingAccessCodes = await getUserAccessCodes(userId)
 
       if (existingAccessCodes.length >= maxAccessCodes) {
-        return NextResponse.json(
-          { error: `最多只能创建 ${maxAccessCodes} 个访问码` },
-          { status: 400 }
-        )
+        throw AppError.badRequest(`最多只能创建 ${maxAccessCodes} 个访问码`)
       }
 
       // 检查访问码最大用户数量限制
@@ -77,10 +63,7 @@ export async function POST(request: NextRequest) {
       const requestedMaxUses = codeData.maxUses || maxUsers
 
       if (requestedMaxUses > maxUsers) {
-        return NextResponse.json(
-          { error: `访问码最大用户数量不能超过 ${maxUsers}` },
-          { status: 400 }
-        )
+        throw AppError.badRequest(`访问码最大用户数量不能超过 ${maxUsers}`)
       }
 
       const accessCode = await createAccessCode({
@@ -93,18 +76,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(accessCode, { status: 201 })
 
     } else {
-      return NextResponse.json(
-        { error: 'Invalid code type. Use "invite" or "access"' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('无效的 type，请使用 "invite" 或 "access"')
     }
 
   } catch (error) {
-    console.error('Error creating code:', error)
-    return NextResponse.json(
-      { error: 'Failed to create code' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/user/codes')
   }
 }
 
@@ -114,10 +90,7 @@ export async function DELETE(request: NextRequest) {
     const { userId, codeId, type } = data
 
     if (!userId || !codeId || !type) {
-      return NextResponse.json(
-        { error: 'userId, codeId, and type are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('userId, codeId 和 type 不能为空')
     }
 
     if (type === 'invite') {
@@ -125,19 +98,12 @@ export async function DELETE(request: NextRequest) {
     } else if (type === 'access') {
       await deleteAccessCode(codeId, userId)
     } else {
-      return NextResponse.json(
-        { error: 'Invalid code type. Use "invite" or "access"' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('无效的 type，请使用 "invite" 或 "access"')
     }
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Error deleting code:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete code' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/user/codes')
   }
 }

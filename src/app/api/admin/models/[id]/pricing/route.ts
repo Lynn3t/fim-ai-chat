@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
 
 async function getModelPricingHandler(
   request: NextRequest,
-  userId: string,
+  user: AuthUser,
   { params }: { params: { id: string } }
 ) {
   const { id: modelId } = await params
@@ -50,7 +50,7 @@ export const GET = withAdminAuth(getModelPricingHandler)
 
 async function updateModelPricingHandler(
   request: NextRequest,
-  userId: string,
+  user: AuthUser,
   { params }: { params: { id: string } }
 ) {
   const { pricingType, inputPrice, outputPrice, usagePrice } = await request.json()

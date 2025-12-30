@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSystemStats } from '@/lib/db/admin'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
+import { handleApiError } from '@/lib/error-handler'
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     const systemStats = await getSystemStats()
 
@@ -21,11 +22,7 @@ async function handleGet(request: NextRequest, userId: string) {
     return NextResponse.json(stats)
 
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch dashboard statistics' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/admin/dashboard')
   }
 }
 

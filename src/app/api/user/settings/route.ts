@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/api-utils'
+import { getCurrentUser } from '@/lib/auth-middleware'
 import { getUserSettings, upsertUserSettings, updateUserDefaultModel } from '@/lib/db/users'
 import { prisma } from '@/lib/prisma'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 // 获取用户设置
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserFromRequest(request)
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const user = await getCurrentUser(request)
+
+    if (!user) {
+      throw AppError.unauthorized('请先登录')
     }
 
-    const settings = await getUserSettings(userId)
-    
+    const settings = await getUserSettings(user.userId)
+
     return NextResponse.json(settings || {
       defaultModelId: null,
       theme: 'light',
@@ -27,24 +25,17 @@ export async function GET(request: NextRequest) {
       messagePageSize: 50,
     })
   } catch (error) {
-    console.error('Error fetching user settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch user settings' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/user/settings')
   }
 }
 
 // 更新用户设置
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = await getUserFromRequest(request)
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const user = await getCurrentUser(request)
+
+    if (!user) {
+      throw AppError.unauthorized('请先登录')
     }
 
     const data = await request.json()
@@ -58,7 +49,7 @@ export async function PATCH(request: NextRequest) {
       messagePageSize,
     } = data
 
-    const settings = await upsertUserSettings(userId, {
+    const settings = await upsertUserSettings(user.userId, {
       defaultModelId,
       theme,
       language,
@@ -73,33 +64,23 @@ export async function PATCH(request: NextRequest) {
       settings,
     })
   } catch (error) {
-    console.error('Error updating user settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to update user settings' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/user/settings')
   }
 }
 
 // 更新默认模型（快捷接口）
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserFromRequest(request)
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const user = await getCurrentUser(request)
+
+    if (!user) {
+      throw AppError.unauthorized('请先登录')
     }
 
     const { defaultModelId } = await request.json()
-    
+
     if (!defaultModelId) {
-      return NextResponse.json(
-        { error: 'defaultModelId is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('defaultModelId 不能为空')
     }
 
     // 检查模型是否存在且用户有权限使用
@@ -108,24 +89,17 @@ export async function POST(request: NextRequest) {
     });
 
     if (!model) {
-      return NextResponse.json(
-        { error: 'Model not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('模型不存在')
     }
 
     // 更新用户默认模型设置
-    const settings = await updateUserDefaultModel(userId, defaultModelId)
+    const settings = await updateUserDefaultModel(user.userId, defaultModelId)
 
     return NextResponse.json({
       success: true,
       settings,
     })
   } catch (error) {
-    console.error('Error updating default model:', error)
-    return NextResponse.json(
-      { error: 'Failed to update default model' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/user/settings')
   }
 }

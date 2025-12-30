@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  createAccessCode, 
-  getUserAccessCodes, 
+import {
+  createAccessCode,
+  getUserAccessCodes,
   validateAccessCode,
   disableAccessCode,
   enableAccessCode
 } from '@/lib/db/codes'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,16 +26,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(accessCodes)
     }
 
-    return NextResponse.json(
-      { error: 'Missing required parameters' },
-      { status: 400 }
-    )
+    throw AppError.badRequest('缺少必要参数')
   } catch (error) {
-    console.error('Error handling access codes:', error)
-    return NextResponse.json(
-      { error: 'Failed to handle access codes' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/codes/access')
   }
 }
 
@@ -44,10 +38,7 @@ export async function POST(request: NextRequest) {
     const { createdBy, allowedModelIds, expiresAt, maxUses } = data
 
     if (!createdBy) {
-      return NextResponse.json(
-        { error: 'createdBy is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 createdBy 参数')
     }
 
     const accessCode = await createAccessCode({
@@ -59,11 +50,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(accessCode, { status: 201 })
   } catch (error) {
-    console.error('Error creating access code:', error)
-    return NextResponse.json(
-      { error: 'Failed to create access code' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/codes/access')
   }
 }
 
@@ -73,10 +60,7 @@ export async function PATCH(request: NextRequest) {
     const { codeId, userId, action } = data
 
     if (!codeId || !userId || !action) {
-      return NextResponse.json(
-        { error: 'codeId, userId, and action are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 codeId, userId 或 action 参数')
     }
 
     let result
@@ -85,18 +69,11 @@ export async function PATCH(request: NextRequest) {
     } else if (action === 'enable') {
       result = await enableAccessCode(codeId, userId)
     } else {
-      return NextResponse.json(
-        { error: 'Invalid action. Use "enable" or "disable"' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('无效的操作，请使用 "enable" 或 "disable"')
     }
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Error updating access code:', error)
-    return NextResponse.json(
-      { error: 'Failed to update access code' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/codes/access')
   }
 }

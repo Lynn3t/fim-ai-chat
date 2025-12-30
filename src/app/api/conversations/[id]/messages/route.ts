@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getConversationMessages } from '@/lib/db/conversations'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import logger from '@/lib/logger'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function GET(
   request: NextRequest,
@@ -18,19 +18,13 @@ export async function GET(
     // 验证用户身份
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('请先登录')
     }
 
     const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('登录已过期')
     }
 
     // 验证用户是否有权限访问此对话
@@ -40,17 +34,11 @@ export async function GET(
     })
 
     if (!conversation) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('对话不存在')
     }
 
     if (conversation.userId !== decoded.userId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
+      throw AppError.forbidden('无权访问此对话')
     }
 
     const messages = await getConversationMessages(id, {
@@ -61,10 +49,6 @@ export async function GET(
 
     return NextResponse.json(messages)
   } catch (error) {
-    logger.error('Error fetching conversation messages', error, 'API')
-    return NextResponse.json(
-      { error: 'Failed to fetch conversation messages' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/conversations/[id]/messages')
   }
-} 
+}

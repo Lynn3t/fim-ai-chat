@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProviders, createProvider } from '@/lib/db/providers'
-import { withAuth, sanitizeProviders, createApiResponse, createErrorResponse } from '@/lib/api-utils'
+import { requireUser, type AuthUser } from '@/lib/auth-middleware'
+import { sanitizeProviders, createApiResponse } from '@/lib/api-utils'
+import { handleApiError } from '@/lib/error-handler'
 
-export const GET = withAuth(async (request: NextRequest, userId: string) => {
-  const { searchParams } = new URL(request.url)
-  const includeDisabled = searchParams.get('includeDisabled') === 'true'
+export const GET = requireUser(async (request: NextRequest, user: AuthUser) => {
+  try {
+    const { searchParams } = new URL(request.url)
+    const includeDisabled = searchParams.get('includeDisabled') === 'true'
 
-  const providers = await getProviders(true, !includeDisabled)
+    const providers = await getProviders(true, !includeDisabled)
 
-  // 过滤敏感信息（API密钥等）
-  const sanitizedProviders = sanitizeProviders(providers)
+    // 过滤敏感信息（API密钥等）
+    const sanitizedProviders = sanitizeProviders(providers)
 
-  return createApiResponse(sanitizedProviders)
+    return createApiResponse(sanitizedProviders)
+  } catch (error) {
+    return handleApiError(error, 'GET /api/providers')
+  }
 })
 
 export async function POST(request: NextRequest) {
@@ -20,10 +26,6 @@ export async function POST(request: NextRequest) {
     const provider = await createProvider(data)
     return NextResponse.json(provider, { status: 201 })
   } catch (error) {
-    console.error('Error creating provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to create provider' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/providers')
   }
 }

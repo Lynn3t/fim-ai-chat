@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { registerUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { handleApiError, AppError } from '@/lib/error-handler'
+import { validateRequest, registerSchema } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
+    // 验证输入
+    const data = await validateRequest(request, registerSchema)
     const { email, username, password, inviteCode, accessCode } = data
-
-    if (!username) {
-      return NextResponse.json(
-        { error: 'Username is required' },
-        { status: 400 }
-      )
-    }
 
     // 检查是否已有管理员用户
     const adminCount = await prisma.user.count({
@@ -23,34 +19,25 @@ export async function POST(request: NextRequest) {
     const isFirstAdmin = adminCount === 0
 
     if (!isFirstAdmin && !inviteCode && !accessCode) {
-      return NextResponse.json(
-        { error: 'Either invite code or access code is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('需要提供邀请码或访问码')
     }
 
     // 如果使用邀请码注册（管理员或用户），密码是必需的
     if ((inviteCode || isFirstAdmin) && !password) {
-      return NextResponse.json(
-        { error: 'Password is required for registration' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('密码不能为空')
     }
 
     const result = await registerUser({
-      email,
+      email: email ?? undefined,
       username,
-      password,
-      inviteCode,
-      accessCode,
-      isFirstAdmin, // 传递参数给注册函数
+      password: password ?? undefined,
+      inviteCode: inviteCode ?? undefined,
+      accessCode: accessCode ?? undefined,
+      isFirstAdmin,
     })
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
-      )
+      throw AppError.badRequest(result.error || '注册失败')
     }
 
     return NextResponse.json({
@@ -64,10 +51,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('Registration error:', error)
-    return NextResponse.json(
-      { error: 'Registration failed' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/auth/register')
   }
 }

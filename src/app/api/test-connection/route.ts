@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError, AppError } from '@/lib/error-handler';
 
 interface ConfigData {
   openaiApiKey: string;
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     const config: ConfigData = await request.json();
 
     if (!config.openaiApiKey) {
-      return NextResponse.json({ error: 'API Key is required' }, { status: 400 });
+      throw AppError.badRequest('API Key is required');
     }
 
     // 构建请求URL
@@ -27,15 +28,11 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('OpenAI API Test Error:', errorData);
-      return NextResponse.json(
-        { error: 'API connection test failed', details: errorData },
-        { status: response.status }
-      );
+      throw AppError.externalApi(`API connection test failed: ${errorData}`);
     }
 
     const data = await response.json();
-    
+
     // 检查指定的模型是否可用
     const availableModels = data.data?.map((model: { id: string }) => model.id) || [];
     const modelAvailable = availableModels.includes(config.model);
@@ -48,10 +45,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Test Connection Error:', error);
-    return NextResponse.json(
-      { error: 'Connection test failed', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'POST /api/test-connection');
   }
 }

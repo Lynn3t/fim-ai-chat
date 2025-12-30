@@ -6,6 +6,7 @@ import {
 } from '@/lib/db/conversations'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function GET(
   request: NextRequest,
@@ -14,25 +15,19 @@ export async function GET(
   try {
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+      throw AppError.badRequest('缺少对话 ID')
     }
 
     // 验证用户身份
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('请先登录')
     }
 
     const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('登录已过期')
     }
 
     // 验证用户是否有权限访问此对话
@@ -42,24 +37,17 @@ export async function GET(
     })
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+      throw AppError.notFound('对话不存在')
     }
 
     if (conversation.userId !== decoded.userId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
+      throw AppError.forbidden('无权访问此对话')
     }
 
     const conversationDetails = await getConversationById(id)
     return NextResponse.json(conversationDetails)
   } catch (error) {
-    console.error('Error fetching conversation:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch conversation' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/conversations/[id]')
   }
 }
 
@@ -70,25 +58,19 @@ export async function PATCH(
   try {
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+      throw AppError.badRequest('缺少对话 ID')
     }
 
     // 验证用户身份
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('请先登录')
     }
 
     const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('登录已过期')
     }
 
     // 验证用户是否有权限修改此对话
@@ -98,14 +80,11 @@ export async function PATCH(
     })
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+      throw AppError.notFound('对话不存在')
     }
 
     if (conversation.userId !== decoded.userId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
+      throw AppError.forbidden('无权修改此对话')
     }
 
     const data = await request.json()
@@ -119,11 +98,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedConversation)
   } catch (error) {
-    console.error('Error updating conversation:', error)
-    return NextResponse.json(
-      { error: 'Failed to update conversation' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/conversations/[id]')
   }
 }
 
@@ -134,25 +109,19 @@ export async function DELETE(
   try {
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+      throw AppError.badRequest('缺少对话 ID')
     }
 
     // 验证用户身份
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('请先登录')
     }
 
     const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      )
+      throw AppError.unauthorized('登录已过期')
     }
 
     // 验证用户是否有权限删除此对话
@@ -162,23 +131,16 @@ export async function DELETE(
     })
 
     if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+      throw AppError.notFound('对话不存在')
     }
 
     if (conversation.userId !== decoded.userId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      )
+      throw AppError.forbidden('无权删除此对话')
     }
 
     const deletedConversation = await deleteConversation(id)
     return NextResponse.json(deletedConversation)
   } catch (error) {
-    console.error('Error deleting conversation:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete conversation' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/conversations/[id]')
   }
 }

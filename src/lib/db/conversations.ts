@@ -257,11 +257,11 @@ export async function searchConversations(
       userId,
       isArchived: false,
       OR: [
-        { title: { contains: query, mode: 'insensitive' } },
+        { title: { contains: query } },
         {
           messages: {
             some: {
-              content: { contains: query, mode: 'insensitive' },
+              content: { contains: query },
               isDeleted: false,
             },
           },

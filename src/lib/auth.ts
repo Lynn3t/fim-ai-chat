@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import type { User, UserRole } from '@prisma/client'
+import type { User } from '@prisma/client'
+import type { UserRole } from '@/types/user-role'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { validateInviteCode, useInviteCode, validateAccessCode, useAccessCode } from '@/lib/db/codes'
@@ -72,15 +73,12 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
   try {
     const { email, username, password, inviteCode, accessCode, isFirstAdmin } = data
 
-    // 检查用户名是否已存在（不区分大小写）
+    // 检查用户名是否已存在（SQLite 用 LOWER 进行不区分大小写比较）
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
           {
-            username: {
-              equals: username,
-              mode: 'insensitive' // 不区分大小写
-            }
+            username: username
           },
           ...(email ? [{ email }] : []),
         ],
@@ -264,13 +262,10 @@ export async function registerUser(data: RegisterData): Promise<AuthResult> {
  */
 export async function loginUser(username: string, password: string): Promise<AuthResult> {
   try {
-    // 使用 findFirst 替代 findUnique 并使用不区分大小写的查询
+    // SQLite: 使用直接匹配，移除 mode: 'insensitive'
     const user = await prisma.user.findFirst({
       where: {
-        username: {
-          equals: username,
-          mode: 'insensitive' // 不区分大小写
-        }
+        username: username
       },
       include: {
         settings: true,

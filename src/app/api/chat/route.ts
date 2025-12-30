@@ -3,7 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { checkChatPermissions } from '@/lib/chat-permissions';
 import { estimateTokens, extractTokenUsage } from '@/lib/token-counter';
 import { recordTokenUsage } from '@/lib/db/token-usage';
-import { getUserFromRequest } from '@/lib/api-utils';
+import { getCurrentUser } from '@/lib/auth-middleware';
+import { handleApiError, AppError } from '@/lib/error-handler';
+import logger from '@/lib/logger';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -23,13 +25,10 @@ interface ChatRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    // 从请求中获取用户ID
-    const userId = await getUserFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    // 从请求中获取用户
+    const user = await getCurrentUser(request);
+    if (!user) {
+      throw AppError.unauthorized('请先登录');
     }
 
     const {
@@ -44,18 +43,13 @@ export async function POST(request: NextRequest) {
     }: ChatRequest = await request.json();
 
     if (!messages || messages.length === 0 || !modelId) {
-      return NextResponse.json({
-        error: 'Missing or empty required fields: messages, modelId'
-      }, { status: 400 });
+      throw AppError.badRequest('缺少必需字段: messages, modelId');
     }
 
     // 检查用户聊天权限
-    const permissions = await checkChatPermissions(userId, modelId);
+    const permissions = await checkChatPermissions(user.userId, modelId);
     if (!permissions.canChat) {
-      return NextResponse.json(
-        { error: permissions.error || 'No permission to chat' },
-        { status: 403 }
-      );
+      throw AppError.forbidden(permissions.error || '无权使用此模型');
     }
 
     // 根据模型ID获取提供商配置
@@ -75,23 +69,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!model || !model.provider) {
-      return NextResponse.json(
-        { error: 'Model or provider not found' },
-        { status: 404 }
-      );
+      throw AppError.notFound('模型或提供商不存在');
     }
 
     if (!model.isEnabled || !model.provider.isEnabled) {
-      return NextResponse.json(
-        { error: 'Model or provider is disabled' },
-        { status: 403 }
-      );
+      throw AppError.forbidden('模型或提供商已禁用');
     }
 
     if (!model.provider.apiKey || !model.provider.baseUrl) {
-      return NextResponse.json({
-        error: 'Provider configuration incomplete'
-      }, { status: 500 });
+      throw AppError.internal('提供商配置不完整');
     }
 
     // 在发送请求前计算输入的token数量（用于备份和比较）
@@ -123,11 +109,8 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('AI API Error:', errorData);
-      return NextResponse.json(
-        { error: 'AI API request failed', details: errorData },
-        { status: response.status }
-      );
+      logger.error('AI API Error', { status: response.status, error: errorData }, 'CHAT');
+      throw AppError.externalApi('AI API 请求失败');
     }
 
     // If client requested no streaming, return full JSON
@@ -236,7 +219,7 @@ export async function POST(request: NextRequest) {
           if (tokenUsage) {
             try {
               await recordTokenUsage({
-                userId,
+                userId: user.userId,
                 providerId: model.provider.id,
                 modelId: model.id,
                 promptTokens: tokenUsage.prompt_tokens,
@@ -250,7 +233,7 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (error) {
-          console.error('Stream processing error:', error);
+          logger.error('Stream processing error', error, 'CHAT');
         } finally {
           controller.close();
         }
@@ -266,10 +249,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Chat API Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'POST /api/chat');
   }
 }

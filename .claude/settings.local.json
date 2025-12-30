@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(copy /Y \"prisma\\\\schema.prisma\" \"prisma\\\\schema.postgres.prisma\")",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run db:seed:*)",
+      "Bash(npm run build:*)",
+      "Bash(powershell -c \"\\(Get-Content ''d:\\\\Users\\\\Fimall\\\\Documents\\\\Codes\\\\fim-ai-chat\\\\src\\\\components\\\\UserConfig.tsx'' | Measure-Object -Line\\).Lines\")"
+    ]
+  }
+}

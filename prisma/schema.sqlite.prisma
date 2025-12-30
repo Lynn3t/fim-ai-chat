@@ -48,9 +48,6 @@ model User {
   generatedAccessCodes AccessCode[]
   modelGroupOrders ModelGroupOrder[]
 
-  @@index([createdAt])
-  @@index([role])
-  @@index([isActive])
   @@map("users")
 }
 
@@ -166,10 +163,6 @@ model Conversation {
   messages   Message[]
   tokenUsage TokenUsage[]
 
-  @@index([userId, updatedAt])
-  @@index([userId, createdAt])
-  @@index([isPinned])
-  @@index([isArchived])
   @@map("conversations")
 }
 
@@ -197,8 +190,6 @@ model Message {
   provider     Provider     @relation(fields: [providerId], references: [id])
   model        Model        @relation(fields: [modelId], references: [id])
 
-  @@index([conversationId, createdAt])
-  @@index([userId, createdAt])
   @@map("messages")
 }
 
@@ -268,10 +259,6 @@ model TokenUsage {
   provider     Provider      @relation(fields: [providerId], references: [id])
   model        Model         @relation(fields: [modelId], references: [id])
 
-  @@index([userId, createdAt])
-  @@index([modelId, createdAt])
-  @@index([providerId, createdAt])
-  @@index([createdAt])
   @@map("token_usage")
 }
 

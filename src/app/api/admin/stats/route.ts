@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  getTokenUsageLeaderboard, 
-  getModelUsageStats 
+import {
+  getTokenUsageLeaderboard,
+  getModelUsageStats
 } from '@/lib/db/token-usage'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
+import { handleApiError } from '@/lib/error-handler'
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
@@ -27,11 +28,7 @@ async function handleGet(request: NextRequest, userId: string) {
     }
 
   } catch (error) {
-    console.error('Error fetching admin stats:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/admin/stats')
   }
 }
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { withAdminAuth } from '@/lib/api-utils'
-import { sanitizeProviders } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
+import { sanitizeProviders, sanitizeProvider } from '@/lib/api-utils'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     // 获取所有提供商
     const providers = await prisma.provider.findMany({
@@ -25,24 +26,17 @@ async function handleGet(request: NextRequest, userId: string) {
     return NextResponse.json(sanitizeProviders(providers))
 
   } catch (error) {
-    console.error('Error fetching providers:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch providers' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/admin/providers')
   }
 }
 
-async function handlePost(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { name, displayName, baseUrl, apiKey, icon, description } = data
 
     if (!name || !displayName) {
-      return NextResponse.json(
-        { error: 'name and displayName are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 name 或 displayName 参数')
     }
 
     // 检查提供商名称是否已存在
@@ -51,10 +45,7 @@ async function handlePost(request: NextRequest, userId: string) {
     })
 
     if (existingProvider) {
-      return NextResponse.json(
-        { error: 'Provider with this name already exists' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('提供商名称已存在')
     }
 
     // 获取当前最大排序值
@@ -92,31 +83,21 @@ async function handlePost(request: NextRequest, userId: string) {
     return NextResponse.json(sanitizeProvider(newProvider), { status: 201 })
 
   } catch (error) {
-    console.error('Error creating provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to create provider' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/admin/providers')
   }
 }
 
-async function handlePut(request: NextRequest, userId: string) {
+async function handlePut(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { providers } = data
 
     if (!Array.isArray(providers)) {
-      return NextResponse.json(
-        { error: 'providers array is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 providers 数组')
     }
-
-    console.log('Updating provider order:', providers);
 
     // 批量更新提供商排序
     const updatePromises = providers.map((provider: { id: string; order: number }) => {
-      console.log(`Updating provider ${provider.id} to order ${provider.order}`);
       return prisma.provider.update({
         where: { id: provider.id },
         data: { order: provider.order },
@@ -125,15 +106,10 @@ async function handlePut(request: NextRequest, userId: string) {
 
     await Promise.all(updatePromises);
 
-    console.log('Provider order update completed successfully');
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Error updating provider order:', error)
-    return NextResponse.json(
-      { error: 'Failed to update provider order' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PUT /api/admin/providers')
   }
 }
 

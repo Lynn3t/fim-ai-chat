@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 const schema = z.object({
   username: z.string().min(1, '用户名不能为空'),
@@ -17,58 +18,38 @@ export async function POST(request: NextRequest) {
     const validation = schema.safeParse(body)
 
     if (!validation.success) {
-      return NextResponse.json({
-        success: false,
-        error: '输入验证失败: ' + validation.error.message
-      }, { status: 400 })
+      throw AppError.validation('输入验证失败', validation.error.errors)
     }
 
     const { username, verificationType, password, email } = validation.data
-    
+
     // 查找用户
     const user = await prisma.user.findUnique({
       where: { username }
     })
 
     if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: '用户不存在'
-      }, { status: 404 })
+      throw AppError.notFound('用户不存在')
     }
 
     // 根据验证类型进行验证
     let isVerified = false
 
     if (verificationType === 'password' && password) {
-      // 验证原密码
       if (!user.password) {
-        return NextResponse.json({
-          success: false,
-          error: '此账户没有设置密码，请使用邮箱验证'
-        }, { status: 400 })
+        throw AppError.badRequest('此账户没有设置密码，请使用邮箱验证')
       }
-
       const passwordMatch = await bcrypt.compare(password, user.password)
       isVerified = passwordMatch
-    } 
-    else if (verificationType === 'email' && email) {
-      // 验证邮箱
+    } else if (verificationType === 'email' && email) {
       if (!user.email) {
-        return NextResponse.json({
-          success: false,
-          error: '此账户没有关联邮箱，请使用密码验证'
-        }, { status: 400 })
+        throw AppError.badRequest('此账户没有关联邮箱，请使用密码验证')
       }
-
       isVerified = user.email.toLowerCase() === email.toLowerCase()
     }
 
     if (!isVerified) {
-      return NextResponse.json({
-        success: false,
-        error: verificationType === 'password' ? '密码不正确' : '邮箱不匹配'
-      }, { status: 400 })
+      throw AppError.badRequest(verificationType === 'password' ? '密码不正确' : '邮箱不匹配')
     }
 
     // 生成重置令牌
@@ -89,12 +70,8 @@ export async function POST(request: NextRequest) {
       resetToken,
       message: '验证成功，请设置新密码'
     })
-    
+
   } catch (error) {
-    console.error('密码重置验证错误:', error)
-    return NextResponse.json({
-      success: false,
-      error: '服务器错误，请稍后重试'
-    }, { status: 500 })
+    return handleApiError(error, 'POST /api/auth/forgot-password')
   }
-} 
+}

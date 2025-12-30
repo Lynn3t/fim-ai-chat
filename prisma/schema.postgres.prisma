@@ -1,13 +1,23 @@
-// SQLite 版本的 Prisma Schema
-// 从 PostgreSQL 迁移到 SQLite
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// 用户角色枚举
+enum UserRole {
+  ADMIN    // 管理员
+  USER     // 普通用户
+  GUEST    // 访客
 }
 
 // 用户模型
@@ -17,23 +27,21 @@ model User {
   username  String?  @unique
   password  String?  // 密码哈希，访客用户可以为空
   avatar    String?
-  role      String   @default("USER") // ADMIN, USER, GUEST (SQLite 不支持 enum)
+  role      UserRole @default(USER)
   isActive  Boolean  @default(true)
-  canShareAccessCode Boolean @default(true)
+  canShareAccessCode Boolean @default(true) // 是否可以分发访问码
 
   // 密码重置相关
-  resetToken String?
-  resetTokenExpiry DateTime?
+  resetToken String? // 密码重置令牌
+  resetTokenExpiry DateTime? // 令牌过期时间
 
-  // 邀请码相关
-  invitedBy String?
-  usedInviteCode String?
+  // 邀请码相关（仅管理员和用户有）
+  invitedBy String?  // 邀请者ID
+  usedInviteCode String? // 使用的邀请码
 
   // 访客相关
-  usedAccessCode String?
-  hostUserId String?
-  hostUser   User?    @relation("GuestHost", fields: [hostUserId], references: [id])
-  guests     User[]   @relation("GuestHost")
+  usedAccessCode String? // 访客使用的访问码
+  hostUserId String? // 访客的宿主用户ID
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -44,13 +52,16 @@ model User {
   settings          UserSettings?
   tokenUsage        TokenUsage[]
   permissions       UserPermission?
+
+  // 邀请码管理（管理员和用户可以生成邀请码）
   generatedInvites  InviteCode[]
+
+  // 访问码管理（用户可以生成访问码）
   generatedAccessCodes AccessCode[]
+
+  // 模型分组排序配置
   modelGroupOrders ModelGroupOrder[]
 
-  @@index([createdAt])
-  @@index([role])
-  @@index([isActive])
   @@map("users")
 }
 
@@ -59,7 +70,7 @@ model UserSettings {
   id               String  @id @default(cuid())
   userId           String  @unique
   defaultModelId   String?
-  theme            String  @default("light")
+  theme            String  @default("light") // light, dark, auto
   language         String  @default("zh-CN")
   enableMarkdown   Boolean @default(true)
   enableLatex      Boolean @default(true)
@@ -69,6 +80,7 @@ model UserSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
@@ -77,10 +89,10 @@ model UserSettings {
 // 系统设置模型
 model SystemSettings {
   id    String @id @default(cuid())
-  key   String @unique
-  value String
-  type  String @default("string")
-  description String?
+  key   String @unique // 设置键名
+  value String // 设置值（JSON字符串）
+  type  String @default("string") // 值类型：string, number, boolean, json
+  description String? // 设置描述
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,18 +103,19 @@ model SystemSettings {
 // AI 服务提供商
 model Provider {
   id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String
-  baseUrl     String?
-  apiKey      String?
+  name        String   @unique // OpenAI, Anthropic, Google, etc.
+  displayName String   // 显示名称
+  baseUrl     String?  // API 基础 URL
+  apiKey      String?  // 加密存储的 API Key
   isEnabled   Boolean  @default(true)
-  order       Int      @default(0)
-  icon        String?
+  order       Int      @default(0) // 排序
+  icon        String?  // 图标 URL 或名称
   description String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   models        Model[]
   conversations Conversation[]
   messages      Message[]
@@ -115,29 +128,30 @@ model Provider {
 model Model {
   id          String   @id @default(cuid())
   providerId  String
-  modelId     String
-  name        String
+  modelId     String   // 模型的实际 ID，如 gpt-4o-mini
+  name        String   // 显示名称
   description String?
   isEnabled   Boolean  @default(true)
-  order       Int      @default(0)
-  group       String?
+  order       Int      @default(0) // 在提供商内的排序
+  group       String?  // 模型分组，如 GPT-4, Claude-3 等
 
   // 模型配置
-  maxTokens      Int?
-  temperature    Float?
-  topP           Float?
-  frequencyPenalty Float?
-  presencePenalty  Float?
+  maxTokens      Int?     // 最大 token 数
+  temperature    Float?   // 温度参数
+  topP           Float?   // top_p 参数
+  frequencyPenalty Float? // 频率惩罚
+  presencePenalty  Float? // 存在惩罚
 
-  // 价格设置
-  pricingType     String  @default("token")
-  inputPrice      Float   @default(2.0)
-  outputPrice     Float   @default(8.0)
-  usagePrice      Float?
+  // 价格设置（直接嵌入到Model中）
+  pricingType     String  @default("token") // 计价类型："token"(按token) 或 "usage"(按次)
+  inputPrice      Float   @default(2.0)     // 输入价格，USD/1M token
+  outputPrice     Float   @default(8.0)     // 输出价格，USD/1M token
+  usagePrice      Float?                    // 若按次计价，每次价格 (USD)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   conversations Conversation[]
   messages      Message[]
@@ -153,23 +167,20 @@ model Conversation {
   userId      String
   providerId  String
   modelId     String
-  title       String
+  title       String   // AI 生成的标题
   isArchived  Boolean  @default(false)
   isPinned    Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider   Provider     @relation(fields: [providerId], references: [id])
   model      Model        @relation(fields: [modelId], references: [id])
   messages   Message[]
   tokenUsage TokenUsage[]
 
-  @@index([userId, updatedAt])
-  @@index([userId, createdAt])
-  @@index([isPinned])
-  @@index([isArchived])
   @@map("conversations")
 }
 
@@ -180,43 +191,44 @@ model Message {
   userId         String
   providerId     String
   modelId        String
-  role           String
-  content        String
-  rawContent     String?
+  role           String   // user, assistant, system
+  content        String   // 消息内容
+  rawContent     String?  // 原始内容（用于编辑）
   isEdited       Boolean  @default(false)
   isDeleted      Boolean  @default(false)
 
-  finishReason   String?
-  tokenUsage     String?  // SQLite 使用 TEXT 存储 JSON
+  // AI 响应相关
+  finishReason   String?  // stop, length, content_filter, etc.
+  tokenUsage     Json?    // token 使用情况
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider     Provider     @relation(fields: [providerId], references: [id])
   model        Model        @relation(fields: [modelId], references: [id])
 
-  @@index([conversationId, createdAt])
-  @@index([userId, createdAt])
   @@map("messages")
 }
 
 // 邀请码模型
 model InviteCode {
   id          String   @id @default(cuid())
-  code        String   @unique
-  createdBy   String
+  code        String   @unique // fimai开头的邀请码
+  createdBy   String   // 创建者ID
   isUsed      Boolean  @default(false)
-  usedBy      String?
+  usedBy      String?  // 使用者ID
   usedAt      DateTime?
-  expiresAt   DateTime?
-  maxUses     Int      @default(1)
-  currentUses Int      @default(0)
+  expiresAt   DateTime? // 过期时间
+  maxUses     Int      @default(1) // 最大使用次数
+  currentUses Int      @default(0) // 当前使用次数
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("invite_codes")
@@ -225,18 +237,20 @@ model InviteCode {
 // 访问码模型
 model AccessCode {
   id          String   @id @default(cuid())
-  code        String   @unique
-  createdBy   String
+  code        String   @unique // fimai开头的访问码
+  createdBy   String   // 创建者ID（用户）
   isActive    Boolean  @default(true)
-  expiresAt   DateTime?
-  maxUses     Int?
-  currentUses Int      @default(0)
+  expiresAt   DateTime? // 过期时间
+  maxUses     Int?     // 最大使用次数，null表示无限制
+  currentUses Int      @default(0) // 当前使用次数
 
-  allowedModelIds String?
+  // 权限设置
+  allowedModelIds String? // 允许使用的模型ID列表，用逗号分隔
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 关联关系
   creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("access_codes")
@@ -245,33 +259,33 @@ model AccessCode {
 // Token使用统计
 model TokenUsage {
   id             String   @id @default(cuid())
-  userId         String
-  conversationId String?
-  messageId      String?
-  providerId     String
-  modelId        String
+  userId         String   // 使用者ID
+  conversationId String?  // 对话ID（可选）
+  messageId      String?  // 消息ID（可选）
+  providerId     String   // 提供商ID
+  modelId        String   // 模型ID
 
-  promptTokens     Int
-  completionTokens Int
-  totalTokens      Int
+  // Token统计
+  promptTokens     Int     // 输入token数
+  completionTokens Int     // 输出token数
+  totalTokens      Int     // 总token数
 
-  isEstimated      Boolean @default(false)
-  inputChars       Int?
-  outputChars      Int?
+  // 如果API不提供token统计，则使用字符/词数估算
+  isEstimated      Boolean @default(false) // 是否为估算值
+  inputChars       Int?    // 输入字符数
+  outputChars      Int?    // 输出字符数
 
-  cost             Float?
+  // 成本计算（可选）
+  cost             Float?  // 成本（美元）
 
   createdAt DateTime @default(now())
 
+  // 关联关系
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   provider     Provider      @relation(fields: [providerId], references: [id])
   model        Model         @relation(fields: [modelId], references: [id])
 
-  @@index([userId, createdAt])
-  @@index([modelId, createdAt])
-  @@index([providerId, createdAt])
-  @@index([createdAt])
   @@map("token_usage")
 }
 
@@ -279,24 +293,20 @@ model TokenUsage {
 model UserPermission {
   id             String    @id @default(cuid())
   userId         String    @unique
-  permissions    String    @default("[]") // SQLite 使用 TEXT 存储 JSON
-
-  // 模型访问权限
-  allowedModelIds String?   // 允许使用的模型ID，逗号分隔
-  canShareAccess  Boolean   @default(true) // 是否可以分享访问权限
-  isActive        Boolean   @default(true) // 权限是否启用
+  permissions    Json      @default("[]") // 存储权限列表，如 ["admin_panel", "manage_users"]
 
   // Token 使用限制
-  limitType      String    @default("none")
-  limitPeriod    String    @default("monthly")
-  tokenLimit     Int?
-  costLimit      Float?
-  tokenUsed      Int       @default(0)
-  lastResetAt    DateTime  @default(now())
+  limitType      String    @default("none") // 限制类型: "none", "token", "cost"
+  limitPeriod    String    @default("monthly") // 限制周期: "daily", "monthly", "quarterly", "yearly"
+  tokenLimit     Int?      // Token 数量限制
+  costLimit      Float?    // 成本限制 (USD)
+  tokenUsed      Int       @default(0) // 已使用的 Token 数量
+  lastResetAt    DateTime  @default(now()) // 上次重置时间
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // 关联关系
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_permissions")
@@ -306,8 +316,8 @@ model UserPermission {
 model ModelGroupOrder {
   id          String   @id @default(cuid())
   userId      String
-  groupName   String
-  order       Int      @default(0)
+  groupName   String   // 分组名称，如 "ChatGPT", "Claude", "Gemini" 等
+  order       Int      @default(0) // 排序值，越小越靠前
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

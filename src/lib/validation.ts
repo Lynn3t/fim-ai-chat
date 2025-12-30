@@ -130,6 +130,15 @@ export const loginUserSchema = z.object({
   password: z.string().min(1, '密码不能为空')
 })
 
+// 别名，兼容 auth 路由
+export const loginSchema = loginUserSchema
+export const registerSchema = registerUserSchema
+
+// 找回用户名验证
+export const recoverUsernameSchema = z.object({
+  email: emailSchema
+})
+
 // 验证函数
 export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data)
@@ -138,6 +147,22 @@ export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
     throw new Error(`${error.path.join('.')}: ${error.message}`)
   }
   return result.data
+}
+
+// 验证请求体
+export async function validateRequest<T>(
+  request: Request,
+  schema: z.ZodSchema<T>
+): Promise<T> {
+  try {
+    const body = await request.json()
+    return validateSchema(schema, body)
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error('无效的 JSON 格式')
+    }
+    throw error
+  }
 }
 
 // 查询参数验证

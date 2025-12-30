@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserConversations, createConversation, searchConversations } from '@/lib/db/conversations'
-import { getUserFromRequest } from '@/lib/api-utils';
+import { getCurrentUser } from '@/lib/auth-middleware';
+import { handleApiError, AppError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
-    // 从JWT中获取用户ID
-    const userId = await getUserFromRequest(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    // 从JWT中获取用户
+    const user = await getCurrentUser(request);
+    if (!user) {
+      throw AppError.unauthorized('请先登录');
     }
 
     const { searchParams } = new URL(request.url)
@@ -21,9 +19,9 @@ export async function GET(request: NextRequest) {
 
     let conversations
     if (query) {
-      conversations = await searchConversations(userId, query, limit)
+      conversations = await searchConversations(user.userId, query, limit)
     } else {
-      conversations = await getUserConversations(userId, {
+      conversations = await getUserConversations(user.userId, {
         includeArchived,
         limit,
         offset,
@@ -32,11 +30,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(conversations)
   } catch (error) {
-    console.error('Error fetching conversations:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch conversations' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/conversations')
   }
 }
 
@@ -46,10 +40,6 @@ export async function POST(request: NextRequest) {
     const conversation = await createConversation(data)
     return NextResponse.json(conversation, { status: 201 })
   } catch (error) {
-    console.error('Error creating conversation:', error)
-    return NextResponse.json(
-      { error: 'Failed to create conversation' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/conversations')
   }
 }

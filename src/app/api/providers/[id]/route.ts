@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProviderById, updateProvider, deleteProvider } from '@/lib/db/providers'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
 export async function GET(
   request: NextRequest,
@@ -9,18 +10,11 @@ export async function GET(
     const { id } = await params
     const provider = await getProviderById(id)
     if (!provider) {
-      return NextResponse.json(
-        { error: 'Provider not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('提供商不存在')
     }
     return NextResponse.json(provider)
   } catch (error) {
-    console.error('Error fetching provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch provider' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/providers/[id]')
   }
 }
 
@@ -34,11 +28,7 @@ export async function PUT(
     const provider = await updateProvider(id, data)
     return NextResponse.json(provider)
   } catch (error) {
-    console.error('Error updating provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to update provider' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PUT /api/providers/[id]')
   }
 }
 
@@ -51,10 +41,6 @@ export async function DELETE(
     await deleteProvider(id)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting provider:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete provider' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/providers/[id]')
   }
 }

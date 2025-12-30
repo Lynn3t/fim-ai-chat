@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
+import { handleApiError, AppError } from '@/lib/error-handler'
 
-async function handleGet(request: NextRequest, userId: string) {
+async function handleGet(request: NextRequest, user: AuthUser) {
   try {
     // 获取所有模型，包括定价信息
     const models = await prisma.model.findMany({
@@ -47,24 +48,17 @@ async function handleGet(request: NextRequest, userId: string) {
     return NextResponse.json(modelsWithDefaultPricing)
 
   } catch (error) {
-    console.error('Error fetching models:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch models' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/admin/models')
   }
 }
 
-async function handlePatch(request: NextRequest, userId: string) {
+async function handlePatch(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { modelId, isEnabled, ...updateData } = data
 
     if (!modelId) {
-      return NextResponse.json(
-        { error: 'modelId is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 modelId 参数')
     }
 
     // 检查模型是否存在
@@ -73,10 +67,7 @@ async function handlePatch(request: NextRequest, userId: string) {
     })
 
     if (!model) {
-      return NextResponse.json(
-        { error: 'Model not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('模型不存在')
     }
 
     // 更新模型
@@ -100,24 +91,17 @@ async function handlePatch(request: NextRequest, userId: string) {
     return NextResponse.json(updatedModel)
 
   } catch (error) {
-    console.error('Error updating model:', error)
-    return NextResponse.json(
-      { error: 'Failed to update model' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/admin/models')
   }
 }
 
-async function handlePost(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { providerId, modelId, name, description, group, ...modelData } = data
 
     if (!providerId || !modelId || !name) {
-      return NextResponse.json(
-        { error: 'providerId, modelId, and name are required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 providerId, modelId 或 name 参数')
     }
 
     // 检查提供商是否存在
@@ -126,10 +110,7 @@ async function handlePost(request: NextRequest, userId: string) {
     })
 
     if (!provider) {
-      return NextResponse.json(
-        { error: 'Provider not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('提供商不存在')
     }
 
     // 检查模型ID是否已存在
@@ -141,10 +122,7 @@ async function handlePost(request: NextRequest, userId: string) {
     })
 
     if (existingModel) {
-      return NextResponse.json(
-        { error: 'Model with this ID already exists for this provider' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('该提供商下已存在相同 ID 的模型')
     }
 
     // 获取当前提供商下最大的 order 值
@@ -182,24 +160,17 @@ async function handlePost(request: NextRequest, userId: string) {
     return NextResponse.json(newModel, { status: 201 })
 
   } catch (error) {
-    console.error('Error creating model:', error)
-    return NextResponse.json(
-      { error: 'Failed to create model' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'POST /api/admin/models')
   }
 }
 
-async function handlePut(request: NextRequest, userId: string) {
+async function handlePut(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { models } = data
 
     if (!Array.isArray(models)) {
-      return NextResponse.json(
-        { error: 'models array is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 models 数组')
     }
 
     // 使用事务批量更新模型排序，避免并发冲突
@@ -215,24 +186,17 @@ async function handlePut(request: NextRequest, userId: string) {
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Error updating model order:', error)
-    return NextResponse.json(
-      { error: 'Failed to update model order' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PUT /api/admin/models')
   }
 }
 
-async function handleDelete(request: NextRequest, userId: string) {
+async function handleDelete(request: NextRequest, user: AuthUser) {
   try {
     const data = await request.json()
     const { modelId } = data
 
     if (!modelId) {
-      return NextResponse.json(
-        { error: 'modelId is required' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('缺少 modelId 参数')
     }
 
     // 检查模型是否存在
@@ -241,10 +205,7 @@ async function handleDelete(request: NextRequest, userId: string) {
     })
 
     if (!model) {
-      return NextResponse.json(
-        { error: 'Model not found' },
-        { status: 404 }
-      )
+      throw AppError.notFound('模型不存在')
     }
 
     // 检查是否有相关的对话或消息
@@ -257,10 +218,7 @@ async function handleDelete(request: NextRequest, userId: string) {
     })
 
     if (conversationCount > 0 || messageCount > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete model with existing conversations or messages' },
-        { status: 400 }
-      )
+      throw AppError.badRequest('无法删除有关联对话或消息的模型')
     }
 
     // 删除模型
@@ -268,17 +226,13 @@ async function handleDelete(request: NextRequest, userId: string) {
       where: { id: modelId }
     })
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       message: 'Model deleted successfully'
     })
 
   } catch (error) {
-    console.error('Error deleting model:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete model' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/admin/models')
   }
 }
 

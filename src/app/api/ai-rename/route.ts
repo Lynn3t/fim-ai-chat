@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError, AppError } from '@/lib/error-handler';
 
 interface AIRenameRequest {
   modelId: string;
@@ -14,11 +15,11 @@ export async function POST(request: NextRequest) {
     const { modelId, aiConfig }: AIRenameRequest = await request.json();
 
     if (!modelId) {
-      return NextResponse.json({ error: 'Model ID is required' }, { status: 400 });
+      throw AppError.badRequest('Model ID is required');
     }
 
     if (!aiConfig.apiKey) {
-      return NextResponse.json({ error: 'AI API Key is required' }, { status: 400 });
+      throw AppError.badRequest('AI API Key is required');
     }
 
     const prompt = `输入模型 ID，输出格式化的模型名称。
@@ -64,11 +65,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('AI Rename API Error:', errorData);
-      return NextResponse.json(
-        { error: 'AI rename request failed', details: errorData },
-        { status: response.status }
-      );
+      throw AppError.externalApi(`AI rename request failed: ${errorData}`);
     }
 
     const data = await response.json();
@@ -81,10 +78,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('AI Rename Error:', error);
-    return NextResponse.json(
-      { error: 'AI rename failed', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'POST /api/ai-rename');
   }
 }

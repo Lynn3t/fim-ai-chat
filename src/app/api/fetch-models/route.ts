@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError, AppError } from '@/lib/error-handler';
 
 interface FetchModelsRequest {
   apiKey: string;
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
     const { apiKey, baseUrl }: FetchModelsRequest = await request.json();
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'API Key is required' }, { status: 400 });
+      throw AppError.badRequest('API Key is required');
     }
 
     // 构建请求URL
@@ -26,15 +27,11 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Fetch Models API Error:', errorData);
-      return NextResponse.json(
-        { error: 'Failed to fetch models', details: errorData },
-        { status: response.status }
-      );
+      throw AppError.externalApi(`Failed to fetch models: ${errorData}`);
     }
 
     const data = await response.json();
-    
+
     // 提取模型ID列表
     const models = data.data?.map((model: { id: string }) => model.id) || [];
 
@@ -45,10 +42,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Fetch Models Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch models', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'POST /api/fetch-models');
   }
 }

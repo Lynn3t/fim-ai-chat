@@ -1,43 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/api-utils';
+import { getCurrentUser } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/prisma';
 import { getUserTokenStats } from '@/lib/db/token-usage';
 import { getUserAccessCodes, getUserInviteCodes } from '@/lib/db/codes';
 import { getUserSettings } from '@/lib/db/users';
+import { handleApiError, AppError } from '@/lib/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserFromRequest(request);
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const authUser = await getCurrentUser(request);
+
+    if (!authUser) {
+      throw AppError.unauthorized('请先登录');
     }
 
     // 获取用户的 Token 使用情况
-    const tokenStats = await getUserTokenStats(userId);
-    
+    const tokenStats = await getUserTokenStats(authUser.userId);
+
     // 获取用户创建的访问码
-    const accessCodes = await getUserAccessCodes(userId);
-    
+    const accessCodes = await getUserAccessCodes(authUser.userId);
+
     // 获取用户创建的邀请码
-    const inviteCodes = await getUserInviteCodes(userId);
-    
+    const inviteCodes = await getUserInviteCodes(authUser.userId);
+
     // 获取用户可用的模型
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: authUser.userId },
       include: {
         permissions: true
       }
     });
-    
+
     // 获取用户的设置信息
-    const userSettings = await getUserSettings(userId);
+    const userSettings = await getUserSettings(authUser.userId);
 
     let allowedModelIds: string[] = [];
-    
+
     // 如果用户是管理员，可以使用所有模型
     if (user?.role === 'ADMIN') {
       const allModels = await prisma.model.findMany({
@@ -45,7 +43,7 @@ export async function GET(request: NextRequest) {
         select: { id: true }
       });
       allowedModelIds = allModels.map(model => model.id);
-    } 
+    }
     // 普通用户使用权限设置中的模型
     else if (user?.permissions?.allowedModelIds) {
       allowedModelIds = user.permissions.allowedModelIds.split(',');
@@ -55,7 +53,7 @@ export async function GET(request: NextRequest) {
       const accessCode = await prisma.accessCode.findUnique({
         where: { code: user.usedAccessCode }
       });
-      
+
       if (accessCode?.allowedModelIds) {
         allowedModelIds = accessCode.allowedModelIds.split(',');
       }
@@ -68,10 +66,10 @@ export async function GET(request: NextRequest) {
       });
       allowedModelIds = allModels.map(model => model.id);
     }
-    
+
     // 获取详细的模型信息
     const allowedModels = await prisma.model.findMany({
-      where: { 
+      where: {
         id: { in: allowedModelIds },
         isEnabled: true
       },
@@ -84,20 +82,16 @@ export async function GET(request: NextRequest) {
         }
       }
     });
-    
+
     return NextResponse.json({
       tokenStats,
       accessCodes,
       inviteCodes,
       allowedModels,
-      userSettings // 添加用户设置信息
+      userSettings
     });
-    
+
   } catch (error) {
-    console.error('Error fetching user dashboard:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch user dashboard' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'GET /api/user/dashboard');
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { withAdminAuth } from '@/lib/api-utils'
+import { withAdminAuth, type AuthUser } from '@/lib/auth-middleware'
 
 interface BatchModelData {
   modelId: string
@@ -15,7 +15,7 @@ interface BatchCreateRequest {
   models: BatchModelData[]
 }
 
-async function handlePost(request: NextRequest, userId: string) {
+async function handlePost(request: NextRequest, user: AuthUser) {
   try {
     const data: BatchCreateRequest = await request.json()
     const { providerId, models } = data
