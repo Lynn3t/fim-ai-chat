@@ -143,8 +143,13 @@ export const recoverUsernameSchema = z.object({
 export function validateSchema<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data)
   if (!result.success) {
-    const error = result.error.errors[0]
-    throw new Error(`${error.path.join('.')}: ${error.message}`)
+    const errors = result.error?.errors
+    if (errors && errors.length > 0) {
+      const error = errors[0]
+      const path = error.path.length > 0 ? `${error.path.join('.')}: ` : ''
+      throw new Error(`${path}${error.message}`)
+    }
+    throw new Error('验证失败')
   }
   return result.data
 }

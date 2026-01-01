@@ -28,6 +28,7 @@ import {
   CheckCircle
 } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
+import Logo from '@/components/Logo'
 
 export default function ResetPasswordPage() {
   const [resetToken, setResetToken] = useState<string | null>(null)
@@ -130,9 +131,9 @@ export default function ResetPasswordPage() {
         {/* Logo */}
         <Fade in={true} timeout={800}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold', 
               color: 'primary.main', 

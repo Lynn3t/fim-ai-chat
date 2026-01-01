@@ -51,6 +51,13 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // 401 未授权时自动重定向到主页（登录页）
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        throw new Error('Unauthorized');
+      }
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }

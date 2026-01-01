@@ -121,3 +121,5 @@ playground/
 # Build artifacts
 .turbo/
 .swc/
+.mcp.json
+.claude/settings.local.json

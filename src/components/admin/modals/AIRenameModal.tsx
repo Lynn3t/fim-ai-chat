@@ -69,14 +69,14 @@ export default function AIRenameModal({ isOpen, onClose, providerId, providers, 
                 <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full relative p-6 max-h-[80vh] overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}>
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                        🤖 AI 智能重命名
+                        AI 智能重命名
                     </h3>
 
-                    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <p className="text-sm text-gray-800 dark:text-gray-200">
                             AI将根据预设规则将模型ID转换为易读的名称，例如：
                         </p>
-                        <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1">
+                        <ul className="text-xs text-gray-700 dark:text-gray-300 mt-2 space-y-1">
                             <li>• gpt-4o-mini → GPT-4o Mini</li>
                             <li>• deepseek-chat-v3-0324 → DeepSeek V3 [0324]</li>
                             <li>• deepseek-ai/deepseek-r1 → DeepSeek R1 {`{deepseek-ai}`}</li>
@@ -92,7 +92,7 @@ export default function AIRenameModal({ isOpen, onClose, providerId, providers, 
                                 value={formData.aiModelId}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, aiModelId: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 required
                             >
@@ -141,7 +141,7 @@ export default function AIRenameModal({ isOpen, onClose, providerId, providers, 
                                             checked={formData.selectedModels.includes(model.id)}
                                             onChange={() => toggleModel(model.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                                            className="h-4 w-4 text-gray-800 focus:ring-gray-500 border-gray-300 rounded pointer-events-auto"
                                             style={{ pointerEvents: 'auto' }}
                                         />
                                         <div className="flex-1">
@@ -167,7 +167,7 @@ export default function AIRenameModal({ isOpen, onClose, providerId, providers, 
                                     e.stopPropagation();
                                     onClose();
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 取消
                             </button>
@@ -175,9 +175,9 @@ export default function AIRenameModal({ isOpen, onClose, providerId, providers, 
                                 type="submit"
                                 onClick={(e) => e.stopPropagation()}
                                 disabled={!formData.aiModelId || formData.selectedModels.length === 0}
-                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-transparent rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
-                                🤖 开始AI重命名
+                                开始AI重命名
                             </button>
                         </div>
                     </form>

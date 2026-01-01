@@ -11,14 +11,13 @@ import {
   AlertMessage, 
   ThemeToggle 
 } from '@/components/MaterialUI'
-import { 
-  Box, 
-  Typography, 
+import {
+  Box,
+  Typography,
   Paper,
   InputAdornment,
   IconButton,
   Fade,
-  Divider,
   FormControl,
   FormControlLabel,
   RadioGroup,
@@ -34,6 +33,7 @@ import {
   LockReset
 } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
+import Logo from '@/components/Logo'
 
 export default function ForgotPasswordPage() {
   const [username, setUsername] = useState('')
@@ -122,9 +122,9 @@ export default function ForgotPasswordPage() {
         {/* Logo */}
         <Fade in={true} timeout={800}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold', 
               color: 'primary.main', 
@@ -258,18 +258,18 @@ export default function ForgotPasswordPage() {
             )}
 
             {/* 错误信息 */}
-            <Fade in={!!error}>
+            {error && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="error">{error}</AlertMessage>
               </Box>
-            </Fade>
+            )}
 
             {/* 成功信息 */}
-            <Fade in={!!success}>
+            {success && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="success">{success}</AlertMessage>
               </Box>
-            </Fade>
+            )}
 
             {/* 提交按钮 */}
             <Button

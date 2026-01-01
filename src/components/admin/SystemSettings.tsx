@@ -112,7 +112,7 @@ export default function SystemSettings() {
                         <textarea
                             value={systemSettings.systemDescription || '智能 AI 聊天助手'}
                             onChange={(e) => setSystemSettings(prev => ({ ...prev, systemDescription: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                             rows={3}
                             placeholder="智能 AI 聊天助手"
                         />
@@ -159,7 +159,7 @@ export default function SystemSettings() {
                         <select
                             value={systemSettings.title_generation_model_id || ''}
                             onChange={(e) => setSystemSettings(prev => ({ ...prev, title_generation_model_id: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                         >
                             <option value="">选择用于生成对话标题的模型</option>
                             {providers.flatMap(provider =>
@@ -182,7 +182,7 @@ export default function SystemSettings() {
                         <select
                             value={systemSettings.system_default_model_id || ''}
                             onChange={(e) => setSystemSettings(prev => ({ ...prev, system_default_model_id: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                         >
                             <option value="">选择系统默认模型</option>
                             {providers.flatMap(provider =>
@@ -227,7 +227,7 @@ export default function SystemSettings() {
                             type="number"
                             value={systemSettings.sessionTimeout || 24}
                             onChange={(e) => setSystemSettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                         />
                     </div>
 
@@ -239,7 +239,7 @@ export default function SystemSettings() {
                             type="number"
                             value={systemSettings.maxConcurrentRequests || 10}
                             onChange={(e) => setSystemSettings(prev => ({ ...prev, maxConcurrentRequests: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                         />
                     </div>
 
@@ -262,7 +262,7 @@ export default function SystemSettings() {
             <div className="flex justify-end">
                 <button
                     onClick={() => updateSystemSettings(systemSettings)}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 transition-colors"
                 >
                     保存所有设置
                 </button>

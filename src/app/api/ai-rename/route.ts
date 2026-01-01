@@ -1,26 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { handleApiError, AppError } from '@/lib/error-handler';
+import { safeDecrypt } from '@/lib/encryption';
 
 interface AIRenameRequest {
   modelId: string;
-  aiConfig: {
-    apiKey: string;
-    baseUrl: string;
-    model: string;
-  };
+  aiModelId: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { modelId, aiConfig }: AIRenameRequest = await request.json();
+    const { modelId, aiModelId }: AIRenameRequest = await request.json();
 
     if (!modelId) {
       throw AppError.badRequest('Model ID is required');
     }
 
-    if (!aiConfig.apiKey) {
-      throw AppError.badRequest('AI API Key is required');
+    if (!aiModelId) {
+      throw AppError.badRequest('AI Model ID is required');
     }
+
+    // 从数据库获取 AI 模型及其提供商信息
+    const aiModel = await prisma.model.findUnique({
+      where: { id: aiModelId },
+      include: {
+        provider: true,
+      },
+    });
+
+    if (!aiModel || !aiModel.provider) {
+      throw AppError.notFound('AI 模型不存在');
+    }
+
+    const provider = aiModel.provider;
+
+    if (!provider.baseUrl) {
+      throw AppError.badRequest('提供商未配置 Base URL');
+    }
+
+    if (!provider.apiKey) {
+      throw AppError.badRequest('提供商未配置 API Key');
+    }
+
+    // 解密 apiKey
+    const apiKey = safeDecrypt(provider.apiKey);
 
     const prompt = `输入模型 ID，输出格式化的模型名称。
 
@@ -44,14 +67,14 @@ export async function POST(request: NextRequest) {
 请直接输出格式化后的模型名称，不要包含其他解释文字。`;
 
     // 调用AI API
-    const response = await fetch(`${aiConfig.baseUrl}/chat/completions`, {
+    const response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${aiConfig.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: aiConfig.model,
+        model: aiModel.modelId,
         messages: [
           {
             role: 'user',
@@ -65,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw AppError.externalApi(`AI rename request failed: ${errorData}`);
+      throw AppError.externalApi(`AI 重命名请求失败: ${errorData}`);
     }
 
     const data = await response.json();

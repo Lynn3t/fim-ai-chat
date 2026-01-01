@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { registerUser } from '@/lib/auth'
+import { registerUser, generateToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { handleApiError, AppError } from '@/lib/error-handler'
 import { validateRequest, registerSchema } from '@/lib/validation'
@@ -40,6 +40,9 @@ export async function POST(request: NextRequest) {
       throw AppError.badRequest(result.error || '注册失败')
     }
 
+    // 生成JWT token
+    const token = generateToken(result.user!.id)
+
     return NextResponse.json({
       success: true,
       user: {
@@ -48,6 +51,7 @@ export async function POST(request: NextRequest) {
         email: result.user!.email,
         role: result.user!.role,
       },
+      token,
     }, { status: 201 })
 
   } catch (error) {

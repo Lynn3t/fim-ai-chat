@@ -483,7 +483,7 @@ export default function UserManagement() {
                                             <button
                                                 type="button"
                                                 onClick={() => setCreateUserData(prev => ({ ...prev, password: generatePassword(12) }))}
-                                                className="text-xs text-blue-600 hover:text-blue-800"
+                                                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                                             >
                                                 生成随机密码
                                             </button>
@@ -507,7 +507,7 @@ export default function UserManagement() {
                                         <button
                                             type="submit"
                                             disabled={!createUserData.username}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                                            className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50"
                                         >
                                             创建用户
                                         </button>
@@ -554,7 +554,7 @@ export default function UserManagement() {
                                         <button
                                             type="submit"
                                             disabled={isResettingPassword || !resetPasswordData.newPassword || resetPasswordData.newPassword.length < 6}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                                            className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50"
                                         >
                                             {isResettingPassword ? '处理中...' : '重置密码'}
                                         </button>

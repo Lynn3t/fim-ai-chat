@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Toast';
 import { Provider, Model } from '@/components/admin/types';
@@ -13,7 +13,10 @@ interface GroupOrder {
 export function useModelManagement() {
   const { user: currentUser, authenticatedFetch } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
-  const toast = { success: toastSuccess, error: toastError };
+
+  // 使用 ref 存储 toast 函数，避免依赖变化导致无限循环
+  const toastRef = useRef({ success: toastSuccess, error: toastError });
+  toastRef.current = { success: toastSuccess, error: toastError };
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -40,14 +43,14 @@ export function useModelManagement() {
         setModels(allModels);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '加载提供商失败');
+        toastRef.current.error(errorData.error || '加载提供商失败');
       }
     } catch {
-      toast.error('加载提供商失败');
+      toastRef.current.error('加载提供商失败');
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, authenticatedFetch, toast]);
+  }, [currentUser, authenticatedFetch]);
 
   // Load group orders
   const loadGroupOrders = useCallback(async () => {
@@ -78,19 +81,19 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('提供商创建成功');
+        toastRef.current.success('提供商创建成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '创建提供商失败');
+        toastRef.current.error(errorData.error || '创建提供商失败');
         return false;
       }
     } catch {
-      toast.error('创建提供商失败');
+      toastRef.current.error('创建提供商失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const updateProvider = useCallback(async (providerId: string, providerData: Partial<Provider>) => {
     if (!currentUser) return false;
@@ -103,19 +106,19 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('提供商更新成功');
+        toastRef.current.success('提供商更新成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '更新提供商失败');
+        toastRef.current.error(errorData.error || '更新提供商失败');
         return false;
       }
     } catch {
-      toast.error('更新提供商失败');
+      toastRef.current.error('更新提供商失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const deleteProvider = useCallback(async (providerId: string, providerName: string) => {
     if (!currentUser) return false;
@@ -127,19 +130,19 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('提供商删除成功');
+        toastRef.current.success('提供商删除成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '删除提供商失败');
+        toastRef.current.error(errorData.error || '删除提供商失败');
         return false;
       }
     } catch {
-      toast.error('删除提供商失败');
+      toastRef.current.error('删除提供商失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const toggleProviderStatus = useCallback(async (providerId: string, isEnabled: boolean) => {
     if (!currentUser) return;
@@ -148,7 +151,7 @@ export function useModelManagement() {
 
     // Optimistic update
     setProviders(prev => prev.map(p => p.id === providerId ? { ...p, isEnabled: !isEnabled } : p));
-    toast.success(isEnabled ? '提供商已禁用' : '提供商已启用');
+    toastRef.current.success(isEnabled ? '提供商已禁用' : '提供商已启用');
 
     try {
       const response = await authenticatedFetch(`/api/admin/providers/${providerId}`, {
@@ -166,25 +169,25 @@ export function useModelManagement() {
             const provider = await verifyResponse.json();
             if (provider.isEnabled !== !isEnabled) {
               setProviders(prev => prev.map(p => p.id === providerId ? { ...p, isEnabled: originalProvider.isEnabled } : p));
-              toast.error('状态更新失败，已恢复原状态');
+              toastRef.current.error('状态更新失败，已恢复原状态');
             }
           }
         } catch {
           setProviders(prev => prev.map(p => p.id === providerId ? { ...p, isEnabled: originalProvider.isEnabled } : p));
-          toast.error('无法验证状态更新，已恢复原状态');
+          toastRef.current.error('无法验证状态更新，已恢复原状态');
         }
       }, 1500);
     } catch {
       setProviders(prev => prev.map(p => p.id === providerId ? { ...p, isEnabled: originalProvider.isEnabled } : p));
-      toast.error('操作失败，已恢复原状态');
+      toastRef.current.error('操作失败，已恢复原状态');
     }
-  }, [currentUser, providers, authenticatedFetch, toast]);
+  }, [currentUser, providers, authenticatedFetch]);
 
   const updateProviderOrder = useCallback(async (reorderedProviders: Provider[]) => {
     if (!currentUser) return;
     const originalProviders = [...providers];
     setProviders(reorderedProviders);
-    toast.success('提供商排序已更新');
+    toastRef.current.success('提供商排序已更新');
 
     try {
       const response = await authenticatedFetch('/api/admin/providers', {
@@ -199,15 +202,15 @@ export function useModelManagement() {
       if (!response.ok) {
         setProviders(originalProviders);
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '更新排序失败');
+        toastRef.current.error(errorData.error || '更新排序失败');
       } else {
         setTimeout(() => loadProvidersAndModels(), 2000);
       }
     } catch {
       setProviders(originalProviders);
-      toast.error('网络错误，排序更新失败');
+      toastRef.current.error('网络错误，排序更新失败');
     }
-  }, [currentUser, providers, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, providers, authenticatedFetch, loadProvidersAndModels]);
 
   // Model operations
   const toggleModelStatus = useCallback(async (modelId: string, isEnabled: boolean) => {
@@ -221,7 +224,7 @@ export function useModelManagement() {
       ...p,
       models: p.models?.map(m => m.id === modelId ? { ...m, isEnabled: !isEnabled } : m)
     })));
-    toast.success(isEnabled ? '模型已禁用' : '模型已启用');
+    toastRef.current.success(isEnabled ? '模型已禁用' : '模型已启用');
 
     try {
       const response = await authenticatedFetch(`/api/admin/models/${modelId}`, {
@@ -239,7 +242,7 @@ export function useModelManagement() {
             const model = await verifyResponse.json();
             if (model.isEnabled !== !isEnabled) {
               loadProvidersAndModels();
-              toast.error('状态更新失败，已恢复原状态');
+              toastRef.current.error('状态更新失败，已恢复原状态');
             }
           }
         } catch {
@@ -248,9 +251,9 @@ export function useModelManagement() {
       }, 1500);
     } catch {
       loadProvidersAndModels();
-      toast.error('操作失败');
+      toastRef.current.error('操作失败');
     }
-  }, [currentUser, models, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, models, authenticatedFetch, loadProvidersAndModels]);
 
   const deleteModel = useCallback(async (modelId: string, modelName: string) => {
     if (!currentUser) return false;
@@ -262,19 +265,19 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('模型删除成功');
+        toastRef.current.success('模型删除成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '删除模型失败');
+        toastRef.current.error(errorData.error || '删除模型失败');
         return false;
       }
     } catch {
-      toast.error('删除模型失败');
+      toastRef.current.error('删除模型失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const updateModel = useCallback(async (data: { id: string; name: string; group?: string }) => {
     if (!currentUser) return false;
@@ -287,19 +290,19 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('模型更新成功');
+        toastRef.current.success('模型更新成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '更新模型失败');
+        toastRef.current.error(errorData.error || '更新模型失败');
         return false;
       }
     } catch {
-      toast.error('更新模型失败');
+      toastRef.current.error('更新模型失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const createCustomModel = useCallback(async (
     providerId: string,
@@ -315,89 +318,68 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('自定义模型添加成功');
+        toastRef.current.success('自定义模型添加成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '添加模型失败');
+        toastRef.current.error(errorData.error || '添加模型失败');
         return false;
       }
     } catch {
-      toast.error('添加模型失败');
+      toastRef.current.error('添加模型失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const fetchModelsFromAPI = useCallback(async (provider: Provider) => {
     if (!currentUser) return;
-    if (!provider.baseUrl || !provider.apiKey) {
-      toast.error('提供商缺少Base URL或API Key，请先配置');
-      return;
-    }
 
     setIsLoading(true);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const response = await authenticatedFetch('/api/fetch-models', {
+      const response = await authenticatedFetch(`/api/admin/providers/${provider.id}/sync-models`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: provider.apiKey, baseUrl: provider.baseUrl }),
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
+
+      const data = await response.json();
 
       if (response.ok) {
-        const data = await response.json();
-        if (data.models?.length === 0) {
-          toast.error('未获取到任何模型');
-          return;
-        }
-
-        const saveResponse = await authenticatedFetch(`/api/admin/providers/${provider.id}/models/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ models: data.models }),
-        });
-
-        if (saveResponse.ok) {
-          toast.success(`成功获取并保存 ${data.models.length} 个模型`);
+        if (data.success) {
+          toastRef.current.success(data.message || `成功同步 ${data.total} 个模型`);
           loadProvidersAndModels();
         } else {
-          toast.error('保存模型失败');
+          toastRef.current.error(data.error || '未获取到任何模型');
         }
       } else {
-        toast.error('获取模型列表失败');
+        toastRef.current.error(data.error || '同步模型列表失败');
       }
     } catch {
-      toast.error('获取模型列表失败');
+      toastRef.current.error('同步模型列表失败');
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const autoGroupModels = useCallback(async (providerId: string) => {
     if (!currentUser) return;
 
     try {
-      toast.success('正在自动分组，请稍候...');
+      toastRef.current.success('正在自动分组，请稍候...');
       const response = await authenticatedFetch(`/api/admin/providers/${providerId}/auto-group`, {
         method: 'POST',
       });
 
       if (response.ok) {
-        toast.success('自动分组成功');
+        toastRef.current.success('自动分组成功');
         loadProvidersAndModels();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '自动分组失败');
+        toastRef.current.error(errorData.error || '自动分组失败');
       }
     } catch {
-      toast.error('自动分组失败');
+      toastRef.current.error('自动分组失败');
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   // Group operations
   const handleGroupReorder = useCallback(async (providerId: string, reorderedGroups: { name: string }[]) => {
@@ -420,7 +402,7 @@ export function useModelManagement() {
     });
 
     setUserGroupOrders(updatedGroupOrders);
-    toast.success('分组排序已更新');
+    toastRef.current.success('分组排序已更新');
 
     try {
       const response = await authenticatedFetch('/api/admin/model-groups', {
@@ -431,15 +413,15 @@ export function useModelManagement() {
 
       if (!response.ok) {
         setUserGroupOrders(originalGroupOrders);
-        toast.error('分组排序更新失败');
+        toastRef.current.error('分组排序更新失败');
       } else {
         setTimeout(() => loadGroupOrders(), 1000);
       }
     } catch {
       setUserGroupOrders(originalGroupOrders);
-      toast.error('分组排序更新失败');
+      toastRef.current.error('分组排序更新失败');
     }
-  }, [currentUser, userGroupOrders, authenticatedFetch, toast, loadGroupOrders]);
+  }, [currentUser, userGroupOrders, authenticatedFetch, loadGroupOrders]);
 
   const createCustomGroup = useCallback(async (groupData: { groupName: string; modelIds: string[] }) => {
     if (!currentUser) return false;
@@ -452,25 +434,25 @@ export function useModelManagement() {
       });
 
       if (response.ok) {
-        toast.success('自定义分组创建成功');
+        toastRef.current.success('自定义分组创建成功');
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || '创建分组失败');
+        toastRef.current.error(errorData.error || '创建分组失败');
         return false;
       }
     } catch {
-      toast.error('创建分组失败');
+      toastRef.current.error('创建分组失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   const performAIRename = useCallback(async (renameData: { aiModelId: string; selectedModels: string[] }) => {
     if (!currentUser) return false;
 
     try {
-      toast.success('正在进行AI重命名，请稍候...');
+      toastRef.current.success('正在进行AI重命名，请稍候...');
       const response = await authenticatedFetch('/api/admin/models/ai-rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -479,19 +461,19 @@ export function useModelManagement() {
 
       if (response.ok) {
         const result = await response.json();
-        toast.success(`成功重命名 ${result.renamedCount} 个模型`);
+        toastRef.current.success(`成功重命名 ${result.renamedCount} 个模型`);
         loadProvidersAndModels();
         return true;
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.error || 'AI重命名失败');
+        toastRef.current.error(errorData.error || 'AI重命名失败');
         return false;
       }
     } catch {
-      toast.error('AI重命名失败');
+      toastRef.current.error('AI重命名失败');
       return false;
     }
-  }, [currentUser, authenticatedFetch, toast, loadProvidersAndModels]);
+  }, [currentUser, authenticatedFetch, loadProvidersAndModels]);
 
   // Initial load
   useEffect(() => {

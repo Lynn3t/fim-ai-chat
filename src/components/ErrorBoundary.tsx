@@ -59,9 +59,9 @@ class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 dark:bg-red-900 rounded-full mb-4">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-gray-200 dark:bg-gray-700 rounded-full mb-4">
               <svg
-                className="w-6 h-6 text-red-600 dark:text-red-400"
+                className="w-6 h-6 text-gray-700 dark:text-gray-300"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -98,7 +98,7 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="flex space-x-3">
               <button
                 onClick={this.handleRetry}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 transition-colors"
               >
                 重试
               </button>
@@ -159,7 +159,7 @@ export function PageErrorBoundary({ children }: { children: ReactNode }) {
             <div className="space-x-4">
               <button
                 onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 transition-colors"
               >
                 刷新页面
               </button>
@@ -188,10 +188,10 @@ export function ApiErrorBoundary({ children }: { children: ReactNode }) {
         // 可以在这里发送错误到监控服务
       }}
       fallback={
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div className="p-4 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
           <div className="flex items-center">
             <svg
-              className="w-5 h-5 text-red-600 dark:text-red-400 mr-2"
+              className="w-5 h-5 text-gray-700 dark:text-gray-300 mr-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -203,11 +203,11 @@ export function ApiErrorBoundary({ children }: { children: ReactNode }) {
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span className="text-red-800 dark:text-red-200 font-medium">
+            <span className="text-gray-800 dark:text-gray-200 font-medium">
               数据加载失败
             </span>
           </div>
-          <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+          <p className="text-gray-700 dark:text-gray-300 text-sm mt-1">
             请检查网络连接或稍后重试
           </p>
         </div>

@@ -51,7 +51,7 @@ class PerformanceMonitor {
 
     // 在开发环境中输出性能信息
     if (process.env.NODE_ENV === 'development') {
-      console.log(`⏱️ ${name}: ${duration.toFixed(2)}ms`, metric.metadata);
+      console.log(`[PERF] ${name}: ${duration.toFixed(2)}ms`, metric.metadata);
     }
 
     return duration;

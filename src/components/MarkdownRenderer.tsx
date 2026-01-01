@@ -70,7 +70,7 @@ export function MarkdownRenderer({
               <code
                 className={`${className || ''} ${
                   isInverted
-                    ? 'bg-blue-700 text-blue-100'
+                    ? 'bg-gray-700 text-gray-100'
                     : 'bg-gray-100 dark:bg-gray-800'
                 } px-1 py-0.5 rounded text-sm`}
                 {...rest}
@@ -107,7 +107,7 @@ export function MarkdownRenderer({
           },
           blockquote(props: ComponentProps) {
             return (
-              <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4">
+              <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4">
                 {props.children}
               </blockquote>
             );

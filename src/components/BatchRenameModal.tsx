@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/components/Toast';
 
 interface AIModel {
   id: string;
@@ -39,11 +40,13 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<RenameProgress[]>([]);
   const [completed, setCompleted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const toast = useToast();
 
   if (!isOpen) return null;
 
   // 获取可用的AI模型选项
-  const availableModels = providers.flatMap(p => 
+  const availableModels = providers.flatMap(p =>
     p.models.filter(m => m.enabled).map(m => ({
       ...m,
       providerId: p.id,
@@ -53,14 +56,16 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
   );
 
   const handleStartBatchRename = async () => {
+    setErrorMessage('');
+
     if (!selectedAIModelId) {
-      alert('请选择AI模型');
+      setErrorMessage('请选择AI模型');
       return;
     }
 
     const selectedModel = availableModels.find(m => m.id === selectedAIModelId);
     if (!selectedModel) {
-      alert('选择的模型无效');
+      setErrorMessage('选择的模型无效');
       return;
     }
 
@@ -93,11 +98,7 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
           },
           body: JSON.stringify({
             modelId: model.modelId,
-            aiConfig: {
-              apiKey: selectedModel.provider.apiKey,
-              baseUrl: selectedModel.provider.baseUrl,
-              model: selectedModel.modelId
-            }
+            aiModelId: selectedModel.id,
           }),
         });
 
@@ -142,13 +143,13 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
   const getStatusIcon = (status: RenameProgress['status']) => {
     switch (status) {
       case 'pending':
-        return '⏳';
+        return '-';
       case 'processing':
-        return '🔄';
+        return '...';
       case 'success':
-        return '✅';
+        return '+';
       case 'error':
-        return '❌';
+        return 'x';
       default:
         return '';
     }
@@ -186,8 +187,11 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
                 </label>
                 <select
                   value={selectedAIModelId}
-                  onChange={(e) => setSelectedAIModelId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  onChange={(e) => {
+                    setSelectedAIModelId(e.target.value);
+                    setErrorMessage('');
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">请选择AI模型</option>
                   {availableModels.map((aiModel) => (
@@ -196,10 +200,13 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
                     </option>
                   ))}
                 </select>
+                {errorMessage && (
+                  <p className="mt-1 text-sm text-red-500">{errorMessage}</p>
+                )}
               </div>
-              
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+
+              <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                <p className="text-sm text-gray-800 dark:text-gray-200">
                   将对 {provider.models.length} 个模型进行批量重命名，这可能需要一些时间。
                 </p>
               </div>
@@ -233,12 +240,12 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
                         {getStatusText(item.status)}
                       </p>
                       {item.newName && (
-                        <p className="text-sm text-green-600 dark:text-green-400">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                           → {item.newName}
                         </p>
                       )}
                       {item.error && (
-                        <p className="text-sm text-red-600 dark:text-red-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           {item.error}
                         </p>
                       )}
@@ -265,9 +272,9 @@ export function BatchRenameModal({ isOpen, provider, providers, onClose, onRenam
               <button
                 onClick={handleStartBatchRename}
                 disabled={!selectedAIModelId}
-                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                🤖 开始批量重命名
+                开始批量重命名
               </button>
             )}
           </div>

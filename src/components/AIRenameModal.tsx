@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/components/Toast';
 
 interface AIModel {
   id: string;
@@ -31,11 +32,13 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
   const [selectedModelId, setSelectedModelId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [previewName, setPreviewName] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const toast = useToast();
 
   if (!isOpen) return null;
 
   // 获取可用的AI模型选项
-  const availableModels = providers.flatMap(provider => 
+  const availableModels = providers.flatMap(provider =>
     provider.models.filter(m => m.enabled).map(m => ({
       ...m,
       providerId: provider.id,
@@ -45,14 +48,16 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
   );
 
   const handleAIRename = async () => {
+    setErrorMessage('');
+
     if (!selectedModelId) {
-      alert('请选择AI模型');
+      setErrorMessage('请选择AI模型');
       return;
     }
 
     const selectedModel = availableModels.find(m => m.id === selectedModelId);
     if (!selectedModel) {
-      alert('选择的模型无效');
+      setErrorMessage('选择的模型无效');
       return;
     }
 
@@ -65,11 +70,7 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
         },
         body: JSON.stringify({
           modelId: model.modelId,
-          aiConfig: {
-            apiKey: selectedModel.provider.apiKey,
-            baseUrl: selectedModel.provider.baseUrl,
-            model: selectedModel.modelId
-          }
+          aiModelId: selectedModel.id,
         }),
       });
 
@@ -77,11 +78,12 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
         const data = await response.json();
         setPreviewName(data.renamedName);
       } else {
-        alert('AI重命名失败，请稍后重试');
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || 'AI重命名失败，请稍后重试');
       }
     } catch (error) {
       console.error('AI重命名错误:', error);
-      alert('AI重命名失败：' + error);
+      toast.error('AI重命名失败：网络错误');
     } finally {
       setIsLoading(false);
     }
@@ -119,8 +121,11 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
               </label>
               <select
                 value={selectedModelId}
-                onChange={(e) => setSelectedModelId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                onChange={(e) => {
+                  setSelectedModelId(e.target.value);
+                  setErrorMessage('');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">请选择AI模型</option>
                 {availableModels.map((aiModel) => (
@@ -129,6 +134,9 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
                   </option>
                 ))}
               </select>
+              {errorMessage && (
+                <p className="mt-1 text-sm text-red-500">{errorMessage}</p>
+              )}
             </div>
 
             <button
@@ -136,7 +144,7 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
               disabled={isLoading || !selectedModelId}
               className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? '正在重命名...' : '🤖 AI重命名'}
+              {isLoading ? '正在重命名...' : 'AI重命名'}
             </button>
 
             {previewName && (
@@ -144,7 +152,7 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   AI建议的名称
                 </label>
-                <p className="text-sm text-gray-900 dark:text-white bg-green-50 dark:bg-green-900/20 p-2 rounded border border-green-200 dark:border-green-700">
+                <p className="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded border border-gray-300 dark:border-gray-600">
                   {previewName}
                 </p>
               </div>
@@ -161,7 +169,7 @@ export function AIRenameModal({ isOpen, model, providers, onClose, onRename }: A
             <button
               onClick={handleConfirm}
               disabled={!previewName}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               确认使用
             </button>

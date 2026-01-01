@@ -68,7 +68,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="搜索模型..."
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
             />
           </div>
 
@@ -77,7 +77,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
             <div className="flex space-x-2">
               <button
                 onClick={handleSelectAll}
-                className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                className="px-3 py-1 text-sm bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
               >
                 全选 ({filteredModels.length})
               </button>
@@ -107,7 +107,7 @@ export function ModelSelectorModal({ isOpen, models, onClose, onImport }: ModelS
                   key={modelId}
                   className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedModels.has(modelId)
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
+                      ? 'bg-gray-100 dark:bg-gray-600 border-gray-400 dark:border-gray-500'
                       : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
                   }`}
                   onClick={() => toggleModel(modelId)}

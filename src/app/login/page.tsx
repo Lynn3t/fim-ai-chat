@@ -12,19 +12,19 @@ import {
   AlertMessage, 
   ThemeToggle 
 } from '@/components/MaterialUI'
-import { 
-  Box, 
-  Typography, 
-  Tabs, 
-  Tab, 
+import {
+  Box,
+  Typography,
+  Tabs,
+  Tab,
   Paper,
   InputAdornment,
   IconButton,
-  Fade,
-  Divider
+  Fade
 } from '@mui/material'
 import { Visibility, VisibilityOff, Login, Person, Key, VpnKey } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
+import Logo from '@/components/Logo'
 
 export default function LoginPage() {
   const [loginType, setLoginType] = useState<'user' | 'guest'>('user')
@@ -92,9 +92,9 @@ export default function LoginPage() {
         {/* Logo */}
         <Fade in={true} timeout={800}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold', 
               color: 'primary.main', 
@@ -221,11 +221,11 @@ export default function LoginPage() {
             )}
 
             {/* 错误信息 */}
-            <Fade in={!!error}>
+            {error && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="error">{error}</AlertMessage>
               </Box>
-            </Fade>
+            )}
 
             {/* 登录按钮 */}
             <Button
@@ -234,8 +234,8 @@ export default function LoginPage() {
               fullWidth
               size="large"
               variant="contained"
-              sx={{ 
-                mb: 2, 
+              sx={{
+                mb: 2,
                 py: 1.5,
                 borderRadius: 8,
                 textTransform: 'none',
@@ -245,51 +245,36 @@ export default function LoginPage() {
             >
               {isLoading ? '登录中...' : '登录'}
             </Button>
-            
-            {/* 忘记密码和用户名链接 */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Link href="/forgot-password">
-                <Typography 
-                  variant="body2" 
-                  component="span"
-                  sx={{ 
-                    color: 'primary.main',
-                    cursor: 'pointer',
-                    '&:hover': { textDecoration: 'underline' }
-                  }}
-                >
-                  忘记密码？
-                </Typography>
-              </Link>
-              <Link href="/recover-username">
-                <Typography 
-                  variant="body2" 
-                  component="span"
-                  sx={{ 
-                    color: 'primary.main',
-                    cursor: 'pointer',
-                    '&:hover': { textDecoration: 'underline' }
-                  }}
-                >
-                  忘记用户名？
-                </Typography>
-              </Link>
-            </Box>
 
+            {/* 忘记密码和用户名链接 */}
             {loginType === 'user' && (
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2">
-                  <Link 
-                    href="/forgot-password" 
-                    style={{ 
-                      color: 'primary', 
-                      textDecoration: 'none',
-                      fontWeight: 500
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Link href="/forgot-password">
+                  <Typography
+                    variant="body2"
+                    component="span"
+                    sx={{
+                      color: 'primary.main',
+                      cursor: 'pointer',
+                      '&:hover': { textDecoration: 'underline' }
                     }}
                   >
                     忘记密码？
-                  </Link>
-                </Typography>
+                  </Typography>
+                </Link>
+                <Link href="/recover-username">
+                  <Typography
+                    variant="body2"
+                    component="span"
+                    sx={{
+                      color: 'primary.main',
+                      cursor: 'pointer',
+                      '&:hover': { textDecoration: 'underline' }
+                    }}
+                  >
+                    忘记用户名？
+                  </Typography>
+                </Link>
               </Box>
             )}
           </Box>
@@ -322,29 +307,6 @@ export default function LoginPage() {
             </Link>
           </Typography>
         </Box>
-
-        {/* 说明 */}
-        <Paper 
-          elevation={1}
-          sx={{ 
-            mt: 4, 
-            p: 2, 
-            bgcolor: mode === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.05)', 
-            borderRadius: 2,
-            border: 1,
-            borderColor: 'divider'
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
-            登录说明
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="body2" component="ul" sx={{ pl: 2, m: 0 }}>
-            <li>用户登录：使用已注册的用户名登录 (不区分大小写)</li>
-            <li>访问码登录：使用他人分享的访问码临时登录</li>
-            <li>访客用户的聊天记录仅保存在本地</li>
-          </Typography>
-        </Paper>
       </Container>
     </Box>
   )

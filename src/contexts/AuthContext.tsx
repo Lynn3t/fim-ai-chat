@@ -80,15 +80,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 带认证的fetch函数
   const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
     const headers = new Headers(options.headers);
-    
+
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    return fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers,
     });
+
+    // 401 未授权时自动清除状态并重定向到主页
+    if (response.status === 401) {
+      localStorage.removeItem('fimai_user');
+      localStorage.removeItem('fimai_token');
+      setUser(null);
+      setToken(null);
+      setChatConfig(null);
+      window.location.href = '/';
+    }
+
+    return response;
   };
 
   const fetchChatConfig = async () => {
@@ -151,10 +163,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json()
 
-      if (data.success && data.user) {
+      if (data.success && data.user && data.token) {
         setUser(data.user)
-        await fetchChatConfig(data.user.id)
+        setToken(data.token)
         localStorage.setItem('fimai_user', JSON.stringify(data.user))
+        localStorage.setItem('fimai_token', data.token)
+
+        // 获取聊天配置
+        await fetchChatConfig()
+
         return { success: true }
       } else {
         return { success: false, error: data.error || 'Access code login failed' }
@@ -174,10 +191,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const result = await response.json()
 
-      if (result.success && result.user) {
+      if (result.success && result.user && result.token) {
         setUser(result.user)
-        await fetchChatConfig(result.user.id)
+        setToken(result.token)
         localStorage.setItem('fimai_user', JSON.stringify(result.user))
+        localStorage.setItem('fimai_token', result.token)
+
+        // 获取聊天配置
+        await fetchChatConfig()
+
         return { success: true }
       } else {
         return { success: false, error: result.error || 'Registration failed' }

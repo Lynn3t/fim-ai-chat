@@ -76,7 +76,7 @@ export function getProviderIcon(iconKey?: string): React.ReactNode {
     // 处理自定义图标，显示实际的emoji
     if (iconKey.startsWith('custom:')) {
         const customEmoji = iconKey.replace('custom:', '');
-        return <span style={{ fontSize: '16px' }}>{customEmoji || '⚙️'}</span>;
+        return <span style={{ fontSize: '16px' }}>{customEmoji || '*'}</span>;
     }
 
     const iconConfig = PROVIDER_ICON_MAPPING[iconKey.toLowerCase()];

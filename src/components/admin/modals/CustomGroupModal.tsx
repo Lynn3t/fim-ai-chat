@@ -67,7 +67,7 @@ export default function CustomGroupModal({ isOpen, onClose, providerId, provider
                                 value={formData.groupName}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, groupName: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 placeholder="例如: 对话模型"
                                 required
@@ -86,7 +86,7 @@ export default function CustomGroupModal({ isOpen, onClose, providerId, provider
                                             checked={formData.modelIds.includes(model.id)}
                                             onChange={() => toggleModel(model.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-auto"
+                                            className="h-4 w-4 text-gray-800 focus:ring-gray-500 border-gray-300 rounded pointer-events-auto"
                                             style={{ pointerEvents: 'auto' }}
                                         />
                                         <div className="flex-1">
@@ -112,7 +112,7 @@ export default function CustomGroupModal({ isOpen, onClose, providerId, provider
                                     e.stopPropagation();
                                     onClose();
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 取消
                             </button>
@@ -120,7 +120,7 @@ export default function CustomGroupModal({ isOpen, onClose, providerId, provider
                                 type="submit"
                                 onClick={(e) => e.stopPropagation()}
                                 disabled={!formData.groupName.trim() || formData.modelIds.length === 0}
-                                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-transparent rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 创建分组
                             </button>

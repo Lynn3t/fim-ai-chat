@@ -147,7 +147,7 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                 value={formData.name}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, name: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 placeholder="例如: OpenAI, Anthropic"
                                 required
@@ -170,7 +170,7 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                         setShowCustomEmoji(value === 'custom');
                                     }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none pointer-events-auto"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white appearance-none pointer-events-auto"
                                     style={{ pointerEvents: 'auto' }}
                                     required
                                 >
@@ -185,13 +185,13 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                     <div className="flex items-center space-x-2">
                                         <span className="text-sm">
                                             {(() => {
-                                                if (formData.icon === 'custom') return '⚙️';
+                                                if (formData.icon === 'custom') return '*';
                                                 const iconConfig = PROVIDER_ICON_MAPPING[formData.icon];
                                                 if (iconConfig?.component) {
                                                     const IconComponent = iconConfig.component;
                                                     return <IconComponent size={16} />;
                                                 }
-                                                return '🤖';
+                                                return 'AI';
                                             })()}
                                         </span>
                                     </div>
@@ -220,8 +220,8 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                             }
                                         }}
                                         onClick={(e) => e.stopPropagation()}
-                                        placeholder="输入一个 emoji，如：🚀"
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                        placeholder="输入一个字符作为图标"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                         style={{ pointerEvents: 'auto' }}
                                         maxLength={1}
                                     />
@@ -241,7 +241,7 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                 value={formData.baseUrl}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, baseUrl: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 placeholder="https://api.openai.com/v1"
                                 required
@@ -257,7 +257,7 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                 value={formData.apiKey}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, apiKey: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 placeholder="sk-..."
                             />
@@ -271,7 +271,7 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                 value={formData.description}
                                 onChange={(e) => setFormData(prevState => ({ ...prevState, description: e.target.value }))}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white pointer-events-auto"
                                 style={{ pointerEvents: 'auto' }}
                                 rows={3}
                                 placeholder="提供商描述..."
@@ -300,14 +300,14 @@ export default function ProviderModal({ isOpen, onClose, onSubmit, title, initia
                                     e.stopPropagation();
                                     onClose();
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 取消
                             </button>
                             <button
                                 type="submit"
                                 onClick={(e) => e.stopPropagation()}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-transparent rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 {initialData ? '更新' : '创建'}
                             </button>

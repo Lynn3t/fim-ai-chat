@@ -275,7 +275,7 @@ export function createDefaultChatMessage(
  */
 export function createErrorMessage(errorText: string): ChatMessage {
   return createDefaultChatMessage(
-    `❌ 错误: ${errorText}`,
+    `[ERROR] ${errorText}`,
     'assistant'
   );
 }
@@ -285,7 +285,7 @@ export function createErrorMessage(errorText: string): ChatMessage {
  */
 export function createSystemMessage(systemText: string): ChatMessage {
   return createDefaultChatMessage(
-    `ℹ️ ${systemText}`,
+    `[INFO] ${systemText}`,
     'assistant'
   );
 }

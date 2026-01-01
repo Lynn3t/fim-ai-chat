@@ -78,7 +78,7 @@ function validateEnv(): Env {
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {
-    console.error('❌ 环境变量配置错误:');
+    console.error('[ERROR] 环境变量配置错误:');
     result.error.errors.forEach(err => {
       console.error(`  - ${err.path.join('.')}: ${err.message}`);
     });
@@ -187,7 +187,7 @@ export function getSafeEnvForLogging(): Record<string, string> {
 export function validateEnvironmentOnStartup(): void {
   try {
     validateEnv();
-    console.log('✅ 环境变量验证通过');
+    console.log('[OK] 环境变量验证通过');
   } catch (error) {
     // 错误已经在 validateEnv 中打印
     if (isProduction()) {

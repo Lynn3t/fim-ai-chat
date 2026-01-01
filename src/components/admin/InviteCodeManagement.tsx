@@ -297,7 +297,7 @@ export default function InviteCodeManagement() {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                            className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
                                         >
                                             创建
                                         </button>
@@ -336,7 +336,7 @@ export default function InviteCodeManagement() {
                                     <button
                                         type="button"
                                         onClick={() => deletingInvite && deleteInviteCode(deletingInvite.id, deletingInvite.code)}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                                        className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
                                     >
                                         删除
                                     </button>

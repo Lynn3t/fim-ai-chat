@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button, Card, Container, Loading, ThemeToggle } from "@/components/MaterialUI";
 import { Typography, Box, Link as MuiLink } from "@mui/material";
+import Logo from "@/components/Logo";
 import Link from "next/link";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -60,13 +61,9 @@ export default function Home() {
         }}>
           {/* FimAI Logo */}
           <Box sx={{ mb: 4 }}>
-            <Typography 
-              variant="h2" 
-              component="div" 
-              sx={{ mb: 2, fontWeight: 'normal' }}
-            >
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography 
               variant="h4" 
               component="h1" 

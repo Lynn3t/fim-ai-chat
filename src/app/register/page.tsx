@@ -12,16 +12,15 @@ import {
   AlertMessage, 
   ThemeToggle 
 } from '@/components/MaterialUI'
-import { 
-  Box, 
-  Typography, 
+import {
+  Box,
+  Typography,
   Paper,
   InputAdornment,
   IconButton,
   CircularProgress,
   Tooltip,
-  Fade,
-  Divider
+  Fade
 } from '@mui/material'
 import { 
   Visibility, 
@@ -34,6 +33,7 @@ import {
   VpnKey
 } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
+import Logo from '@/components/Logo'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -132,7 +132,7 @@ export default function RegisterPage() {
         username: formData.username,
         email: formData.email || undefined,
         password: formData.password,
-        inviteCode: formData.inviteCode,
+        inviteCode: formData.inviteCode || undefined,
       })
 
       if (result.success) {
@@ -164,9 +164,9 @@ export default function RegisterPage() {
         {/* Logo */}
         <Fade in={true} timeout={800}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold', 
               color: 'primary.main', 
@@ -278,51 +278,52 @@ export default function RegisterPage() {
               />
             </Box>
 
-            {/* 邀请码 */}
-            <Box sx={{ mb: 3 }}>
-              <TextField
-                label="邀请码"
-                id="inviteCode"
-                name="inviteCode"
-                value={formData.inviteCode}
-                onChange={handleInputChange}
-                placeholder="请输入邀请码 (fimai_xxxxxxxxxxxxxxxx)"
-                required={hasAdmin}
-                fullWidth
-                error={inviteCodeStatus === 'invalid'}
-                color={inviteCodeStatus === 'valid' ? 'success' : undefined}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <VpnKey color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      {isValidating && <CircularProgress size={20} />}
-                      {!isValidating && inviteCodeStatus === 'valid' && (
-                        <Tooltip title="邀请码有效">
-                          <CheckCircleOutline color="success" />
-                        </Tooltip>
-                      )}
-                      {!isValidating && inviteCodeStatus === 'invalid' && (
-                        <Tooltip title="邀请码无效">
-                          <Cancel color="error" />
-                        </Tooltip>
-                      )}
-                    </InputAdornment>
-                  ),
-                }}
-                helperText={!hasAdmin ? '首个管理员注册不需要邀请码' : ''}
-              />
-            </Box>
+            {/* 邀请码 - 仅在已有管理员时显示 */}
+            {hasAdmin && (
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  label="邀请码"
+                  id="inviteCode"
+                  name="inviteCode"
+                  value={formData.inviteCode}
+                  onChange={handleInputChange}
+                  placeholder="请输入邀请码 (fimai_xxxxxxxxxxxxxxxx)"
+                  required
+                  fullWidth
+                  error={inviteCodeStatus === 'invalid'}
+                  color={inviteCodeStatus === 'valid' ? 'success' : undefined}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <VpnKey color="action" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        {isValidating && <CircularProgress size={20} />}
+                        {!isValidating && inviteCodeStatus === 'valid' && (
+                          <Tooltip title="邀请码有效">
+                            <CheckCircleOutline color="success" />
+                          </Tooltip>
+                        )}
+                        {!isValidating && inviteCodeStatus === 'invalid' && (
+                          <Tooltip title="邀请码无效">
+                            <Cancel color="error" />
+                          </Tooltip>
+                        )}
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+            )}
 
             {/* 错误信息 */}
-            <Fade in={!!error}>
+            {error && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="error">{error}</AlertMessage>
               </Box>
-            </Fade>
+            )}
 
             {/* 注册按钮 */}
             <Button
@@ -372,30 +373,6 @@ export default function RegisterPage() {
             </Link>
           </Typography>
         </Box>
-
-        {/* 说明 */}
-        <Paper 
-          elevation={1}
-          sx={{ 
-            mt: 4, 
-            p: 2, 
-            bgcolor: mode === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.05)', 
-            borderRadius: 2,
-            border: 1,
-            borderColor: 'divider'
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.primary' }}>
-            注册说明
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="body2" component="ul" sx={{ pl: 2, m: 0 }}>
-            <li>通常需要邀请码才能注册，请联系管理员获取</li>
-            <li>如果是系统首次注册（无管理员时），无需邀请码</li>
-            <li>用户名不区分大小写，请使用字母、数字组合</li>
-            <li>邮箱地址用于密码找回，强烈建议设置</li>
-          </Typography>
-        </Paper>
       </Container>
     </Box>
   )

@@ -55,8 +55,8 @@ export default function Dashboard() {
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                            <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex-shrink-0 bg-gray-800 dark:bg-gray-200 rounded-md p-3">
+                            <svg className="h-6 w-6 text-white dark:text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                         </div>
@@ -76,7 +76,7 @@ export default function Dashboard() {
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-700 px-5 py-3">
                     <div className="text-sm">
-                        <span className="text-green-600 font-medium">
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">
                             {stats.activeUsers}
                         </span>
                         <span className="text-gray-500 dark:text-gray-400 ml-2">
@@ -89,8 +89,8 @@ export default function Dashboard() {
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                            <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex-shrink-0 bg-gray-800 dark:bg-gray-200 rounded-md p-3">
+                            <svg className="h-6 w-6 text-white dark:text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                             </svg>
                         </div>

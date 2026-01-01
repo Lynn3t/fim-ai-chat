@@ -23,6 +23,7 @@ import {
   AccountCircle
 } from '@mui/icons-material'
 import { useTheme } from '@/contexts/ThemeContext'
+import Logo from '@/components/Logo'
 
 export default function RecoverUsernamePage() {
   const [email, setEmail] = useState('')
@@ -86,9 +87,9 @@ export default function RecoverUsernamePage() {
         {/* Logo */}
         <Fade in={true} timeout={800}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h2" component="div" sx={{ mb: 2 }}>
-              🤖
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Logo size={80} />
+            </Box>
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold', 
               color: 'primary.main', 
@@ -144,23 +145,23 @@ export default function RecoverUsernamePage() {
             </Box>
 
             {/* 错误信息 */}
-            <Fade in={!!error}>
+            {error && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="error">{error}</AlertMessage>
               </Box>
-            </Fade>
+            )}
 
             {/* 成功信息和显示找回的用户名 */}
-            <Fade in={!!success}>
+            {success && (
               <Box sx={{ mb: 3 }}>
                 <AlertMessage severity="success">{success}</AlertMessage>
                 {recoveredUsername && (
-                  <Box 
-                    sx={{ 
-                      mt: 2, 
-                      p: 2, 
-                      border: 1, 
-                      borderColor: 'success.light', 
+                  <Box
+                    sx={{
+                      mt: 2,
+                      p: 2,
+                      border: 1,
+                      borderColor: 'success.light',
                       borderRadius: 1,
                       bgcolor: 'success.main',
                       color: 'white',
@@ -177,7 +178,7 @@ export default function RecoverUsernamePage() {
                   </Box>
                 )}
               </Box>
-            </Fade>
+            )}
 
             {/* 提交按钮 */}
             <Button

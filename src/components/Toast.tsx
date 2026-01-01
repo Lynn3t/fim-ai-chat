@@ -27,7 +27,7 @@ export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
       case 'warning':
         return 'bg-yellow-500 text-white';
       case 'info':
-        return 'bg-blue-500 text-white';
+        return 'bg-gray-700 text-white';
       default:
         return 'bg-gray-500 text-white';
     }
@@ -36,13 +36,13 @@ export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return '✓';
+        return '+';
       case 'error':
-        return '✕';
+        return 'x';
       case 'warning':
-        return '⚠';
+        return '!';
       case 'info':
-        return 'ℹ';
+        return 'i';
       default:
         return '';
     }
@@ -56,7 +56,7 @@ export function Toast({ message, type, duration = 3000, onClose }: ToastProps) {
         onClick={onClose}
         className="ml-2 text-white hover:text-gray-200 transition-colors"
       >
-        ✕
+        x
       </button>
     </div>
   );

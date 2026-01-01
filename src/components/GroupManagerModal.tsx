@@ -67,13 +67,13 @@ export function GroupManagerModal({
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="输入新分组名称"
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-700 dark:text-white"
               onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup()}
             />
             <button
               onClick={handleCreateGroup}
               disabled={!newGroupName.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-900 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               创建分组
             </button>
@@ -92,7 +92,7 @@ export function GroupManagerModal({
                   </span>
                   <button
                     onClick={() => onDeleteGroup(group.id)}
-                    className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                    className="p-1 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
                     title="删除分组"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,7 +129,7 @@ export function GroupManagerModal({
                   <select
                     value={model.customGroup || ''}
                     onChange={(e) => onMoveModel(model.id, e.target.value || undefined)}
-                    className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white"
+                    className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 dark:bg-gray-600 dark:text-white"
                   >
                     <option value="">默认分组</option>
                     {providerGroups.map(group => (
