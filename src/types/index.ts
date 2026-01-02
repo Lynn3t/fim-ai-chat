@@ -193,16 +193,44 @@ export interface SystemStats {
   usedInviteCodes: number;
   totalAccessCodes: number;
   usedAccessCodes: number;
+  // 新增字段
+  totalTokens?: number;
+  totalCost?: number;
+  todayTokens?: number;
+  todayCost?: number;
+  totalRequests?: number;
+  todayRequests?: number;
+  totalModels?: number;
+  activeModels?: number;
+  totalProviders?: number;
+  activeProviders?: number;
   detailed?: {
     userCount?: {
       admin: number;
       user?: number;
       guest?: number;
+      active?: number;
+      inactive?: number;
+    };
+    tokenUsage?: {
+      totalTokens: number;
+      totalCost: number;
+      todayTokens: number;
+      todayCost: number;
+      totalRequests: number;
+      todayRequests: number;
+    };
+    codeUsage?: {
+      totalInviteCodes: number;
+      usedInviteCodes: number;
+      totalAccessCodes: number;
+      activeAccessCodes: number;
     };
     modelUsage?: {
       totalModels: number;
       activeModels: number;
       totalProviders: number;
+      activeProviders?: number;
     };
   };
 }

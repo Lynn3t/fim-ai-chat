@@ -15,6 +15,14 @@ async function handleGet(request: NextRequest, user: AuthUser) {
       totalCost: systemStats.tokenUsage.totalCost,
       todayTokens: systemStats.tokenUsage.todayTokens,
       todayCost: systemStats.tokenUsage.todayCost,
+      totalRequests: systemStats.tokenUsage.totalRequests,
+      todayRequests: systemStats.tokenUsage.todayRequests,
+      totalInviteCodes: systemStats.codeUsage.totalInviteCodes,
+      usedInviteCodes: systemStats.codeUsage.usedInviteCodes,
+      totalModels: systemStats.modelUsage.totalModels,
+      activeModels: systemStats.modelUsage.activeModels,
+      totalProviders: systemStats.modelUsage.totalProviders,
+      activeProviders: systemStats.modelUsage.activeProviders,
       // 包含完整的系统统计信息
       detailed: systemStats,
     }

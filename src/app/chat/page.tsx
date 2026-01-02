@@ -15,6 +15,16 @@ import React from 'react'; // Added for useRef
 import { MaterialChatLayout } from '@/components/MaterialChatLayout';
 import { Box, Typography } from '@mui/material';
 
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  preview?: string;
+  file?: File;
+}
+
 interface Message {
   id: string;
   conversationId?: string;
@@ -110,6 +120,7 @@ function ChatPageContent() {
     output: 0,
     total: 0,
   });
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
@@ -1099,6 +1110,45 @@ function ChatPageContent() {
     sendMessageToAI(messageToRetry);
   };
 
+  // 处理文件选择
+  const handleFileSelect = (files: FileList) => {
+    const newAttachments: FileAttachment[] = [];
+
+    Array.from(files).forEach((file) => {
+      const attachment: FileAttachment = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file: file,
+      };
+
+      // 如果是图片，创建预览
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setAttachments((prev) =>
+            prev.map((att) =>
+              att.id === attachment.id
+                ? { ...att, preview: e.target?.result as string }
+                : att
+            )
+          );
+        };
+        reader.readAsDataURL(file);
+      }
+
+      newAttachments.push(attachment);
+    });
+
+    setAttachments((prev) => [...prev, ...newAttachments]);
+  };
+
+  // 移除附件
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((att) => att.id !== id));
+  };
+
   // 处理模型选择
   const handleModelSelect = (modelId: string) => {
     if (isLoading) return;
@@ -1229,6 +1279,9 @@ function ChatPageContent() {
       modelGroups={userGroupOrders}
       onModelSelect={handleModelSelect}
       currentModelId={selectedModelId}
+      attachments={attachments}
+      onFileSelect={handleFileSelect}
+      onRemoveAttachment={handleRemoveAttachment}
     />
   );
 }

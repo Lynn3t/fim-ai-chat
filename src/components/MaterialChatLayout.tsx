@@ -23,7 +23,7 @@ import {
   Avatar,
   Stack
 } from '@mui/material';
-import { 
+import {
   Menu as MenuIcon,
   Send as SendIcon,
   Add as AddIcon,
@@ -37,7 +37,10 @@ import {
   SmartToy as SmartToyIcon,
   ContentCopy as CopyIcon,
   Edit as EditIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  AttachFile as AttachFileIcon,
+  Image as ImageIcon,
+  ArrowUpward as ArrowUpwardIcon
 } from '@mui/icons-material';
 import { ThemeToggle } from './MaterialUI';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -45,11 +48,21 @@ import { sortGroupsByUserOrder, getModelGroups } from '@/utils/aiModelUtils';
 import { AIIcon } from './AIIcon';
 import { MessageActions } from './MessageActions';
 
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  preview?: string;
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: Date;
+  attachments?: FileAttachment[];
   modelInfo?: {
     modelId: string;
     modelName: string;
@@ -76,7 +89,7 @@ interface MaterialChatLayoutProps {
   input: string;
   isLoading: boolean;
   isLoadingHistory?: boolean; // 添加历史记录加载状态
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSend: () => void;
   onNewChat: () => void;
   onSelectChat: (id: string) => void;
@@ -89,7 +102,7 @@ interface MaterialChatLayoutProps {
   providerName?: string;
   userName?: string;
   models?: Array<{
-    id: string, 
+    id: string,
     name: string,
     group?: string,
     provider?: string
@@ -105,6 +118,10 @@ interface MaterialChatLayoutProps {
   onRetryMessage?: (messageId: string) => void;
   drawerOpen?: boolean;
   onDrawerToggle?: () => void;
+  // 文件上传相关
+  attachments?: FileAttachment[];
+  onFileSelect?: (files: FileList) => void;
+  onRemoveAttachment?: (id: string) => void;
 }
 
 const DRAWER_WIDTH = 280;
@@ -139,14 +156,22 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
   onEditMessage,
   onRetryMessage,
   drawerOpen = false,
-  onDrawerToggle
+  onDrawerToggle,
+  attachments = [],
+  onFileSelect,
+  onRemoveAttachment
 }) => {
   // Remove the internal drawer state and use props instead
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [modelMenuAnchorEl, setModelMenuAnchorEl] = React.useState<null | HTMLElement>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [editableTitle, setEditableTitle] = React.useState(chatTitle);
+  const [isSending, setIsSending] = React.useState(false);
   const { mode } = useTheme();
+
+  // 文件上传引用
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
   
   // 创建消息气泡的引用数组 - 移到组件顶层，避免hooks顺序问题
   const messageBubbleRefs = React.useRef<{ [key: string]: React.RefObject<HTMLDivElement> }>({});
@@ -221,6 +246,40 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
       e.preventDefault();
       handleTitleSave();
     }
+  };
+
+  // 文件上传处理
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageButtonClick = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && onFileSelect) {
+      onFileSelect(files);
+    }
+    // 重置 input，允许重复选择相同文件
+    e.target.value = '';
+  };
+
+  // 格式化文件大小
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // 发送按钮点击处理
+  const handleSendClick = () => {
+    setIsSending(true);
+    onSend();
+    setTimeout(() => setIsSending(false), 300);
   };
 
   // 抽屉内容
@@ -549,10 +608,11 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
         </AppBar>
 
         {/* 消息区域 */}
-        <Box sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto', 
+        <Box sx={{
+          flexGrow: 1,
+          overflow: 'auto',
           p: 2,
+          pb: 16, // 为浮动输入框留出空间
           bgcolor: mode === 'light' ? '#f5f5f5' : '#121212',
           display: 'flex',
           flexDirection: 'column'
@@ -605,16 +665,17 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
             )}
             
             {!isLoadingHistory && messages.length === 0 ? (
-              <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
+                mt: 12,
                 opacity: 0.7
               }}>
                 <Typography variant="h4" gutterBottom>
-                  👋 欢迎使用 FimAI Chat
+                  欢迎使用 FimAI Chat
                 </Typography>
                 <Typography variant="body1" textAlign="center">
                   开始一个新的对话，输入您的问题或指令。
@@ -717,50 +778,188 @@ export const MaterialChatLayout: React.FC<MaterialChatLayoutProps> = ({
           </Box>
         </Box>
 
-        {/* 输入区域 */}
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 2,
-            borderTop: '1px solid',
-            borderColor: 'divider'
+        {/* 浮动输入区域 */}
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: '50%',
+            left: '50%',
+            transform: 'translate(-50%, 50%)',
+            width: { xs: 'calc(100% - 32px)', sm: '80%', md: '800px' },
+            maxWidth: '800px',
+            zIndex: 1000,
           }}
         >
-          <Box sx={{ 
-            maxWidth: { xs: '100%', sm: '80%', md: '800px' }, 
-            width: '100%', 
-            mx: 'auto' 
-          }}>
-            <TextField
-              fullWidth
-              placeholder="输入消息..."
-              value={input}
-              onChange={onInputChange}
-              onKeyPress={onKeyPress}
-              disabled={isLoading}
-              multiline
-              maxRows={4}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton 
-                      onClick={onSend} 
-                      disabled={isLoading || !input.trim()}
-                      color="primary"
+          <Paper
+            elevation={8}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              bgcolor: mode === 'light' ? 'grey.400' : '#1e1e1e',
+              border: '1px solid',
+              borderColor: mode === 'light' ? 'grey.500' : 'rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            {/* 附件预览区域 */}
+            {attachments.length > 0 && (
+              <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {attachments.map((file) => (
+                  <Box
+                    key={file.id}
+                    sx={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      p: 1,
+                      bgcolor: mode === 'light' ? 'grey.100' : 'grey.800',
+                      borderRadius: 1,
+                      maxWidth: 200,
+                    }}
+                  >
+                    {file.type.startsWith('image/') && file.preview ? (
+                      <Box
+                        component="img"
+                        src={file.preview}
+                        alt={file.name}
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          objectFit: 'cover',
+                          borderRadius: 0.5,
+                        }}
+                      />
+                    ) : (
+                      <AttachFileIcon fontSize="small" />
+                    )}
+                    <Box sx={{ overflow: 'hidden', flex: 1 }}>
+                      <Typography variant="caption" noWrap sx={{ display: 'block' }}>
+                        {file.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatFileSize(file.size)}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={() => onRemoveAttachment?.(file.id)}
+                      sx={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        bgcolor: 'background.paper',
+                        boxShadow: 1,
+                        '&:hover': { bgcolor: 'error.light', color: 'white' },
+                      }}
                     >
-                      <SendIcon />
+                      <CloseIcon fontSize="small" />
                     </IconButton>
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                }
-              }}
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* 输入区域 */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+              {/* 文本输入框 */}
+              <TextField
+                fullWidth
+                placeholder="输入消息..."
+                value={input}
+                onChange={onInputChange}
+                onKeyPress={onKeyPress}
+                disabled={isLoading}
+                multiline
+                minRows={1}
+                maxRows={10}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end" sx={{ alignSelf: 'flex-end', mb: 0.5, mr: -0.5 }}>
+                      <Tooltip title="上传文件">
+                        <IconButton
+                          size="small"
+                          onClick={handleFileButtonClick}
+                          disabled={isLoading}
+                          sx={{
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                          }}
+                        >
+                          <AttachFileIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="上传图片">
+                        <IconButton
+                          size="small"
+                          onClick={handleImageButtonClick}
+                          disabled={isLoading}
+                          sx={{
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                          }}
+                        >
+                          <ImageIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    bgcolor: mode === 'light' ? 'grey.200' : '#1a1a1a',
+                    '& input::placeholder, & textarea::placeholder': {
+                      color: mode === 'light' ? 'grey.600' : 'grey.500',
+                    },
+                  },
+                }}
+              />
+
+              {/* 发送按钮 */}
+              <Tooltip title="发送">
+                <span>
+                  <IconButton
+                    onClick={handleSendClick}
+                    disabled={isLoading || (!input.trim() && attachments.length === 0)}
+                    sx={{
+                      color: 'white',
+                      width: 40,
+                      height: 40,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                      '&:disabled': { color: 'grey.600' },
+                    }}
+                  >
+                    <ArrowUpwardIcon
+                      sx={{
+                        transition: 'transform 0.3s ease',
+                        transform: isSending ? 'translateY(-8px)' : 'translateY(0)',
+                        opacity: isSending ? 0 : 1,
+                      }}
+                    />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
+
+            {/* 隐藏的文件输入 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              accept="*/*"
             />
-          </Box>
-        </Paper>
+            <input
+              ref={imageInputRef}
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              accept="image/*"
+            />
+          </Paper>
+        </Box>
       </Box>
     </Box>
   );

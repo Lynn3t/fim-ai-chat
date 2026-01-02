@@ -89,7 +89,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     // 尝试从localStorage读取主题偏好
     if (typeof window !== 'undefined') {
       const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
-      
+
       if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
         setMode(savedTheme);
       } else {
@@ -99,6 +99,18 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, []);
+
+  // 同步 HTML 元素的 dark 类，用于 Tailwind dark mode
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const html = document.documentElement;
+      if (mode === 'dark') {
+        html.classList.add('dark');
+      } else {
+        html.classList.remove('dark');
+      }
+    }
+  }, [mode]);
 
   // 主题切换函数
   const toggleTheme = () => {

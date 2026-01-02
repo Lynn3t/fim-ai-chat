@@ -162,6 +162,8 @@ export async function getSystemStats(): Promise<{
     totalCost: number
     todayTokens: number
     todayCost: number
+    totalRequests: number
+    todayRequests: number
   }
   codeUsage: {
     totalInviteCodes: number
@@ -204,13 +206,17 @@ export async function getSystemStats(): Promise<{
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [totalTokenStats, todayTokenStats] = await Promise.all([
+  const [totalTokenStats, todayTokenStats, totalRequestCount, todayRequestCount] = await Promise.all([
     prisma.tokenUsage.aggregate({
       _sum: { totalTokens: true, cost: true },
     }),
     prisma.tokenUsage.aggregate({
       where: { createdAt: { gte: today } },
       _sum: { totalTokens: true, cost: true },
+    }),
+    prisma.tokenUsage.count(),
+    prisma.tokenUsage.count({
+      where: { createdAt: { gte: today } },
     }),
   ])
 
@@ -219,6 +225,8 @@ export async function getSystemStats(): Promise<{
     totalCost: totalTokenStats._sum.cost || 0,
     todayTokens: todayTokenStats._sum.totalTokens || 0,
     todayCost: todayTokenStats._sum.cost || 0,
+    totalRequests: totalRequestCount,
+    todayRequests: todayRequestCount,
   }
 
   // 邀请码和访问码统计
